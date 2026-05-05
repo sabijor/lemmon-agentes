@@ -192,7 +192,7 @@ def _make_confirmacao_callback(ws_conn, event_loop, agent_name: str):
         ctrl = await ws_conn.receive_json()
         return ctrl.get("type") == "confirmar_sim"
 
-    def callback(mensagem: str) -> bool:
+    def callback(mensagem: str = "") -> bool:
         future = asyncio.run_coroutine_threadsafe(_ask(mensagem), event_loop)
         try:
             return future.result(timeout=300)

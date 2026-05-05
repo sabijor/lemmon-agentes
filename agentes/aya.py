@@ -422,25 +422,25 @@ Use `compilar_resumos_lemmon`.
 
         if outputs.get("otto"):
             partes.append(f"## {secao_num}. Otto — Estratégia\n\n")
-            partes.append(outputs["otto"].get("output_humano", "(sem output humano)") + "\n\n")
+            partes.append(str(outputs["otto"].get("output_humano", "(sem output humano)")) + "\n\n")
             partes.append("---\n\n")
             secao_num += 1
 
         if outputs.get("heitor"):
             partes.append(f"## {secao_num}. Heitor — Compliance\n\n")
-            partes.append(outputs["heitor"].get("output_humano", "(sem output humano)") + "\n\n")
+            partes.append(str(outputs["heitor"].get("output_humano", "(sem output humano)")) + "\n\n")
             partes.append("---\n\n")
             secao_num += 1
 
         if outputs.get("salles"):
             partes.append(f"## {secao_num}. Salles — Roteiro\n\n")
-            partes.append(outputs["salles"].get("output_humano", "(sem output humano)") + "\n\n")
+            partes.append(str(outputs["salles"].get("output_humano", "(sem output humano)")) + "\n\n")
             partes.append("---\n\n")
             secao_num += 1
 
         if outputs.get("sonia"):
             partes.append(f"## {secao_num}. Sonia — Performance\n\n")
-            partes.append(outputs["sonia"].get("output_humano", "(sem output humano)") + "\n\n")
+            partes.append(str(outputs["sonia"].get("output_humano", "(sem output humano)")) + "\n\n")
             partes.append("---\n\n")
 
         # RODAPÉ MÍNIMO
