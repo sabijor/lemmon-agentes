@@ -175,6 +175,16 @@ async def _stream(ws: WebSocket, agent: str, text: str):
         await asyncio.sleep(0.06)
 
 
+def _make_on_token(ws_conn, event_loop, agent_name: str):
+    """Retorna callback síncrono que envia tokens de streaming via WS a partir de uma thread."""
+    def on_token(text: str) -> None:
+        asyncio.run_coroutine_threadsafe(
+            ws_conn.send_json({"type": "token", "agent": agent_name, "content": text}),
+            event_loop,
+        )
+    return on_token
+
+
 def _make_confirmacao_callback(ws_conn, event_loop, agent_name: str):
     """Cria callback síncrono que envia aviso via WS e aguarda confirmação do operador."""
     async def _ask(mensagem: str) -> bool:
@@ -521,10 +531,11 @@ async def reuniao(ws: WebSocket):
                     snap_hist = list(historico_anterior)
                     snap_turno = list(respostas_turno)
                     snap_msg = message
+                    on_tok = _make_on_token(ws, loop, name)
                     result = await loop.run_in_executor(
                         None,
-                        lambda ag=ag, h=snap_hist, r=snap_turno, m=snap_msg:
-                            ag.responder(m, h, r or None),
+                        lambda ag=ag, h=snap_hist, r=snap_turno, m=snap_msg, ot=on_tok:
+                            ag.responder(m, h, r or None, on_token=ot),
                     )
                     text = result.get("output_humano", "")
                     cost = result.get("custo_total_usd", 0)
@@ -534,7 +545,7 @@ async def reuniao(ws: WebSocket):
                     reun_custos[name] = reun_custos.get(name, 0) + cost
                     if name not in reun_agentes_vistos:
                         reun_agentes_vistos.append(name)
-                    await _stream(ws, name, text)
+                    # tokens já enviados via on_token durante o stream — sem fake _stream()
                     await ws.send_json({"type": "agent_done", "agent": name, "cost": cost})
                 except Exception as e:
                     await ws.send_json({"type": "agent_error", "agent": name, "error": str(e)})

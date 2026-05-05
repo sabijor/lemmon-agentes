@@ -1,6 +1,7 @@
 """Classe base para todos os agentes Lemmon."""
 import time
 from abc import ABC, abstractmethod
+from typing import Callable
 from anthropic import Anthropic, APIError, AuthenticationError, RateLimitError
 from .config import ANTHROPIC_API_KEY, MODELO_PADRAO, PROMPTS_DIR
 from .custo import Custo
@@ -67,6 +68,46 @@ class AgenteBase(ABC):
 
         return response, custo, duracao
 
+    def _chamar_api_stream(self, mensagens: list, on_token: Callable[[str], None],
+                           tools: list = None, tool_choice: dict = None,
+                           system_override: str = None):
+        """Como _chamar_api, mas chama on_token(text) para cada delta de texto."""
+        params = {
+            "model": self.modelo,
+            "max_tokens": self.max_tokens,
+            "system": system_override or self.system_prompt,
+            "messages": mensagens,
+        }
+        if tools:
+            params["tools"] = tools
+        if tool_choice:
+            params["tool_choice"] = tool_choice
+
+        inicio = time.time()
+        try:
+            with self.client.messages.stream(**params) as stream:
+                for text in stream.text_stream:
+                    on_token(text)
+                response = stream.get_final_message()
+        except AuthenticationError:
+            raise RuntimeError(
+                "Chave da API inválida. Verifique sua ANTHROPIC_API_KEY."
+            )
+        except RateLimitError:
+            raise RuntimeError(
+                "Rate limit atingido. Aguarde alguns segundos e tente novamente."
+            )
+        except APIError as e:
+            raise RuntimeError(f"Erro da API Anthropic: {e}")
+
+        duracao = round(time.time() - inicio, 2)
+        custo = Custo.calcular(
+            response.usage.input_tokens,
+            response.usage.output_tokens
+        )
+        self.logger.info(f"Stream em {duracao}s | {custo.resumo()}")
+        return response, custo, duracao
+
     def _formatar_historico_reuniao(self, historico: list[dict]) -> list[dict]:
         """Converte histórico multi-agente para formato user/assistant da API Anthropic."""
         msgs = []
@@ -86,7 +127,8 @@ class AgenteBase(ABC):
         return msgs
 
     def responder(self, mensagem: str, historico_anterior: list[dict],
-                  respostas_turno: list[dict] | None = None) -> dict:
+                  respostas_turno: list[dict] | None = None,
+                  on_token: Callable[[str], None] | None = None) -> dict:
         """Responde conversacionalmente em modo reunião. Sem tool use forçado."""
         msgs = self._formatar_historico_reuniao(historico_anterior)
 
@@ -101,9 +143,14 @@ class AgenteBase(ABC):
 
         msgs.append({"role": "user", "content": conteudo})
 
-        resp, custo, duracao = self._chamar_api(
-            msgs, system_override=self.system_prompt_reuniao or None
-        )
+        if on_token is not None:
+            resp, custo, duracao = self._chamar_api_stream(
+                msgs, on_token, system_override=self.system_prompt_reuniao or None
+            )
+        else:
+            resp, custo, duracao = self._chamar_api(
+                msgs, system_override=self.system_prompt_reuniao or None
+            )
         texto = next((b.text for b in resp.content if hasattr(b, "text")), "")
         return {"output_humano": texto, "custo_total_usd": custo.custo_usd, "duracao": duracao}
 
