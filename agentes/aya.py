@@ -212,7 +212,8 @@ class Aya(AgenteBase):
         outputs = {}
 
         for agente in AYA_AGENTES_PADRAO:
-            if outputs_diretos and agente in outputs_diretos:
+            if outputs_diretos is not None and agente in outputs_diretos:
+                # None = ausente nesta sessão; pula busca no disco
                 outputs[agente] = outputs_diretos[agente]
                 continue
 

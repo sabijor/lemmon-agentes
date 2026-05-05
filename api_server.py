@@ -46,7 +46,7 @@ def _salvar_sessao_reuniao(
 
     if session_path and session_path.exists():
         registro = json.loads(session_path.read_text(encoding="utf-8"))
-        registro["agentes_usados"] = list(set(agentes_usados))
+        registro["agentes_usados"] = list(dict.fromkeys(agentes_usados))
         registro["respostas"] = respostas
         registro["custos_usd"] = custos
         registro["custo_total_usd"] = sum(custos.values())
@@ -357,33 +357,31 @@ async def chat(ws: WebSocket):
                 elif name == "aya":
                     ag = Aya()
                     nome_projeto = briefing[:60] if briefing else None
-                    snap_outputs: dict[str, dict] = {}
-                    if analise_otto is not None:
-                        snap_outputs["otto"] = {
+                    # Sempre passa os 4 agentes; None = ausente nesta sessão
+                    # (Aya não vai buscar no disco para os ausentes)
+                    snap_outputs: dict[str, dict | None] = {
+                        "otto": {
                             "output_humano": respostas.get("otto", ""),
                             "output_tecnico": analise_otto,
-                        }
-                    if diretrizes_heitor:
-                        snap_outputs["heitor"] = {
-                            "output_humano": diretrizes_heitor,
-                            "output_tecnico": {},
-                        }
-                    if roteiro_salles:
-                        snap_outputs["salles"] = {
+                        } if analise_otto is not None else None,
+                        "heitor": {
+                            "output_humano": respostas.get("heitor", ""),
+                            "output_tecnico": diretrizes_heitor or {},
+                        } if diretrizes_heitor else None,
+                        "salles": {
                             "output_humano": roteiro_salles,
                             "output_tecnico": {},
-                        }
-                    if "sonia" in respostas:
-                        snap_outputs["sonia"] = {
-                            "output_humano": respostas["sonia"],
+                        } if roteiro_salles else None,
+                        "sonia": {
+                            "output_humano": respostas.get("sonia", ""),
                             "output_tecnico": {},
-                        }
-                    snap_op = snap_outputs or None
+                        } if "sonia" in respostas else None,
+                    }
                     res = await loop.run_in_executor(
                         None,
                         lambda: ag.executar(
                             nome_projeto=nome_projeto,
-                            outputs_diretos=snap_op,
+                            outputs_diretos=snap_outputs,
                         ),
                     )
                     return res.get("output_humano", ""), res.get("custo_total_usd", 0)
