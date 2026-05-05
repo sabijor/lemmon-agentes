@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uvicorn api_server:app --reload --port 8000)",
+      "Bash(npm run *)",
+      "Bash(curl -s http://localhost:3000)",
+      "Bash(curl -s http://localhost:8000/docs)",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('api_server.py'\\).read\\(\\)\\); print\\('OK'\\)\")",
+      "Bash(git init *)",
+      "Bash(git add *)"
+    ]
+  }
+}

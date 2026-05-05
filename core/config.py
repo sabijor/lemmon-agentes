@@ -1,0 +1,152 @@
+"""Configuração centralizada do sistema Lemmon."""
+import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# Paths
+BASE_DIR = Path(__file__).parent.parent
+PROMPTS_DIR = BASE_DIR / "prompts"
+OUTPUTS_DIR = BASE_DIR / "outputs"
+HISTORICO_DIR = BASE_DIR / "historico"
+INPUTS_DIR = BASE_DIR / "inputs"
+
+# API
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
+MODELO_PADRAO = os.getenv("LEMMON_MODELO_PADRAO", "claude-sonnet-4-6")
+
+# Custos (USD por 1M tokens) — Sonnet 4.6
+CUSTO_INPUT_USD_POR_MILHAO = 3.00
+CUSTO_OUTPUT_USD_POR_MILHAO = 15.00
+
+# Validação de input
+BRIEFING_MIN_CARACTERES = 50
+BRIEFING_MAX_CARACTERES = 15000
+
+# Logging
+LOG_LEVEL = os.getenv("LEMMON_LOG_LEVEL", "INFO")
+
+# ============================================================================
+# LIMITES DO HEITOR (COMPLIANCE)
+# ============================================================================
+
+# Número padrão de buscas web por execução
+HEITOR_MAX_BUSCAS_DEFAULT = 3
+
+# Número de buscas em modo profundo (--profundo)
+HEITOR_MAX_BUSCAS_PROFUNDO = 6
+
+# Faixa de custo previsto por execução (pra estimativa pré-execução)
+HEITOR_PREVISAO_RANGE_USD = (0.20, 0.40)
+
+# Threshold de aviso amarelo durante execução
+HEITOR_AVISO_AMARELO_USD = 0.50
+
+# Threshold pra pedir confirmação antes de executar
+# (None = nunca pede; valor = pede se previsão > esse valor)
+HEITOR_PEDIR_CONFIRMACAO_ACIMA_USD = 0.50
+
+# Threshold de aviso vermelho pós-execução
+HEITOR_AVISO_VERMELHO_USD = 0.70
+
+# Domínios oficiais permitidos pra busca
+HEITOR_DOMINIOS_OFICIAIS = [
+    # Meta oficial
+    "transparency.meta.com",
+    "transparency.fb.com",
+    "facebook.com",
+    "business.facebook.com",
+    "help.instagram.com",
+    "about.fb.com",
+    # Órgãos brasileiros
+    "gov.br",
+    "anvisa.gov.br",
+    "consultas.anvisa.gov.br",
+    "conar.org.br",
+    "portal.cfm.org.br",
+    "cfm.org.br",
+    "cfo.org.br",
+    "cro.org.br",
+    "crmsp.org.br",
+    "crmrj.org.br",
+    "cfn.org.br",
+    "cff.org.br",
+    "crfsp.org.br",    "cfp.org.br",
+    "cfbio.gov.br",
+    "coffito.gov.br",
+]
+
+# ============================================================================
+# LIMITES DA SONIA (PERFORMANCE)
+# ============================================================================
+
+# Web search é opt-in
+SONIA_WEB_SEARCH_DEFAULT = False
+
+# Buscas
+SONIA_MAX_BUSCAS_DEFAULT = 3
+SONIA_MAX_BUSCAS_PROFUNDO = 5
+
+# Faixa de custo previsto
+SONIA_PREVISAO_RANGE_USD_SEM_BUSCA = (0.15, 0.25)
+SONIA_PREVISAO_RANGE_USD_COM_BUSCA = (0.30, 0.50)
+
+# Thresholds de aviso
+SONIA_AVISO_AMARELO_USD = 0.40
+SONIA_PEDIR_CONFIRMACAO_ACIMA_USD = 0.40
+SONIA_AVISO_VERMELHO_USD = 0.65
+
+# Cortes (Sonia decide quantos, dentro desses limites)
+SONIA_CORTES_MIN = 1
+SONIA_CORTES_MAX = 6
+
+# Limites de tamanho (proteção contra prompt gigante)
+SONIA_TENDENCIAS_MAX_CHARS = 8000
+SONIA_ROTEIRO_MAX_CHARS = 30000
+SONIA_HEITOR_CONTEXTO_MAX_TERMOS = 30  # trunca lista de termos do Heitor
+
+# Threshold pra aviso de pipeline caro (somando todos os agentes)
+PIPELINE_AVISO_CUSTO_TOTAL_USD = 1.00
+
+# Domínios pra busca da Sonia
+# IMPORTANTE: lista CONSERVADORA. Anthropic confirmadamente bloqueia jornais
+# (estadao, valor, g1). Outros sites de marketing podem falhar — se acontecer,
+# operador remove da lista.
+SONIA_DOMINIOS_OFICIAIS = [
+    # Meta oficial (sempre funciona)
+    "transparency.meta.com",
+    "transparency.fb.com",
+    "facebook.com",
+    "business.facebook.com",
+    "help.instagram.com",
+    "about.fb.com",
+    "developers.facebook.com",
+    "creators.facebook.com",
+    "creators.instagram.com",
+    # Análise de marketing (testar antes — pode falhar)
+    "socialmediatoday.com",
+    "buffer.com",
+    "later.com",
+    "hubspot.com",
+    "sproutsocial.com",
+]
+
+# ============================================================================
+# LIMITES DA AYA (ASSISTENTE VIRTUAL — COMPILADORA)
+# ============================================================================
+
+AYA_PREVISAO_RANGE_USD = (0.05, 0.20)
+AYA_AVISO_AMARELO_USD = 0.25
+AYA_AVISO_VERMELHO_USD = 0.40
+AYA_PEDIR_CONFIRMACAO_ACIMA_USD = None
+
+# Limites de tamanho
+AYA_OUTPUT_AGENTE_MAX_CHARS = 15000
+AYA_DOSSIE_MAX_CHARS_TOTAL = 100000
+
+# Agentes que Aya tenta detectar (em ordem de aparição no dossiê)
+AYA_AGENTES_PADRAO = ["otto", "heitor", "salles", "sonia"]
+
+# Tamanho do resumo de cada agente na página 1 (chars máximos)
+AYA_RESUMO_AGENTE_MAX_CHARS = 400
