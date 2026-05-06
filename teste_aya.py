@@ -47,6 +47,30 @@ def main():
         encoding="utf-8"
     )
 
+    # ===== EXPORT v1.1: HTML + PDF =====
+    from core.exportador_aya import exportar_dossie
+    from core.config import AYA_GERAR_HTML, AYA_GERAR_PDF, AYA_PDF_ENGINE
+
+    print("\n📤 Exportando HTML + PDF (design system AURA)...")
+
+    export_resultado = exportar_dossie(
+        markdown_original=resultado["output_humano"],
+        caminho_md=arquivo_md,
+        agentes_consultados=resultado["agentes_detectados"],
+        gerar_html=AYA_GERAR_HTML,
+        gerar_pdf=AYA_GERAR_PDF,
+        pdf_engine=AYA_PDF_ENGINE,
+    )
+
+    if export_resultado["html_gerado"]:
+        print(f"🌐 HTML:     {export_resultado['caminho_html']}")
+    if export_resultado["pdf_gerado"]:
+        print(f"📕 PDF:      {export_resultado['caminho_pdf']}")
+    if export_resultado["erros"]:
+        print(f"\n⚠️  Avisos de export:")
+        for erro in export_resultado["erros"]:
+            print(f"   - {erro}")
+
     print("=" * 60)
     print("DOSSIÊ COMPILADO")
     print("=" * 60)
