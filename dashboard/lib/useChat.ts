@@ -66,6 +66,9 @@ export function useChat() {
   const [tagsSugeridas, setTagsSugeridas] = useState<string[]>([])
   const [fastTrack, setFastTrack] = useState(false)
   const [sandbox, setSandbox] = useState(false)
+  const [custoCap, setCustoCap] = useState<number | null>(null)
+  const [custoCapAtingido, setCustoCapAtingido] = useState<{ total: number; cap: number } | null>(null)
+  const [custoAviso, setCustoAviso] = useState<{ total: number; cap: number; pct: number } | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
   const currentMsgId = useRef<Record<string, string>>({})
   const resumeContextRef = useRef<Record<string, unknown> | null>(null)
@@ -114,6 +117,8 @@ export function useChat() {
     setAvaliado(false)
     setAwaitingApproval(null)
     setTagsSugeridas([])
+    setCustoCapAtingido(null)
+    setCustoAviso(null)
 
     const userId = crypto.randomUUID()
     setMessages(prev => [...prev, { id: userId, role: 'user', content: userMessage, done: true, hasImage: !!image }])
@@ -136,6 +141,7 @@ export function useChat() {
       manual_mode: manualMode,
       fast_track: fastTrack,
       sandbox,
+      custo_cap_usd: custoCap ?? undefined,
       config: agentConfig,
       ...(resumeCtx && { resume_context: resumeCtx }),
       ...(image && { image_base64: image.base64, image_media_type: image.mediaType }),
@@ -192,6 +198,22 @@ export function useChat() {
         setAwaitingApproval({ agent: data.agent, mode: 'confirmar', mensagem: data.mensagem })
       }
 
+      if (data.type === 'routing_condicional') {
+        // T29: show as system message
+        const msgId = crypto.randomUUID()
+        setMessages(prev => [...prev, { id: msgId, role: 'aya' as AgentId, content: data.mensagem, done: true }])
+      }
+
+      if (data.type === 'custo_aviso') {
+        // T30: low warning
+        setCustoAviso({ total: data.total_atual, cap: data.cap, pct: data.pct })
+      }
+
+      if (data.type === 'custo_cap_atingido') {
+        // T30: cap hit — show block dialog
+        setCustoCapAtingido({ total: data.total_atual, cap: data.cap })
+      }
+
       if (data.type === 'tags_sugeridas') {
         setTagsSugeridas(data.tags ?? [])
       }
@@ -232,6 +254,16 @@ export function useChat() {
   const toggleManualMode = useCallback(() => setManualMode(v => !v), [])
   const toggleFastTrack = useCallback(() => setFastTrack(v => !v), [])
   const toggleSandbox = useCallback(() => setSandbox(v => !v), [])
+  const autorizarCusto = useCallback((valor: number) => {
+    wsRef.current?.send(JSON.stringify({ type: 'autorizar_custo', valor }))
+    setCustoCapAtingido(null)
+    setCustoAviso(null)
+  }, [])
+  const recusarCustoExtra = useCallback(() => {
+    wsRef.current?.send(JSON.stringify({ type: 'cancel' }))
+    setCustoCapAtingido(null)
+    setIsRunning(false)
+  }, [])
 
   const avaliar = useCallback(async (nota: number, observacoes = '', tags?: string[]) => {
     if (!sessionId || avaliado) return
@@ -283,13 +315,18 @@ export function useChat() {
     setAwaitingApproval(null)
     setResumedFrom(null)
     setTagsSugeridas([])
+    setCustoCapAtingido(null)
+    setCustoAviso(null)
     resumeContextRef.current = null
     currentMsgId.current = {}
   }, [])
 
   return {
     messages, agentStatus, isRunning, sessionId, avaliado, resumedFrom,
-    manualMode, fastTrack, sandbox, awaitingApproval, agentConfig, tagsSugeridas,
-    send, approve, abort, toggleManualMode, toggleFastTrack, toggleSandbox, updateConfig, avaliar, exportar, reset, loadSession,
+    manualMode, fastTrack, sandbox, custoCap, custoCapAtingido, custoAviso,
+    awaitingApproval, agentConfig, tagsSugeridas,
+    send, approve, abort, toggleManualMode, toggleFastTrack, toggleSandbox,
+    setCustoCap, autorizarCusto, recusarCustoExtra,
+    updateConfig, avaliar, exportar, reset, loadSession,
   }
 }
