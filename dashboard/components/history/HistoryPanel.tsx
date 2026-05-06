@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { motion, type DragControls } from 'framer-motion'
 import { AGENT_MAP } from '@/lib/agents'
 import { type HistoryItem, type HistoryDetail } from '@/lib/useHistory'
+import { API_URL } from '@/lib/api'
 import CharacterSprite from '../office/CharacterSprite'
 
 const HEADER_H = 52
@@ -126,6 +127,25 @@ function SessionDetail({ detail, loadingDetail, bodyH, onBack, onResume }: {
 }) {
   const bottomRef = useRef<HTMLDivElement>(null)
   const [briefingExpanded, setBriefingExpanded] = useState(false)
+  const [exemplaresMarked, setExemplaresMarked] = useState<Record<string, boolean>>({})
+
+  const marcarExemplar = async (agentId: string, trecho: string) => {
+    if (!detail) return
+    const key = `${detail.session_id}-${agentId}`
+    try {
+      await fetch(`${API_URL}/exemplares`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          agente: agentId,
+          trecho,
+          contexto: detail.briefing?.slice(0, 200) ?? '',
+          session_id: detail.session_id,
+        }),
+      })
+      setExemplaresMarked(prev => ({ ...prev, [key]: true }))
+    } catch {}
+  }
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -277,7 +297,20 @@ function SessionDetail({ detail, loadingDetail, bodyH, onBack, onResume }: {
                     </span>
                     <span className="text-[8px] font-mono text-stone-400">{agent.title}</span>
                     {cost !== undefined && cost > 0 && (
-                      <span className="text-[8px] font-mono text-stone-300 ml-auto">${cost.toFixed(5)}</span>
+                      <span className="text-[8px] font-mono text-stone-300">${cost.toFixed(5)}</span>
+                    )}
+                    {detail.avaliacao === 5 && (
+                      <button
+                        onClick={() => marcarExemplar(agentId, text)}
+                        className={`ml-auto text-[8px] font-mono px-2 py-0.5 rounded-full border transition-all ${
+                          exemplaresMarked[`${detail.session_id}-${agentId}`]
+                            ? 'bg-amber-100 border-amber-300 text-amber-700 cursor-default'
+                            : 'bg-white border-stone-200 text-stone-400 hover:border-amber-300 hover:text-amber-600'
+                        }`}
+                        disabled={!!exemplaresMarked[`${detail.session_id}-${agentId}`]}
+                      >
+                        {exemplaresMarked[`${detail.session_id}-${agentId}`] ? '⭐ marcado' : '☆ exemplar'}
+                      </button>
                     )}
                   </div>
                   <div className="rounded-2xl rounded-tl-sm px-4 py-3 border"

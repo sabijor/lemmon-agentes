@@ -5,6 +5,7 @@ from typing import Callable
 from anthropic import Anthropic, APIError, AuthenticationError, RateLimitError
 from .config import ANTHROPIC_API_KEY, MODELO_PADRAO, PROMPTS_DIR
 from .custo import Custo
+from .exemplares import formatar_exemplares_para_prompt
 from .historico import Historico
 from .logger import get_logger
 
@@ -25,6 +26,9 @@ class AgenteBase(ABC):
         self.logger = get_logger(f"lemmon.{self.nome}")
         self.historico = Historico(self.nome)
         self.system_prompt = self._carregar_prompt()
+        exemplares = formatar_exemplares_para_prompt(self.nome)
+        if exemplares:
+            self.system_prompt += exemplares
 
     def _carregar_prompt(self) -> str:
         arquivo = PROMPTS_DIR / f"{self.nome}_system_{self.versao_prompt}.md"

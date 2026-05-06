@@ -25,6 +25,7 @@ from agentes.pedro_abrahao import PedroAbrahao
 from core.config import HISTORICO_DIR, OUTPUTS_DIR, AYA_GERAR_HTML, AYA_GERAR_PDF, AYA_PDF_ENGINE
 from core.exportador_aya import exportar_dossie
 from core.discussao import construir_prompt_questionamento_mesa, construir_prompt_ata_mesa
+from core.exemplares import salvar_exemplar, carregar_exemplares, remover_exemplar
 
 app = FastAPI(title="Lemmon Dashboard API")
 app.add_middleware(
@@ -218,6 +219,32 @@ async def download_arquivo(session_id: str, tipo: str):
     if not path.exists():
         raise HTTPException(status_code=404, detail="Arquivo não encontrado. Exporte primeiro.")
     return FileResponse(path, media_type=media_type, filename=path.name)
+
+
+class ExemplarPayload(BaseModel):
+    agente: str
+    trecho: str
+    contexto: str = ""
+    session_id: str = ""
+
+
+@app.post("/exemplares")
+async def criar_exemplar(payload: ExemplarPayload):
+    entrada = salvar_exemplar(payload.agente, payload.trecho, payload.contexto, payload.session_id)
+    return {"ok": True, "exemplar": entrada}
+
+
+@app.get("/exemplares/{agente}")
+async def listar_exemplares(agente: str):
+    return carregar_exemplares(agente)
+
+
+@app.delete("/exemplares/{agente}/{exemplar_id}")
+async def deletar_exemplar(agente: str, exemplar_id: str):
+    ok = remover_exemplar(agente, exemplar_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Exemplar não encontrado")
+    return {"ok": True}
 
 
 @app.post("/avaliar")
