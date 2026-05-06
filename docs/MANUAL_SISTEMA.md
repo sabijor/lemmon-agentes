@@ -1,6 +1,6 @@
 # LEMMON AGENTES — Manual do Sistema
 
-**Versão atual:** v1.2
+**Versão atual:** v1.3
 **Última atualização:** 2026-05-06
 **Mantido por:** Calebe Alves / Lemmon Produções
 
@@ -11,6 +11,20 @@
 ## Histórico de versões
 
 > **Convenção:** versões mais novas no topo. Cada release lista o que mudou em relação à anterior, mantendo histórico completo.
+
+### v1.3 — 2026-05-06
+
+**Épico C — Memória institucional e saúde do sistema.**
+
+- **Pulse semanal (T11):** Script `scripts/pulse_semanal.py` gera relatório semanal em markdown — sessões, custos, tendências e análise narrativa por Aya. Rodável via cron ou manualmente: `python scripts/pulse_semanal.py --semana 2026-W18`. Output em `outputs/pulse/`.
+- **Few-shot curado (T12):** Sessões 5⭐ podem ter trechos marcados como exemplares. Botão `☆ exemplar` aparece em cada resposta de agente nas sessões 5-estrelas do histórico. Exemplares são salvos em `core/exemplares/<agente>.json` e injetados automaticamente no `system_prompt` de cada agente. Endpoints: `POST /exemplares`, `GET /exemplares/{agente}`, `DELETE /exemplares/{agente}/{id}`.
+- **Busca semântica (T13):** Antes de enviar um briefing, botão "🔍 ver referências similares" (aparece quando input > 20 chars, modo pipeline) busca sessões passadas com briefings similares por TF-IDF de tokens. Endpoint `GET /historico/similar?briefing=...&n=3`.
+- **Hall of Fame (T14):** Página `/hall-of-fame` lista todas as sessões 5⭐ em grid de cards com briefing, agentes, custo e filtros por período e agente. Acessível pelo ícone 🏆 no header.
+- **Tags semi-automáticas (T15):** Ao fim de todo pipeline, Haiku sugere automaticamente 3-5 tags descritivas. Chips aparecem na sessão; o operador pode remover tags indesejadas (× em cada chip). Tags aceitas são salvas com a avaliação via `POST /tags`. Endpoint `POST /tags` também disponível para salvar tags sem nota.
+- **Dashboard de saúde (T16):** Página `/saude` com KPIs do sistema: sessões totais, custo total e médio, taxa de avaliação, taxa 5⭐; bar charts CSS de sessões e custo por mês (últimos 6); horizontal bars de uso por agente. Acessível pelo ícone de atividade no header.
+- **Histórico filtrável (T17):** FilterBar no painel de histórico com filtros por período (7/30/90 dias), origem (dashboard/reunião), agente envolvido, e nota mínima (inclui opção "sem avaliação"). Contador no cabeçalho mostra `filtradas/total` quando filtro ativo. Botão "limpar (N)" reseta tudo.
+
+---
 
 ### v1.2 — 2026-05-06
 
@@ -296,13 +310,29 @@ Painel flutuante, ícone de relógio no header geral. Lista as 200 sessões mais
 
 **Detalhe da sessão.** Click → painel abre detalhe completo, incluindo respostas por agente, custos individuais, e — para reuniões — o histórico cronológico dos turnos.
 
-**Filtros.** Hoje não há filtros (planejado em T17 do Épico C).
+**Filtros (T17).** FilterBar acima da lista: período (7/30/90 dias), origem (dashboard/reunião), agente envolvido, e nota mínima. Contador `filtradas/total` no cabeçalho quando filtro ativo.
 
-## 4.5 Painéis flutuantes
+## 4.5 Hall of Fame
+
+Página `/hall-of-fame` (ícone 🏆 no header). Grid de cards com todas as sessões 5⭐. Filtros por período e por agente. Útil para mostrar ao cliente o tipo de trabalho que o sistema produz, ou para inspiração antes de uma nova sessão.
+
+## 4.6 Dashboard de saúde
+
+Página `/saude` (ícone de atividade no header). KPIs: sessões totais, custo total e médio, taxa de avaliação e taxa 5⭐. Bar charts de sessões e custo por mês (últimos 6). Horizontal bars de uso por agente com percentual.
+
+## 4.7 Referências similares (busca semântica)
+
+No modo pipeline, quando o campo de input tem mais de 20 caracteres, aparece o botão "🔍 ver referências similares". Clicando, o sistema busca sessões passadas com briefings semanticamente próximos (TF-IDF de tokens pt-BR). Retorna até 3 resultados com briefing truncado, avaliação e score de similaridade.
+
+## 4.8 Tags sugeridas
+
+Ao fim de cada pipeline, Haiku gera automaticamente 3-5 tags descritivas. Aparecem como chips logo acima do bloco de avaliação. Clique × em qualquer chip para dispensar a tag — a lista restante é salva imediatamente. As tags aceitas também são incluídas quando você avalia com estrelas.
+
+## 4.9 Painéis flutuantes
 
 Tanto o ChatPanel quanto o HistoryPanel são arrastáveis (drag pelo header) e redimensionáveis (handles nas bordas). Posições persistem na sessão atual; resetam ao recarregar.
 
-## 4.6 Escritório virtual
+## 4.10 Escritório virtual
 
 Cena RPG com sprites dos agentes em mesas. Quando você convoca um agente, ele caminha da mesa para a sala de reunião. Status físico (idle, thinking, speaking, done, error) reflete em cor e animação. Idle quotes aparecem em bolas de fala periodicamente.
 
@@ -356,7 +386,16 @@ python pedro_cli.py "como você responderia se uma paciente perguntasse X"
 python pedro_cli.py inputs/pergunta.txt --modo validacao --contexto outputs/salles/roteiro.md
 ```
 
-## 5.7 Pipeline completo
+## 5.7 Pulse semanal
+
+```bash
+python scripts/pulse_semanal.py                     # semana atual
+python scripts/pulse_semanal.py --semana 2026-W18   # semana específica
+python scripts/pulse_semanal.py --dias 14            # últimos 14 dias
+python scripts/pulse_semanal.py --dry-run            # só mostra contexto, sem chamar API
+```
+
+## 5.8 Pipeline completo
 
 ```
 python pipeline_completo.py inputs/briefing.txt
@@ -365,6 +404,10 @@ python pipeline_completo.py inputs/briefing.txt --profundo --busca-sonia --com-a
 ```
 
 Flags úteis: `--sem-heitor`, `--sem-sonia`, `--no-confirm`, `--profundo`, `--sonia-profundo`, `--nome-projeto "X"`.
+
+## 5.9 Exemplares (few-shot curado)
+
+Gerenciado pelo endpoint `/exemplares`, mas também pode ser inspecionado direto em `core/exemplares/<agente>.json`. Para remover um exemplar problemático: `DELETE /exemplares/{agente}/{id}` via curl ou via código. O limite é 10 exemplares por agente; os 3 mais recentes são injetados no system_prompt.
 
 ---
 
@@ -437,11 +480,11 @@ done
 
 O `PLANO_ACAO_2026-05-05.md` na raiz do projeto contém o plano completo com 9 épicos e 39 tarefas. Resumo do que está no horizonte:
 
-**Próximos passos imediatos.** ~~Família de espelhos de cliente~~ ✅ (v1.1), ~~Pedro como gate de qualidade~~ ✅ (v1.2), Pulse semanal automatizado (relatório institucional toda segunda).
+**Próximos passos imediatos.** ~~Família de espelhos de cliente~~ ✅ (v1.1), ~~Pedro como gate de qualidade~~ ✅ (v1.2), ~~Memória institucional e saúde~~ ✅ (v1.3). Próximo: Épico E — workflows avançados (remix, briefing reverso, A/B, cortes-prontos, fast-track, lab).
 
-**Médio prazo.** Novos agentes (Marcia/pós-produção, Felipe/concorrente, Renata/distribuição, Lia/voz Lemmon). Workflows novos (modo remix, briefing reverso, comparativo A/B no Salles, cortes-prontos).
+**Médio prazo.** Novos agentes (Marcia/pós-produção, Felipe/concorrente, Renata/distribuição, Lia/voz Lemmon). Roteamento condicional baseado em Heitor. Custo-cap por sessão.
 
-**Aprendizado.** Few-shot curado de sessões 5⭐, busca semântica no histórico, Hall of Fame compartilhável, tags semi-automáticas, dashboard de saúde do sistema.
+**Sugeridor de pipeline.** Heitor ou Otto podem sugerir a sequência ideal de agentes baseado no tipo de projeto detectado no briefing.
 
 **Camada visual.** Whiteboards que se preenchem em tempo real, sprites com status físico mais expressivo, mesa de reunião com mic destacado, salas customizáveis por cliente.
 
