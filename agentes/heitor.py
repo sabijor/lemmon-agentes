@@ -7,13 +7,9 @@ Arquitetura: 3 chamadas separadas à API
 
 Sistema de avisos em 3 camadas (pré, durante, pós-execução).
 """
-import time
 import json as _json
 from typing import Optional
-from anthropic import APIError, AuthenticationError, RateLimitError
-
 from core.agente_base import AgenteBase
-from core.custo import Custo
 from core.web_search_helper import (
     construir_tool_web_search_oficial,
     construir_tool_web_search_amplo,
@@ -347,23 +343,10 @@ as suas observações, fontes consultadas e classificações.
         else:
             tool = construir_tool_web_search_oficial(max_buscas)
 
-        inicio = time.time()
-        try:
-            response = self.client.messages.create(
-                model=self.modelo,
-                max_tokens=self.max_tokens,
-                system=self.system_prompt,
-                messages=[{"role": "user", "content": prompt}],
-                tools=[tool],
-            )
-        except AuthenticationError:
-            raise RuntimeError("Chave API inválida.")
-        except RateLimitError as e:
-            raise RuntimeError(f"Rate limit atingido na Chamada 1: {e}")
-        except APIError as e:
-            raise RuntimeError(f"Erro API na Chamada 1: {e}")
-
-        duracao = round(time.time() - inicio, 2)
+        response, custo_obj, duracao = self._chamar_api(
+            [{"role": "user", "content": prompt}],
+            tools=[tool],
+        )
 
         analise_texto = extrair_texto_raciocinio(response.content)
         if not analise_texto.strip():
@@ -374,13 +357,8 @@ as suas observações, fontes consultadas e classificações.
 
         fontes = extrair_fontes_consultadas(response.content)
         buscas = contar_buscas_realizadas(response.usage)
-
-        custo = Custo.calcular(
-            response.usage.input_tokens,
-            response.usage.output_tokens
-        )
         custo_buscas = buscas * 0.01
-        custo_total = custo.custo_usd + custo_buscas
+        custo_total = custo_obj.custo_usd + custo_buscas
 
         self.logger.info(
             f"Chamada 1 em {duracao}s | {response.usage.input_tokens} in / "
@@ -439,20 +417,11 @@ INSTRUÇÕES:
 Use a ferramenta `registrar_analise_compliance`.
 """
 
-        try:
-            response = self.client.messages.create(
-                model=self.modelo,
-                max_tokens=self.max_tokens,
-                system=self.system_prompt,
-                messages=[{"role": "user", "content": prompt}],
-                tools=[FERRAMENTA_ANALISE_HEITOR],
-                tool_choice={
-                    "type": "tool",
-                    "name": "registrar_analise_compliance"
-                }
-            )
-        except APIError as e:
-            raise RuntimeError(f"Erro API na Chamada 2: {e}")
+        response, custo_obj, _ = self._chamar_api(
+            [{"role": "user", "content": prompt}],
+            tools=[FERRAMENTA_ANALISE_HEITOR],
+            tool_choice={"type": "tool", "name": "registrar_analise_compliance"},
+        )
 
         analise_json = None
         for bloco in response.content:
@@ -463,13 +432,7 @@ Use a ferramenta `registrar_analise_compliance`.
         if analise_json is None:
             raise RuntimeError("Heitor Chamada 2 não retornou tool_use estruturado.")
 
-        custo = Custo.calcular(
-            response.usage.input_tokens,
-            response.usage.output_tokens
-        )
-        self.logger.info(f"Chamada 2 | {custo.resumo()}")
-
-        return analise_json, custo.custo_usd
+        return analise_json, custo_obj.custo_usd
 
     def _chamada_3_formatar(self, analise_json, modo_saida):
         """Chamada 3: formata em markdown via tool_choice forçado."""
@@ -513,20 +476,11 @@ DIRETRIZES DE FORMATAÇÃO:
 Use a ferramenta `formatar_analise_heitor`.
 """
 
-        try:
-            response = self.client.messages.create(
-                model=self.modelo,
-                max_tokens=self.max_tokens,
-                system=self.system_prompt,
-                messages=[{"role": "user", "content": prompt}],
-                tools=[FERRAMENTA_FORMATACAO_HEITOR],
-                tool_choice={
-                    "type": "tool",
-                    "name": "formatar_analise_heitor"
-                }
-            )
-        except APIError as e:
-            raise RuntimeError(f"Erro API na Chamada 3: {e}")
+        response, custo_obj, _ = self._chamar_api(
+            [{"role": "user", "content": prompt}],
+            tools=[FERRAMENTA_FORMATACAO_HEITOR],
+            tool_choice={"type": "tool", "name": "formatar_analise_heitor"},
+        )
 
         output_humano = None
         for bloco in response.content:
@@ -537,10 +491,4 @@ Use a ferramenta `formatar_analise_heitor`.
         if not output_humano:
             raise RuntimeError("Heitor Chamada 3 não retornou output_humano.")
 
-        custo = Custo.calcular(
-            response.usage.input_tokens,
-            response.usage.output_tokens
-        )
-        self.logger.info(f"Chamada 3 | {custo.resumo()}")
-
-        return output_humano, custo.custo_usd
+        return output_humano, custo_obj.custo_usd
