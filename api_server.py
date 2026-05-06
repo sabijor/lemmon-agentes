@@ -466,6 +466,12 @@ async def criar_share(payload: SharePayload):
     return {"token": token}
 
 
+@app.get("/share/{token}.json")
+async def ver_share_json(token: str):
+    """T50: Endpoint JSON puro para página Next.js renderizar com branding Lemmon."""
+    return _load_share(token)
+
+
 @app.get("/share/{token}", response_class=HTMLResponse)
 async def ver_share(token: str):
     """T36: Página pública de aprovação — dossiê limpo sem custos/técnico."""
