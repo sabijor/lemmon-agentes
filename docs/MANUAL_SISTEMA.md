@@ -1,6 +1,6 @@
 # LEMMON AGENTES — Manual do Sistema
 
-**Versão atual:** v1.9
+**Versão atual:** v1.11
 **Última atualização:** 2026-05-06
 **Mantido por:** Calebe Alves / Lemmon Produções
 
@@ -11,6 +11,25 @@
 ## Histórico de versões
 
 > **Convenção:** versões mais novas no topo. Cada release lista o que mudou em relação à anterior, mantendo histórico completo.
+
+### v1.11 — 2026-05-06
+
+**FASE 4 — T51+T54+T55: menções, URL e tags.**
+
+- **Alias `@pedro` em reunião (T51):** `_parse_mentions` agora usa `AGENTE_ALIAS` dict para casar nome curto com id composto. `@pedro` aciona Pedro Abrahão; `@pedro_abrahao` (id completo) também funciona. Adicionar aliases novos em `AGENTE_ALIAS` ao onboar novos clientes espelho.
+- **URL `/cortes` verificada (T54):** Rota existe, build confirma HTTP 200, link do header ✂️ abre a página sem 404. O 404 visto no teste E2E era de estado anterior. Verificado em 2026-05-06.
+- **Tags com log e fallback heurístico (T55):** Bloco de tags substitui `except: pass` por `_log.warning` com tipo e mensagem (visível nos logs do uvicorn). Fallback heurístico: quando Haiku falha, extrai 3 palavras mais frequentes do briefing (filtradas por stopwords pt-BR) e envia como chips com prefixo `auto:`. Evento `tags_sugeridas_falhou` enviado para rastreamento. Feature degrada graciosamente: operador sempre recebe algum sinal.
+
+---
+
+### v1.10 — 2026-05-06
+
+**FASE 4 — T52+T53: erros Anthropic legíveis (bloco crítico sistêmico).**
+
+- **Helper `formatar_erro_anthropic` (T53):** `core/agente_base.py` centraliza a formatação de erros do SDK Anthropic. `_chamar_api` e `_chamar_api_stream` usam tipos específicos (`APIError`, `APIConnectionError`, `AuthenticationError`, `RateLimitError`) — sem `Exception` genérico que mascararia bugs próprios. Mensagens pt-BR claras para overloaded, rate_limit, auth inválida e sem conexão. Chat nunca exibe `{'type': 'error', ...}` como string Python.
+- **Endpoints LLM protegidos (T52):** `/sugerir_pipeline`, `/briefing_reverso` e `/cortes_prontos` agora envolvem a chamada Anthropic com os mesmos tipos específicos → `HTTPException(503, detail=<mensagem legível>)`. Frontend de cada página lê `err.detail` e exibe a mensagem no estado de erro (antes mostrava "Failed to fetch" ou string genérica).
+
+---
 
 ### v1.9 — 2026-05-06
 

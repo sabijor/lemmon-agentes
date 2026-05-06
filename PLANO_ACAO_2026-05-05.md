@@ -1017,3 +1017,8 @@ Quando voltar à conversa, eu (o assistente daqui) vou:
 | T48 — idleQuote wizard | ✅ concluído | 2026-05-06 | Placeholder TODO visível no snippet gerado pelo onboard_cliente.py |
 | T49 — pulse agendado | ✅ concluído | 2026-05-06 | Instruções de cron e launchd adicionadas ao §5.7 do manual |
 | T50 — share Next.js | ✅ concluído | 2026-05-06 | GET /share/{token}.json + página Next.js com branding Lemmon; sem redirect |
+| T52 — erros 503 endpoints | ✅ concluído | 2026-05-06 | try/except com tipos específicos Anthropic em /sugerir_pipeline, /briefing_reverso, /cortes_prontos; frontend lê err.detail |
+| T53 — erros API no chat | ✅ concluído | 2026-05-06 | formatar_erro_anthropic() helper em core/agente_base.py; _chamar_api/_chamar_api_stream consolidados; repr dict nunca chega ao operador |
+| T51 — @pedro em reunião | ✅ concluído | 2026-05-06 | AGENTE_ALIAS dict; _parse_mentions testa alias curto + id completo |
+| T54 — URL /cortes | ✅ concluído | 2026-05-06 | HTTP 200 confirmado por curl + build; 404 era estado anterior. Verificado em 2026-05-06 |
+| T55 — tags fallback | ✅ concluído | 2026-05-06 | except:pass → warning log + fallback heurístico (Counter + stopwords pt-BR, prefix auto:); evento tags_sugeridas_falhou enviado |
