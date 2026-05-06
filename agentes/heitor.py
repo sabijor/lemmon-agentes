@@ -227,7 +227,7 @@ class Heitor(AgenteBase):
         # ===== CHAMADA 3: formatação humana =====
         output_humano, custo_3 = self._chamada_3_formatar(analise_json, modo_saida)
 
-        custo_total = custo_1 + custo_2 + custo_3
+        custo_total = self._somar_custo(custo_1, custo_2, custo_3)
 
         # CAMADA 3 — aviso pós-execução
         breakdown = {

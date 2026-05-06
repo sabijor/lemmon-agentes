@@ -8,10 +8,7 @@ Arquitetura: 3 chamadas separadas.
 Sistema de avisos em 3 camadas.
 """
 import json as _json
-import time
 from typing import Optional
-
-from anthropic import APIError, AuthenticationError, RateLimitError
 
 from core.agente_base import AgenteBase
 from core.config import (
@@ -24,7 +21,6 @@ from core.config import (
     SONIA_ROTEIRO_MAX_CHARS,
     SONIA_TENDENCIAS_MAX_CHARS,
 )
-from core.custo import Custo
 from core.limites_sonia import (
     aviso_amarelo_sonia,
     aviso_pos_execucao_sonia,
@@ -348,7 +344,7 @@ class Sonia(AgenteBase):
         # ===== CHAMADA 3: formatação =====
         output_humano, custo_3 = self._chamada_3(plano_json, modo)
 
-        custo_total = custo_1 + custo_2 + custo_3
+        custo_total = self._somar_custo(custo_1, custo_2, custo_3)
 
         breakdown = {
             "analise_usd": round(custo_1, 6),
@@ -485,29 +481,10 @@ Se receber diretrizes do Heitor e decidir discordar, registre ressalva inline.
         if com_busca:
             tools = [construir_tool_web_search_sonia(max_buscas)]
 
-        kwargs = {
-            "model": self.modelo,
-            "max_tokens": self.max_tokens,
-            "system": self.system_prompt,
-            "messages": [{"role": "user", "content": prompt}],
-        }
-        if tools:
-            kwargs["tools"] = tools
-
-        inicio = time.time()
-        try:
-            response = self.client.messages.create(**kwargs)
-        except AuthenticationError:
-            raise RuntimeError("Chave API inválida.")
-        except RateLimitError as e:
-            raise RuntimeError(
-                f"Rate limit Chamada 1: {e}\n"
-                f"Aguarde 60-90 segundos e tente de novo."
-            )
-        except APIError as e:
-            raise RuntimeError(f"Erro API Chamada 1: {e}")
-
-        duracao = round(time.time() - inicio, 2)
+        response, custo_obj, duracao = self._chamar_api(
+            mensagens=[{"role": "user", "content": prompt}],
+            tools=tools if tools else None,
+        )
 
         analise_texto = extrair_texto_raciocinio(response.content)
         if not analise_texto.strip():
@@ -516,11 +493,8 @@ Se receber diretrizes do Heitor e decidir discordar, registre ressalva inline.
         fontes = extrair_fontes_consultadas(response.content) if com_busca else []
         buscas = contar_buscas_realizadas(response.usage) if com_busca else 0
 
-        custo_modelo = Custo.calcular(
-            response.usage.input_tokens, response.usage.output_tokens
-        )
         custo_buscas = buscas * 0.01
-        custo_total = custo_modelo.custo_usd + custo_buscas
+        custo_total = custo_obj.custo_usd + custo_buscas
 
         self.logger.info(
             f"Chamada 1 em {duracao}s | "
@@ -582,21 +556,11 @@ INSTRUÇÕES:
 Use `registrar_plano_performance`.
 """
 
-        try:
-            response = self.client.messages.create(
-                model=self.modelo,
-                max_tokens=self.max_tokens,
-                system=self.system_prompt,
-                messages=[{"role": "user", "content": prompt}],
-                tools=[FERRAMENTA_PLANO_PERFORMANCE],
-                tool_choice={"type": "tool", "name": "registrar_plano_performance"}
-            )
-        except RateLimitError as e:
-            raise RuntimeError(
-                f"Rate limit Chamada 2: {e}\nAguarde e tente de novo."
-            )
-        except APIError as e:
-            raise RuntimeError(f"Erro API Chamada 2: {e}")
+        response, custo_obj, _ = self._chamar_api(
+            mensagens=[{"role": "user", "content": prompt}],
+            tools=[FERRAMENTA_PLANO_PERFORMANCE],
+            tool_choice={"type": "tool", "name": "registrar_plano_performance"},
+        )
 
         plano = None
         for bloco in response.content:
@@ -607,12 +571,9 @@ Use `registrar_plano_performance`.
         if plano is None:
             raise RuntimeError("Sonia Chamada 2: tool_use não retornado.")
 
-        custo = Custo.calcular(
-            response.usage.input_tokens, response.usage.output_tokens
-        )
-        self.logger.info(f"Chamada 2 | {custo.resumo()}")
+        self.logger.info(f"Chamada 2 | {custo_obj.resumo()}")
 
-        return plano, custo.custo_usd
+        return plano, custo_obj.custo_usd
 
     def _chamada_3(self, plano_json, modo):
         """Chamada 3: formatação humana."""
@@ -657,21 +618,11 @@ DIRETRIZES:
 Use `formatar_plano_sonia`.
 """
 
-        try:
-            response = self.client.messages.create(
-                model=self.modelo,
-                max_tokens=self.max_tokens,
-                system=self.system_prompt,
-                messages=[{"role": "user", "content": prompt}],
-                tools=[FERRAMENTA_FORMATACAO_SONIA],
-                tool_choice={"type": "tool", "name": "formatar_plano_sonia"}
-            )
-        except RateLimitError as e:
-            raise RuntimeError(
-                f"Rate limit Chamada 3: {e}\nAguarde e tente de novo."
-            )
-        except APIError as e:
-            raise RuntimeError(f"Erro API Chamada 3: {e}")
+        response, custo_obj, _ = self._chamar_api(
+            mensagens=[{"role": "user", "content": prompt}],
+            tools=[FERRAMENTA_FORMATACAO_SONIA],
+            tool_choice={"type": "tool", "name": "formatar_plano_sonia"},
+        )
 
         output = None
         for bloco in response.content:
@@ -682,9 +633,6 @@ Use `formatar_plano_sonia`.
         if not output:
             raise RuntimeError("Sonia Chamada 3: output_humano não retornado.")
 
-        custo = Custo.calcular(
-            response.usage.input_tokens, response.usage.output_tokens
-        )
-        self.logger.info(f"Chamada 3 | {custo.resumo()}")
+        self.logger.info(f"Chamada 3 | {custo_obj.resumo()}")
 
-        return output, custo.custo_usd
+        return output, custo_obj.custo_usd

@@ -82,6 +82,24 @@ class AgenteBase(ABC):
 
         return response, custo, duracao
 
+    def _chamar_api_chain(self, chamadas: list[dict]) -> tuple[list, float, float]:
+        """Executa N chamadas sequenciais independentes, retorna responses + custo total + duração total.
+
+        Para chamadas DEPENDENTES (onde mensagem N usa resposta N-1), use _chamar_api()
+        individualmente e some os custos manualmente com _somar_custo().
+        """
+        responses, custo_total, dur_total = [], 0.0, 0.0
+        for kwargs in chamadas:
+            resp, custo, dur = self._chamar_api(**kwargs)
+            responses.append(resp)
+            custo_total += custo.custo_usd
+            dur_total += dur
+        return responses, custo_total, dur_total
+
+    def _somar_custo(self, *custos_usd: float) -> float:
+        """Soma N custos vindos de chamadas _chamar_api() individuais."""
+        return sum(custos_usd)
+
     def _chamar_api_stream(self, mensagens: list, on_token: Callable[[str], None],
                            tools: list = None, tool_choice: dict = None,
                            system_override: str = None):
