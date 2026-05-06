@@ -22,6 +22,14 @@ export interface ImageData {
 
 export type AgentStatus = 'idle' | 'thinking' | 'speaking' | 'done' | 'error'
 
+export interface ExportResult {
+  html_gerado: boolean
+  pdf_gerado: boolean
+  caminho_html: string | null
+  caminho_pdf: string | null
+  erros: string[]
+}
+
 export interface ApprovalRequest {
   agent: string
   mode: 'approval' | 'retry' | 'confirmar'
@@ -32,21 +40,21 @@ export interface ApprovalRequest {
 export interface AgentConfig {
   otto: { modo_visual: 'completo' | 'resumido' | 'minimo' }
   heitor: { max_buscas: number }
-  salles: { formato: 'auto' | 'reels' | 'documental' | 'mini-doc' | 'tese' | 'aftermovie' }
+  salles: { formato: 'auto' | 'reels' | 'documental' | 'mini-doc' | 'tese' | 'aftermovie'; gate_espelho: 'off' | 'auto' | 'manual' }
   sonia: { com_busca: boolean; usar_tendencias: boolean }
 }
 
 const DEFAULT_CONFIG: AgentConfig = {
   otto: { modo_visual: 'completo' },
   heitor: { max_buscas: 3 },
-  salles: { formato: 'auto' },
+  salles: { formato: 'auto', gate_espelho: 'off' },
   sonia: { com_busca: false, usar_tendencias: true },
 }
 
 export function useChat() {
   const [messages, setMessages] = useState<Message[]>([])
   const [agentStatus, setAgentStatus] = useState<Record<AgentId, AgentStatus>>({
-    otto: 'idle', heitor: 'idle', salles: 'idle', sonia: 'idle', aya: 'idle',
+    otto: 'idle', heitor: 'idle', salles: 'idle', sonia: 'idle', aya: 'idle', pedro_abrahao: 'idle',
   })
   const [isRunning, setIsRunning] = useState(false)
   const [sessionId, setSessionId] = useState<string | null>(null)
@@ -85,7 +93,7 @@ export function useChat() {
     setAvaliado(detail.avaliacao !== null)
     setIsRunning(false)
     setAwaitingApproval(null)
-    setAgentStatus({ otto: 'idle', heitor: 'idle', salles: 'idle', sonia: 'idle', aya: 'idle' })
+    setAgentStatus({ otto: 'idle', heitor: 'idle', salles: 'idle', sonia: 'idle', aya: 'idle', pedro_abrahao: 'idle' })
     setResumedFrom(detail.session_id)
     currentMsgId.current = {}
     resumeContextRef.current = (detail as HistoryDetail & { contexto_tecnico?: Record<string, unknown> }).contexto_tecnico ?? {
@@ -162,6 +170,18 @@ export function useChat() {
         }
       }
 
+      if (data.type === 'gate_espelho_result') {
+        // Prepend veredicto badge to the gate message content
+        const badge = data.veredicto === 'vermelho' ? '🔴 VETO' : data.veredicto === 'amarelo' ? '🟡 ALERTA' : '🟢 OK'
+        const msgId = currentMsgId.current['gate_espelho']
+        if (msgId) {
+          setMessages(prev => prev.map(m => m.id === msgId
+            ? { ...m, content: `**Gate Espelho — ${badge}**\n\n` + m.content }
+            : m
+          ))
+        }
+      }
+
       if (data.type === 'confirmar') {
         setAwaitingApproval({ agent: data.agent, mode: 'confirmar', mensagem: data.mensagem })
       }
@@ -215,6 +235,19 @@ export function useChat() {
     }
   }, [sessionId, avaliado])
 
+  const exportar = useCallback(async (sid: string): Promise<ExportResult> => {
+    const res = await fetch(`${API_URL}/exportar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: sid }),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: 'Erro desconhecido' }))
+      throw new Error((err as { detail?: string }).detail ?? 'Erro ao exportar')
+    }
+    return res.json() as Promise<ExportResult>
+  }, [])
+
   const abort = useCallback(() => {
     wsRef.current?.close()
     setIsRunning(false)
@@ -231,7 +264,7 @@ export function useChat() {
   const reset = useCallback(() => {
     wsRef.current?.close()
     setMessages([])
-    setAgentStatus({ otto: 'idle', heitor: 'idle', salles: 'idle', sonia: 'idle', aya: 'idle' })
+    setAgentStatus({ otto: 'idle', heitor: 'idle', salles: 'idle', sonia: 'idle', aya: 'idle', pedro_abrahao: 'idle' })
     setIsRunning(false)
     setSessionId(null)
     setAvaliado(false)
@@ -244,6 +277,6 @@ export function useChat() {
   return {
     messages, agentStatus, isRunning, sessionId, avaliado, resumedFrom,
     manualMode, awaitingApproval, agentConfig,
-    send, approve, abort, toggleManualMode, updateConfig, avaliar, reset, loadSession,
+    send, approve, abort, toggleManualMode, updateConfig, avaliar, exportar, reset, loadSession,
   }
 }

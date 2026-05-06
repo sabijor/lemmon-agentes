@@ -8,6 +8,7 @@ from pathlib import Path
 
 import anthropic as _anthropic
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi.responses import FileResponse
 
 _anthropic_client = _anthropic.Anthropic()
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,7 +21,9 @@ from agentes.heitor import Heitor
 from agentes.salles import Salles
 from agentes.sonia import Sonia
 from agentes.aya import Aya
-from core.config import HISTORICO_DIR
+from agentes.pedro_abrahao import PedroAbrahao
+from core.config import HISTORICO_DIR, OUTPUTS_DIR, AYA_GERAR_HTML, AYA_GERAR_PDF, AYA_PDF_ENGINE
+from core.exportador_aya import exportar_dossie
 
 app = FastAPI(title="Lemmon Dashboard API")
 app.add_middleware(
@@ -145,7 +148,75 @@ async def detalhe_historico(session_id: str):
     path = session_dir / f"{session_id}.json"
     if not path.exists():
         raise HTTPException(status_code=404, detail="Sessão não encontrada")
-    return json.loads(path.read_text(encoding="utf-8"))
+    dados = json.loads(path.read_text(encoding="utf-8"))
+    dados["session_id"] = session_id  # garante que o id vem do nome do arquivo (nunca null)
+    return dados
+
+
+class ExportarPayload(BaseModel):
+    session_id: str
+
+
+@app.post("/exportar")
+async def exportar(payload: ExportarPayload):
+    """Gera HTML + PDF do dossiê da Aya a partir de uma sessão salva."""
+    session_dir = HISTORICO_DIR / "dashboard"
+    path = session_dir / f"{payload.session_id}.json"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Sessão não encontrada")
+
+    dados = json.loads(path.read_text(encoding="utf-8"))
+    markdown_aya = dados.get("respostas", {}).get("aya", "")
+    if not markdown_aya.strip():
+        raise HTTPException(status_code=400, detail="Sessão não contém output da Aya")
+
+    respostas = dados.get("respostas", {})
+    agentes_detectados = [
+        a for a in dados.get("agentes_usados", [])
+        if a != "aya" and respostas.get(a, "").strip()
+    ]
+
+    out_dir = OUTPUTS_DIR / "aya"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    caminho_md = out_dir / f"{payload.session_id}.md"
+
+    loop = asyncio.get_event_loop()
+    resultado = await loop.run_in_executor(
+        None,
+        lambda: exportar_dossie(
+            markdown_original=markdown_aya,
+            caminho_md=caminho_md,
+            agentes_consultados=agentes_detectados,
+            gerar_html=AYA_GERAR_HTML,
+            gerar_pdf=AYA_GERAR_PDF,
+            pdf_engine=AYA_PDF_ENGINE,
+        ),
+    )
+
+    return {
+        "html_gerado": resultado["html_gerado"],
+        "pdf_gerado": resultado["pdf_gerado"],
+        "caminho_html": str(resultado["caminho_html"]) if resultado["caminho_html"] else None,
+        "caminho_pdf": str(resultado["caminho_pdf"]) if resultado["caminho_pdf"] else None,
+        "erros": resultado["erros"],
+    }
+
+
+@app.get("/download/{session_id}/{tipo}")
+async def download_arquivo(session_id: str, tipo: str):
+    """Serve o HTML ou PDF gerado para download pelo browser."""
+    out_dir = OUTPUTS_DIR / "aya"
+    if tipo == "html":
+        path = out_dir / f"{session_id}.html"
+        media_type = "text/html"
+    elif tipo == "pdf":
+        path = out_dir / f"{session_id}.pdf"
+        media_type = "application/pdf"
+    else:
+        raise HTTPException(status_code=400, detail="Tipo inválido. Use 'html' ou 'pdf'.")
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Arquivo não encontrado. Exporte primeiro.")
+    return FileResponse(path, media_type=media_type, filename=path.name)
 
 
 @app.post("/avaliar")
@@ -428,12 +499,69 @@ async def chat(ws: WebSocket):
                             await ws.send_json({"type": "agent_error", "agent": name, "error": str(e)})
                             return True
 
+            async def _run_gate_espelho() -> bool:
+                """Roda Pedro como gate de qualidade após Salles. Retorna False se pipeline cancelado."""
+                nonlocal pipeline_cancelled
+                gate_mode = cfg_salles.get("gate_espelho", "off")
+                if gate_mode == "off" or not roteiro_salles:
+                    return True
+                await ws.send_json({"type": "agent_start", "agent": "gate_espelho"})
+                try:
+                    pedro = PedroAbrahao()
+                    gate_res = await loop.run_in_executor(
+                        None,
+                        lambda: pedro.executar(
+                            pergunta="Valide se o roteiro abaixo está fiel à minha voz, posicionamento e tom.",
+                            contexto_opcional=roteiro_salles,
+                            modo="validacao",
+                            tags=["gate_pipeline"],
+                        ),
+                    )
+                    gate_text = gate_res.get("output_humano", "")
+                    gate_cost = gate_res.get("custo_total_usd", 0)
+                    veredicto = "verde"
+                    if "🔴" in gate_text:
+                        veredicto = "vermelho"
+                    elif "🟡" in gate_text:
+                        veredicto = "amarelo"
+                    respostas["gate_espelho"] = gate_text
+                    custos["gate_espelho"] = gate_cost
+                    await ws.send_json({
+                        "type": "gate_espelho_result",
+                        "veredicto": veredicto,
+                        "cost": gate_cost,
+                    })
+                    await _stream(ws, "gate_espelho", gate_text)
+                    await ws.send_json({"type": "agent_done", "agent": "gate_espelho", "cost": gate_cost})
+                    # Bloqueia se vermelho em modo auto, ou sempre em modo manual
+                    if veredicto == "vermelho" or gate_mode == "manual":
+                        emoji = "🔴" if veredicto == "vermelho" else "🟡"
+                        msg = (
+                            f"{emoji} Gate Espelho — veredicto {veredicto}.\n"
+                            f"Pedro flagrou problemas de voz/posicionamento.\n\n"
+                            f"{gate_text[:500]}\n\nContinuar para Sônia mesmo assim?"
+                        )
+                        await ws.send_json({"type": "confirmar", "agent": "gate_espelho", "mensagem": msg})
+                        ctrl = await ws.receive_json()
+                        if ctrl.get("type") != "confirmar_sim":
+                            pipeline_cancelled = True
+                            return False
+                    return True
+                except Exception as e:
+                    await ws.send_json({"type": "agent_error", "agent": "gate_espelho", "error": str(e)})
+                    return True  # gate falhou, não bloqueia
+
             for name in names:
                 if name == "aya":
                     continue
                 ok = await _execute_with_approval(name)
                 if not ok:
                     break
+                # Gate de espelho Pedro entre Salles e Sônia
+                if name == "salles" and not pipeline_cancelled:
+                    ok = await _run_gate_espelho()
+                    if not ok:
+                        break
 
             # Aya compila os outputs dos outros agentes (sempre por último)
             if "aya" in names and not pipeline_cancelled:
@@ -465,7 +593,7 @@ def _parse_mentions(text: str, agents: list[str]) -> list[str]:
     return [a for a in agents if re.search(rf'@{re.escape(a)}\b', text, re.IGNORECASE)]
 
 def _make_agent(name: str):
-    mapping = {"otto": Otto, "heitor": Heitor, "salles": Salles, "sonia": Sonia, "aya": Aya}
+    mapping = {"otto": Otto, "heitor": Heitor, "salles": Salles, "sonia": Sonia, "aya": Aya, "pedro_abrahao": PedroAbrahao}
     cls = mapping.get(name)
     return cls() if cls else None
 

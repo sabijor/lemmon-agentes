@@ -13,7 +13,8 @@ interface ISpeechRecognition extends EventTarget {
 declare const SpeechRecognition: { new(): ISpeechRecognition } | undefined
 declare const webkitSpeechRecognition: { new(): ISpeechRecognition } | undefined
 import { AGENT_MAP, AGENTS as AGENTS_LIST, type AgentId } from '@/lib/agents'
-import { type Message, type AgentStatus, type ImageData, type ApprovalRequest, type AgentConfig } from '@/lib/useChat'
+import { type Message, type AgentStatus, type ImageData, type ApprovalRequest, type AgentConfig, type ExportResult } from '@/lib/useChat'
+import { API_URL } from '@/lib/api'
 import CharacterSprite from '../office/CharacterSprite'
 
 interface AttachedImage extends ImageData {
@@ -47,6 +48,7 @@ interface Props {
   onReunSend: (agents: AgentId[], msg: string, manual?: boolean) => void
   onReunReset: () => void
   onReunAbort: () => void
+  onExportar?: (sessionId: string) => Promise<ExportResult>
   onClose?: () => void
   dragControls?: DragControls
 }
@@ -198,7 +200,7 @@ function ConfigSidebar({ agentConfig, onUpdateConfig, isRunning }: {
             <span className="text-[9px] font-mono uppercase tracking-widest text-stone-500 font-bold">Salles</span>
           </div>
           <p className="text-[8px] font-mono text-stone-400 mb-1.5">formato</p>
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1 mb-3">
             {(['auto', 'reels', 'documental', 'mini-doc', 'tese', 'aftermovie'] as const).map(v => (
               <button key={v} disabled={isRunning} onClick={() => onUpdateConfig('salles', { formato: v })}
                 className={`px-2 py-1 rounded-md text-[9px] font-mono border transition-all text-left disabled:opacity-50 ${
@@ -206,6 +208,19 @@ function ConfigSidebar({ agentConfig, onUpdateConfig, isRunning }: {
                     ? 'bg-stone-900 text-white border-stone-900'
                     : 'bg-white text-stone-500 border-stone-200 hover:border-stone-400'
                 }`}>{v}</button>
+            ))}
+          </div>
+          <p className="text-[8px] font-mono text-stone-400 mb-1.5">gate espelho pedro</p>
+          <div className="flex flex-col gap-1">
+            {(['off', 'auto', 'manual'] as const).map(v => (
+              <button key={v} disabled={isRunning} onClick={() => onUpdateConfig('salles', { gate_espelho: v })}
+                className={`px-2 py-1 rounded-md text-[9px] font-mono border transition-all text-left disabled:opacity-50 ${
+                  agentConfig.salles.gate_espelho === v
+                    ? 'bg-stone-900 text-white border-stone-900'
+                    : 'bg-white text-stone-500 border-stone-200 hover:border-stone-400'
+                }`}>
+                {v === 'off' ? 'off — sem gate' : v === 'auto' ? 'auto — bloqueia se 🔴' : 'manual — sempre pede OK'}
+              </button>
             ))}
           </div>
         </div>
@@ -247,25 +262,28 @@ export default function ChatPanel({
   manualMode, awaitingApproval, agentConfig, dragControls,
   onSend, onReset, onAvaliar, onApprove, onAbort, onToggleManualMode, onUpdateConfig,
   reunMessages, reunAgentStatus, reunIsRunning, onReunSend, onReunReset, onReunAbort,
-  onClose,
+  onExportar, onClose,
 }: Props) {
   // Mode-aware aliases
   const activeMessages    = mode === 'reuniao' ? reunMessages    : messages
   const activeAgentStatus = mode === 'reuniao' ? reunAgentStatus : agentStatus
   const activeIsRunning   = mode === 'reuniao' ? reunIsRunning   : isRunning
-  const activeReset       = mode === 'reuniao' ? onReunReset     : onReset
   const activeAbort       = mode === 'reuniao' ? onReunAbort     : onAbort
 
   const [input, setInput] = useState('')
   const [minimized, setMinimized] = useState(false)
+  const [configOpen, setConfigOpen] = useState(false)
   const [reuniaoManual, setReuniaoManual] = useState(false)
+  const [reuniaoRating, setReuniaoRating] = useState(0)
+
+  const activeReset = mode === 'reuniao' ? () => { onReunReset(); setReuniaoRating(0) } : onReset
   // @mention autocomplete
   const [mentionQuery, setMentionQuery] = useState<string | null>(null)
   const [mentionCursor, setMentionCursor] = useState(0)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [panelSize, setPanelSize] = useState(() => ({
-    w: 620,
-    h: typeof window !== 'undefined' ? Math.max(400, window.innerHeight - 80) : 640,
+    w: 460,
+    h: typeof window !== 'undefined' ? Math.min(Math.max(480, window.innerHeight - 160), 640) : 560,
   }))
   const panelSizeRef = useRef(panelSize)
   useEffect(() => { panelSizeRef.current = panelSize }, [panelSize])
@@ -296,6 +314,55 @@ export default function ChatPanel({
     window.addEventListener('pointermove', resizeHandlers.current.move)
     window.addEventListener('pointerup', resizeHandlers.current.end)
   }
+  const [exportState, setExportState] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
+  const [exportResult, setExportResult] = useState<ExportResult | null>(null)
+
+  useEffect(() => {
+    setExportState('idle')
+    setExportResult(null)
+  }, [sessionId])
+
+  const handleExportar = async () => {
+    if (!sessionId || !onExportar) return
+    setExportState('loading')
+    try {
+      const r = await onExportar(sessionId)
+      setExportResult(r)
+      setExportState(r.erros.length > 0 && !r.html_gerado && !r.pdf_gerado ? 'error' : 'done')
+    } catch {
+      setExportState('error')
+      setExportResult(null)
+    }
+  }
+
+  const handleDownload = async (tipo: 'html' | 'pdf', filename: string) => {
+    if (!sessionId) return
+    const url = `${API_URL}/download/${sessionId}/${tipo}`
+    const w = window as Window & typeof globalThis & { showSaveFilePicker?: (opts: unknown) => Promise<FileSystemFileHandle> }
+    if (w.showSaveFilePicker) {
+      try {
+        const res = await fetch(url)
+        const blob = await res.blob()
+        const handle = await w.showSaveFilePicker({
+          suggestedName: filename,
+          types: tipo === 'html'
+            ? [{ description: 'HTML', accept: { 'text/html': ['.html'] } }]
+            : [{ description: 'PDF', accept: { 'application/pdf': ['.pdf'] } }],
+        })
+        const writable = await handle.createWritable()
+        await writable.write(blob)
+        await writable.close()
+        return
+      } catch (e) {
+        if ((e as { name?: string }).name === 'AbortError') return
+      }
+    }
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+  }
+
   const [hoveredStar, setHoveredStar] = useState(0)
   const [attachedImage, setAttachedImage] = useState<AttachedImage | null>(null)
   const [imageError, setImageError] = useState('')
@@ -415,8 +482,21 @@ export default function ChatPanel({
           </svg>
         </div>
       </>}
-      {/* Config sidebar — pipeline only */}
-      {!minimized && mode === 'pipeline' && <ConfigSidebar agentConfig={agentConfig} onUpdateConfig={onUpdateConfig} isRunning={isRunning} />}
+      {/* Config sidebar — pipeline only, collapsible */}
+      <AnimatePresence initial={false}>
+        {!minimized && mode === 'pipeline' && configOpen && (
+          <motion.div
+            key="config"
+            initial={{ width: 0, opacity: 0 }}
+            animate={{ width: 176, opacity: 1 }}
+            exit={{ width: 0, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 260, damping: 28 }}
+            className="overflow-hidden flex-shrink-0"
+          >
+            <ConfigSidebar agentConfig={agentConfig} onUpdateConfig={onUpdateConfig} isRunning={isRunning} />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Main chat */}
       <div className="flex-1 flex flex-col min-w-0">
@@ -492,6 +572,21 @@ export default function ChatPanel({
               <button onClick={activeReset}
                 className="text-[10px] font-mono text-stone-400 hover:text-stone-700 transition-colors uppercase tracking-wider">
                 limpar
+              </button>
+            )}
+
+            {/* Config toggle — pipeline only */}
+            {mode === 'pipeline' && (
+              <button onClick={() => setConfigOpen(v => !v)} title="Configurações"
+                className={`w-7 h-7 rounded-lg border flex items-center justify-center transition-all ${
+                  configOpen
+                    ? 'bg-stone-900 border-stone-900 text-white'
+                    : 'border-stone-200 bg-white text-stone-500 hover:bg-stone-50 hover:border-stone-400'
+                }`}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="3"/>
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
               </button>
             )}
 
@@ -657,6 +752,142 @@ export default function ChatPanel({
           )}
         </AnimatePresence>}
 
+        {/* Avaliação + Export — pipeline only, fora do input para nunca ser cortado */}
+        <AnimatePresence>
+          {!minimized && mode === 'pipeline' && sessionId && !isRunning && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+              className="mx-4 mb-1 flex flex-col gap-3 px-4 py-3 rounded-xl border border-stone-200/60 bg-stone-50/80 flex-shrink-0"
+            >
+              {/* Estrelas */}
+              {avaliado ? (
+                <p className="text-[10px] font-mono text-green-600 uppercase tracking-widest text-center">
+                  ✓ Avaliação salva no histórico
+                </p>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-mono text-stone-400 uppercase tracking-widest">Como foi essa sessão?</span>
+                  <div className="flex gap-1">
+                    {[1, 2, 3, 4, 5].map(n => (
+                      <button key={n} onClick={() => onAvaliar(n)}
+                        onMouseEnter={() => setHoveredStar(n)} onMouseLeave={() => setHoveredStar(0)}
+                        className="text-lg transition-transform hover:scale-125 active:scale-110">
+                        <span style={{ color: n <= hoveredStar ? '#f59e0b' : '#d6d3d1' }}>★</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Export Dossiê — só aparece se Aya rodou */}
+              {onExportar && messages.some(m => m.role === 'aya' && m.done) && (
+                <div className="border-t border-stone-200/60 pt-2">
+                  {exportState === 'idle' && (
+                    <button onClick={handleExportar}
+                      className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl
+                        bg-stone-900 text-white text-[10px] font-mono uppercase tracking-widest
+                        hover:bg-stone-700 active:scale-[0.98] transition-all">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                        <line x1="12" y1="18" x2="12" y2="12"/>
+                        <line x1="9" y1="15" x2="15" y2="15"/>
+                      </svg>
+                      Exportar Dossiê (HTML + PDF)
+                    </button>
+                  )}
+                  {exportState === 'loading' && (
+                    <div className="flex items-center justify-center gap-2 py-2">
+                      <div className="flex gap-0.5">
+                        {[0, 1, 2].map(i => (
+                          <div key={i} className="w-1 h-1 rounded-full bg-stone-400 animate-bounce"
+                            style={{ animationDelay: `${i * 0.15}s` }} />
+                        ))}
+                      </div>
+                      <span className="text-[9px] font-mono text-stone-400 uppercase tracking-widest">Gerando HTML + PDF...</span>
+                    </div>
+                  )}
+                  {exportState === 'done' && exportResult && (
+                    <div className="flex flex-col gap-1.5">
+                      {exportResult.html_gerado && (
+                        <button
+                          onClick={() => handleDownload('html', exportResult.caminho_html?.split('/').pop() ?? 'dossie.html')}
+                          className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-green-50 border border-green-200 hover:bg-green-100 active:scale-[0.98] transition-all w-full text-left">
+                          <span className="text-green-600 text-[10px]">🌐</span>
+                          <span className="text-[9px] font-mono text-green-700 truncate flex-1">
+                            {exportResult.caminho_html?.split('/').pop()}
+                          </span>
+                          <span className="text-[8px] font-mono text-green-500 uppercase tracking-widest flex-shrink-0">HTML ↓</span>
+                        </button>
+                      )}
+                      {exportResult.pdf_gerado && (
+                        <button
+                          onClick={() => handleDownload('pdf', exportResult.caminho_pdf?.split('/').pop() ?? 'dossie.pdf')}
+                          className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-green-50 border border-green-200 hover:bg-green-100 active:scale-[0.98] transition-all w-full text-left">
+                          <span className="text-green-600 text-[10px]">📕</span>
+                          <span className="text-[9px] font-mono text-green-700 truncate flex-1">
+                            {exportResult.caminho_pdf?.split('/').pop()}
+                          </span>
+                          <span className="text-[8px] font-mono text-green-500 uppercase tracking-widest flex-shrink-0">PDF ↓</span>
+                        </button>
+                      )}
+                      {exportResult.erros.length > 0 && (
+                        <div className="px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200">
+                          {exportResult.erros.map((e, i) => (
+                            <p key={i} className="text-[9px] font-mono text-amber-700">{e}</p>
+                          ))}
+                        </div>
+                      )}
+                      <button onClick={() => setExportState('idle')}
+                        className="text-[8px] font-mono text-stone-400 hover:text-stone-600 transition-colors text-center uppercase tracking-widest mt-0.5">
+                        exportar novamente
+                      </button>
+                    </div>
+                  )}
+                  {exportState === 'error' && (
+                    <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-red-50 border border-red-200">
+                      <span className="text-[9px] font-mono text-red-600">Falha ao exportar</span>
+                      <button onClick={() => setExportState('idle')}
+                        className="text-[9px] font-mono text-stone-500 hover:text-stone-700 transition-colors uppercase tracking-widest">
+                        tentar novamente
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Avaliação — reunião */}
+        <AnimatePresence>
+          {!minimized && mode === 'reuniao' && reunMessages.length > 0 && !reunIsRunning && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+              className="mx-4 mb-1 px-4 py-3 rounded-xl border border-stone-200/60 bg-stone-50/80 flex-shrink-0"
+            >
+              {reuniaoRating > 0 ? (
+                <p className="text-[10px] font-mono text-green-600 uppercase tracking-widest text-center">
+                  ✓ Obrigado pelo feedback!
+                </p>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-mono text-stone-400 uppercase tracking-widest">Como foi a reunião?</span>
+                  <div className="flex gap-1">
+                    {[1, 2, 3, 4, 5].map(n => (
+                      <button key={n} onClick={() => setReuniaoRating(n)}
+                        onMouseEnter={() => setHoveredStar(n)} onMouseLeave={() => setHoveredStar(0)}
+                        className="text-lg transition-transform hover:scale-125 active:scale-110">
+                        <span style={{ color: n <= (hoveredStar || reuniaoRating) ? '#f59e0b' : '#d6d3d1' }}>★</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Input */}
         {!minimized && <div className="p-4 border-t border-stone-200/50 flex-shrink-0">
           {inMeeting.size === 0 ? (
@@ -808,32 +1039,6 @@ export default function ChatPanel({
             )}
           </AnimatePresence>
 
-          {/* Avaliação — pipeline only */}
-          <AnimatePresence>
-            {mode === 'pipeline' && sessionId && !isRunning && (
-              <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                className="mt-3 pt-3 border-t border-stone-200/60">
-                {avaliado ? (
-                  <p className="text-[10px] font-mono text-green-600 uppercase tracking-widest text-center">
-                    ✓ Avaliação salva no histórico
-                  </p>
-                ) : (
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-mono text-stone-400 uppercase tracking-widest">Como foi essa sessão?</span>
-                    <div className="flex gap-1">
-                      {[1, 2, 3, 4, 5].map(n => (
-                        <button key={n} onClick={() => onAvaliar(n)}
-                          onMouseEnter={() => setHoveredStar(n)} onMouseLeave={() => setHoveredStar(0)}
-                          className="text-lg transition-transform hover:scale-125 active:scale-110">
-                          <span style={{ color: n <= hoveredStar ? '#f59e0b' : '#d6d3d1' }}>★</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
         </div>}
       </div>
     </motion.div>
