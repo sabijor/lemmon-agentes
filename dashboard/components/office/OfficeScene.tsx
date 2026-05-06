@@ -360,7 +360,7 @@ function Whiteboard({ gy1, gy2, fillPct, agentColor }: { gy1: number; gy2: numbe
   const color = agentColor ?? '#1e3a8a'
 
   return (
-    <g>
+    <g data-testid="whiteboard">
       <WallRect wall="left" g1={gy1} g2={gy2} h1={20} h2={82} fill="#292524" />
       <WallRect wall="left" g1={gy1 + 0.08} g2={gy2 - 0.08} h1={24} h2={79} fill="#f8fafc" />
       {/* Content fill bars — appear as pipeline runs */}
