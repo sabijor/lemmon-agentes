@@ -73,7 +73,7 @@ function exportTxt(messages: Message[]) {
     if (msg.role === 'user') {
       lines.push('VOCÊ:', msg.content, '')
     } else {
-      const agent = AGENT_MAP[msg.role as AgentId]
+      const agent = AGENT_MAP[msg.role as AgentId] ?? AGENT_MAP[msg.role.replace(/_v\d+$/, '') as AgentId]
       if (agent) {
         lines.push(`${agent.name.toUpperCase()} | ${agent.title}:`)
         lines.push(msg.content)
@@ -118,7 +118,7 @@ function UserMessage({ msg }: { msg: Message }) {
 }
 
 function AgentMessage({ msg }: { msg: Message }) {
-  const agent = AGENT_MAP[msg.role as AgentId]
+  const agent = AGENT_MAP[msg.role as AgentId] ?? AGENT_MAP[msg.role.replace(/_v\d+$/, '') as AgentId]
   if (!agent) return null
   return (
     <motion.div

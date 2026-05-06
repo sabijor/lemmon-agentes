@@ -978,8 +978,9 @@ async def chat(ws: WebSocket):
                 formato = cfg_salles.get("formato", "auto")
                 todos_textos: list[str] = []
                 for idx, (label, hint) in enumerate(variacoes):
+                    variant_id = f"salles_v{idx+1}"
                     bv = briefing + hint
-                    await ws.send_json({"type": "agent_start", "agent": "salles"})
+                    await ws.send_json({"type": "agent_start", "agent": variant_id})
                     try:
                         ag_s = Salles()
                         res_s = await loop.run_in_executor(
@@ -995,17 +996,17 @@ async def chat(ws: WebSocket):
                         custo_s = res_s.get("custo_total_usd", 0)
                         todos_textos.append(res_s.get("output_humano", ""))
                         custos[f"salles_v{idx+1}"] = custo_s
-                        await _stream(ws, "salles", texto_s)
+                        await _stream(ws, variant_id, texto_s)
                         if manual_mode and idx == len(variacoes) - 1:
-                            await ws.send_json({"type": "agent_done", "agent": "salles", "cost": custo_s, "awaiting_approval": True})
+                            await ws.send_json({"type": "agent_done", "agent": variant_id, "cost": custo_s, "awaiting_approval": True})
                             ctrl = await ws.receive_json()
                             if ctrl.get("type") == "cancel":
                                 pipeline_cancelled = True
                                 return False
                         else:
-                            await ws.send_json({"type": "agent_done", "agent": "salles", "cost": custo_s})
+                            await ws.send_json({"type": "agent_done", "agent": variant_id, "cost": custo_s})
                     except Exception as e:
-                        await ws.send_json({"type": "agent_error", "agent": "salles", "error": str(e)})
+                        await ws.send_json({"type": "agent_error", "agent": variant_id, "error": str(e)})
                         return True
                 roteiro_salles = "\n\n---\n\n".join(
                     [f"## Variante {i+1}\n\n{t}" for i, t in enumerate(todos_textos)]
