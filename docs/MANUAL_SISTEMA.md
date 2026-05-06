@@ -1,6 +1,6 @@
 # LEMMON AGENTES — Manual do Sistema
 
-**Versão atual:** v1.13
+**Versão atual:** v1.14
 **Última atualização:** 2026-05-06
 **Mantido por:** Calebe Alves / Lemmon Produções
 
@@ -11,6 +11,19 @@
 ## Histórico de versões
 
 > **Convenção:** versões mais novas no topo. Cada release lista o que mudou em relação à anterior, mantendo histórico completo.
+
+### v1.14 — 2026-05-06
+
+**FASE 5 — BLOCO 1: refatoração de dívida técnica (T61 → T62 → T63 → T64 → T65 → T78).**
+
+- **T61 — Modularizar api_server.py:** Monólito de ~1317 linhas quebrado em `api/` com 10 módulos: `main.py` (FastAPI + middlewares), `deps.py` (globals compartilhados), `schemas.py` (modelos Pydantic), `storage.py` (persistência de sessões), `ws_helpers.py` (utilidades WebSocket), `ws_chat.py`, `ws_reuniao.py`, `ws_mesa.py` e routers por domínio (`historico`, `exportar`, `exemplares`, `auxiliares`, `transcrever`, `share`, `calibragem`). `api_server.py` vira shim de 1 linha. Output idêntico.
+- **T62 — print() → logger:** Substituídos todos os `print()` restantes em `agentes/aya.py`, `agentes/heitor.py`, `agentes/sonia.py` e `core/espelho.py` por `self.logger.info()` / `self.logger.warning()`. Duplicatas (print + logger.warning no mesmo bloco) eliminadas. Output dos agentes inalterado.
+- **T63 — Extrair CSS do exportador:** String inline de ~455 linhas do AURA Design System extraída de `core/exportador_aya.py` para `core/templates/aura.css`. Leitura via `Path(__file__).parent / "templates" / "aura.css"` em tempo de importação. CSS byte-idêntico ao anterior.
+- **T64 — Splitar OfficeScene.tsx:** Componente SVG isométrico de 1627 linhas dividido em 5 arquivos em `dashboard/components/office/`: `constants.ts` (temas, coordenadas, ROLES, IDLE_QUOTES), `SpeechBubble.tsx`, `WorkRoom.tsx` (estúdio + todos os móveis), `MeetingRoom.tsx` e `ReceptionRoom.tsx`. `OfficeScene.tsx` reduzido para 594 linhas com apenas posições de personagens, estado de movimento e componente principal. TypeScript sem erros.
+- **T65 — Splitar ChatPanel.tsx:** Componente de 1493 linhas reorganizado: `MessageBubble.tsx` recebe `exportTxt`, `UserMessage` e `AgentMessage`; `ConfigSidebar.tsx` recebe o sidebar de configurações com interface própria (sem `Props['onUpdateConfig']`). `ChatPanel.tsx` importa dos novos módulos e reduz para 1247 linhas. TypeScript sem erros.
+- **T78 — Heitor usa _chamar_api da base:** As 3 chamadas diretas a `self.client.messages.create()` em `agentes/heitor.py` foram migradas para `self._chamar_api()` da base, que centraliza exception handling (`formatar_erro_anthropic`), timing e cálculo de custo. Imports de `APIError`, `AuthenticationError`, `RateLimitError` e `Custo` removidos do arquivo. Output do agente inalterado.
+
+---
 
 ### v1.13 — 2026-05-06
 
