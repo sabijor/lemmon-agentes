@@ -175,7 +175,7 @@ def gerar_snippet_ts(id_agente: str, nome: str, nicho: str, cor: str) -> str:
     colorText: '#fff',
     deskPosition: {{ x: 400, y: 140 }},  // ajustar conforme layout
     meetingPosition: {{ x: 440, y: 260 }},
-    idleQuote: 'Avaliando pela ótica do cliente...',
+    idleQuote: 'TODO: defina a frase de fundo de {nome_curto}',
     reuniaoOnly: true,
   }},"""
 
