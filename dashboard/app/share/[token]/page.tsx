@@ -1,16 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
-import { API_URL } from '@/lib/api'
-
-interface ShareData {
-  token: string
-  session_id: string
-  briefing: string
-  agentes_usados: string[]
-  respostas: Record<string, string>
-  comentarios: Array<{ autor: string; texto: string; created_at: string }>
-}
+import { fetchShare, postComentario, type ShareData } from '@/lib/api-client'
 
 export default function SharePage() {
   const params = useParams()
@@ -26,8 +17,7 @@ export default function SharePage() {
 
   useEffect(() => {
     if (!token) return
-    fetch(`${API_URL}/share/${token}.json`)
-      .then(r => { if (!r.ok) throw new Error(); return r.json() })
+    fetchShare(token)
       .then(setData)
       .catch(() => setNotFound(true))
   }, [token])
@@ -38,23 +28,14 @@ export default function SharePage() {
     setSending(true)
     setSendError('')
     try {
-      const r = await fetch(`${API_URL}/share/${token}/comentar`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ autor: autor || 'Cliente', texto }),
-      })
-      if (!r.ok) {
-        const err = await r.json()
-        setSendError(err.detail ?? 'Erro ao enviar comentário')
-        return
-      }
-      const updated = await fetch(`${API_URL}/share/${token}.json`).then(r => r.json())
+      await postComentario(token, { autor: autor || 'Cliente', texto })
+      const updated = await fetchShare(token)
       setData(updated)
       setTexto('')
       setSent(true)
       setTimeout(() => setSent(false), 3000)
-    } catch {
-      setSendError('Erro de conexão. Tente novamente.')
+    } catch (err) {
+      setSendError((err as Error).message || 'Erro de conexão. Tente novamente.')
     } finally {
       setSending(false)
     }

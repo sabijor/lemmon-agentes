@@ -1,28 +1,13 @@
 'use client'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { API_URL } from '@/lib/api'
-
-interface SessionOption {
-  session_id: string
-  briefing: string
-}
-
-interface FeedbackEntry {
-  id: string
-  session_id: string
-  elemento: string
-  predicao_ia: string
-  feedback_real: string
-  nota_acerto: number
-  created_at: string
-}
-
-interface CalibragensData {
-  registros: FeedbackEntry[]
-  media_acerto: number | null
-  total: number
-}
+import {
+  fetchCalibragemPedro,
+  postCalibragemPedro,
+  fetchHistorico,
+  type SessionOption,
+  type CalibragensData,
+} from '@/lib/api-client'
 
 export default function CalibragemPage() {
   const [data, setData] = useState<CalibragensData | null>(null)
@@ -40,8 +25,7 @@ export default function CalibragemPage() {
 
   const fetchData = async () => {
     try {
-      const res = await fetch(`${API_URL}/calibragem_pedro`)
-      setData(await res.json())
+      setData(await fetchCalibragemPedro())
     } catch {
       setData({ registros: [], media_acerto: null, total: 0 })
     } finally {
@@ -51,9 +35,8 @@ export default function CalibragemPage() {
 
   useEffect(() => {
     fetchData()
-    fetch(`${API_URL}/historico`)
-      .then(r => r.json())
-      .then((sessions: Array<{ session_id: string; briefing: string; agentes_usados: string[] }>) => {
+    fetchHistorico()
+      .then(sessions => {
         const withPedro = sessions
           .filter(s => s.agentes_usados?.includes('pedro'))
           .slice(0, 20)
@@ -68,11 +51,7 @@ export default function CalibragemPage() {
     setSaving(true)
     setSaved(false)
     try {
-      await fetch(`${API_URL}/calibragem_pedro`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
-      })
+      await postCalibragemPedro(form)
       setSaved(true)
       setForm({ session_id: '', elemento: '', predicao_ia: '', feedback_real: '', nota_acerto: 3 })
       fetchData()

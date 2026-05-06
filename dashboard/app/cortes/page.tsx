@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import Link from 'next/link'
-import { API_URL } from '@/lib/api'
+import { fetchCortesProntos } from '@/lib/api-client'
 
 const DURACOES_DISPONIVEIS = [15, 30, 60, 90]
 
@@ -23,16 +23,7 @@ export default function CortesProntos() {
     setResultado('')
     setError('')
     try {
-      const res = await fetch(`${API_URL}/cortes_prontos`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transcricao, duracoes }),
-      })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.detail ?? 'Falha ao gerar cortes')
-      }
-      const data = await res.json()
+      const data = await fetchCortesProntos(transcricao, duracoes)
       setResultado(data.cortes)
       setCusto(data.custo_total_usd)
     } catch (e) {

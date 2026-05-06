@@ -1,17 +1,8 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { API_URL } from '@/lib/api'
+import { fetchHistorico, type Session } from '@/lib/api-client'
 import { AGENT_MAP } from '@/lib/agents'
-
-interface Session {
-  session_id: string
-  timestamp: string
-  agentes_usados: string[]
-  custo_total_usd: number
-  avaliacao: number | null
-  origem: string
-}
 
 function pct(n: number, total: number) {
   if (!total) return 0
@@ -36,8 +27,7 @@ export default function Saude() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetch(`${API_URL}/historico`)
-      .then(r => r.json())
+    fetchHistorico()
       .then((data: Session[]) => { setSessions(data); setLoading(false) })
       .catch(() => setLoading(false))
   }, [])

@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import Link from 'next/link'
-import { API_URL } from '@/lib/api'
+import { fetchBriefingReverso } from '@/lib/api-client'
 
 export default function BriefingReverso() {
   const [transcricao, setTranscricao] = useState('')
@@ -16,16 +16,7 @@ export default function BriefingReverso() {
     setResultado('')
     setError('')
     try {
-      const res = await fetch(`${API_URL}/briefing_reverso`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transcricao }),
-      })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.detail ?? 'Falha na análise')
-      }
-      const data = await res.json()
+      const data = await fetchBriefingReverso(transcricao)
       setResultado(data.resultado)
       setCusto(data.custo_total_usd)
     } catch (e) {

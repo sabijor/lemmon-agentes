@@ -1,18 +1,8 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { API_URL } from '@/lib/api'
+import { fetchHistorico, type Session } from '@/lib/api-client'
 import { AGENT_MAP } from '@/lib/agents'
-
-interface Session {
-  session_id: string
-  timestamp: string
-  briefing: string
-  agentes_usados: string[]
-  custo_total_usd: number
-  avaliacao: number | null
-  origem: string
-}
 
 function fmt(ts: string) {
   return new Date(ts).toLocaleDateString('pt-BR', {
@@ -27,8 +17,7 @@ export default function HallOfFame() {
   const [filter, setFilter] = useState<{ formato: string; periodo: string }>({ formato: '', periodo: '' })
 
   useEffect(() => {
-    fetch(`${API_URL}/historico`)
-      .then(r => r.json())
+    fetchHistorico()
       .then((data: Session[]) => {
         setSessions(data.filter(s => s.avaliacao === 5))
         setLoading(false)
