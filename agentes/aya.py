@@ -160,7 +160,7 @@ class Aya(AgenteBase):
                 "Rode pelo menos um agente antes."
             )
 
-        print(aviso_pre_execucao_aya(num_presentes))
+        self.logger.info(aviso_pre_execucao_aya(num_presentes))
 
         self.logger.info(
             f"Aya iniciando | agentes detectados: {num_presentes}/4 | "
@@ -181,7 +181,7 @@ class Aya(AgenteBase):
             )
 
         aviso_final = aviso_pos_execucao_aya(custo, num_presentes)
-        print(aviso_final)
+        self.logger.info(aviso_final)
         self.logger.info(f"Aya concluída | total: ${custo:.6f}")
 
         resultado = {

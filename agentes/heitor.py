@@ -194,7 +194,7 @@ class Heitor(AgenteBase):
 
         # CAMADA 1 — aviso pré-execução
         aviso_1 = aviso_pre_execucao(max_buscas, modo, modo_saida)
-        print(aviso_1["mensagem"])
+        self.logger.info(aviso_1["mensagem"])
 
         if aviso_1["precisa_confirmacao"] and confirmacao_callback:
             if not confirmacao_callback():
@@ -215,7 +215,6 @@ class Heitor(AgenteBase):
         # CAMADA 2 — aviso amarelo durante execução
         aviso_2_msg = aviso_amarelo(custo_1, "chamada 1 (análise)")
         if aviso_2_msg:
-            print(aviso_2_msg)
             self.logger.warning(aviso_2_msg.strip())
 
         # ===== CHAMADA 2: estruturação em JSON =====
@@ -227,7 +226,6 @@ class Heitor(AgenteBase):
         custo_acumulado = custo_1 + custo_2
         aviso_2b_msg = aviso_amarelo(custo_acumulado, "chamada 2 (estruturação)")
         if aviso_2b_msg:
-            print(aviso_2b_msg)
             self.logger.warning(aviso_2b_msg.strip())
 
         # ===== CHAMADA 3: formatação humana =====
@@ -244,7 +242,7 @@ class Heitor(AgenteBase):
         aviso_3_msg = aviso_pos_execucao(
             custo_total, breakdown, max_buscas, buscas_realizadas, modo_saida
         )
-        print(aviso_3_msg)
+        self.logger.info(aviso_3_msg)
         self.logger.info(f"Heitor concluído | total: ${custo_total:.6f}")
 
         resultado = {

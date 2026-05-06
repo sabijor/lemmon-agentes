@@ -99,7 +99,7 @@ class EspelhoCliente(AgenteBase):
             self.logger.warning("Contexto truncado.")
             contexto_opcional = contexto_opcional[:self._contexto_max]
 
-        print(aviso_pre_execucao(self._nome_display, modo, self._previsao_range))
+        self.logger.info(aviso_pre_execucao(self._nome_display, modo, self._previsao_range))
 
         user_message = self._construir_user_message(pergunta, contexto_opcional, modo)
         response, custo, duracao = self._chamar_api(
@@ -111,8 +111,8 @@ class EspelhoCliente(AgenteBase):
             raise RuntimeError(f"{self._nome_display} não retornou resposta.")
 
         custo_total = custo.custo_usd
-        print(aviso_pos_execucao(self._nome_display, custo_total,
-                                  self._previsao_range, self._aviso_vermelho))
+        self.logger.info(aviso_pos_execucao(self._nome_display, custo_total,
+                                             self._previsao_range, self._aviso_vermelho))
 
         resultado = {
             "output_tecnico": {

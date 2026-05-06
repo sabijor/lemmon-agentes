@@ -315,7 +315,7 @@ class Sonia(AgenteBase):
         aviso_1 = aviso_pre_execucao_sonia(
             com_busca, max_buscas, modo, modo_busca_descricao
         )
-        print(aviso_1["mensagem"])
+        self.logger.info(aviso_1["mensagem"])
 
         if aviso_1["precisa_confirmacao"] and confirmacao_callback:
             if not confirmacao_callback():
@@ -336,7 +336,6 @@ class Sonia(AgenteBase):
 
         aviso = aviso_amarelo_sonia(custo_1, "chamada 1 (análise)")
         if aviso:
-            print(aviso)
             self.logger.warning(aviso.strip())
 
         # ===== CHAMADA 2: estruturação =====
@@ -345,7 +344,6 @@ class Sonia(AgenteBase):
         custo_acumulado = custo_1 + custo_2
         aviso = aviso_amarelo_sonia(custo_acumulado, "chamada 2 (estruturação)")
         if aviso:
-            print(aviso)
             self.logger.warning(aviso.strip())
 
         # ===== CHAMADA 3: formatação =====
@@ -361,7 +359,7 @@ class Sonia(AgenteBase):
         aviso_final = aviso_pos_execucao_sonia(
             custo_total, breakdown, com_busca, max_buscas, buscas_realizadas, modo
         )
-        print(aviso_final)
+        self.logger.info(aviso_final)
         self.logger.info(f"Sonia concluída | total: ${custo_total:.6f}")
 
         resultado = {
