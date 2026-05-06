@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, animate } from 'framer-motion'
 import { AGENTS, type AgentId } from '@/lib/agents'
-import { type AgentStatus } from '@/lib/useChat'
+import { type AgentStatus, type Message } from '@/lib/useChat'
 import CharacterSprite from './CharacterSprite'
 
 // ─── Meeting room themes per cliente espelho ─────────────────────────
@@ -354,18 +354,45 @@ function TV({ gx, gy }: { gx: number; gy: number }) {
   )
 }
 
-function Whiteboard({ gy1, gy2 }: { gy1: number; gy2: number }) {
+function Whiteboard({ gy1, gy2, fillPct, agentColor }: { gy1: number; gy2: number; fillPct?: number; agentColor?: string }) {
+  const boardW = gy2 - gy1 - 0.16
+  const filled = fillPct ?? 0
+  const color = agentColor ?? '#1e3a8a'
+
   return (
     <g>
       <WallRect wall="left" g1={gy1} g2={gy2} h1={20} h2={82} fill="#292524" />
       <WallRect wall="left" g1={gy1 + 0.08} g2={gy2 - 0.08} h1={24} h2={79} fill="#f8fafc" />
-      <WallRect wall="left" g1={gy1 + 0.2} g2={gy2 - 0.4} h1={60} h2={62} fill="#64748b" opacity="0.6" />
-      <WallRect wall="left" g1={gy1 + 0.2} g2={gy2 - 0.6} h1={66} h2={68} fill="#64748b" opacity="0.5" />
-      <WallRect wall="left" g1={gy1 + 0.5} g2={gy2 - 0.3} h1={72} h2={74} fill="#3b82f6" opacity="0.5" />
-      <WallRect wall="left" g1={gy1 + 0.3} g2={gy1 + 0.9} h1={40} h2={56} fill="#dbeafe" opacity="0.7" />
-      <WallRect wall="left" g1={gy1 + 1.1} g2={gy1 + 1.7} h1={40} h2={56} fill="#dcfce7" opacity="0.7" />
+      {/* Content fill bars — appear as pipeline runs */}
+      {filled > 0 ? (
+        <>
+          {/* Background tint */}
+          <WallRect wall="left" g1={gy1 + 0.12} g2={gy2 - 0.12} h1={26} h2={78} fill={color} opacity="0.07" />
+          {/* Line 1 */}
+          {filled >= 0.15 && <WallRect wall="left" g1={gy1 + 0.2} g2={gy1 + 0.2 + boardW * Math.min(filled, 0.4) * 2} h1={35} h2={37} fill={color} opacity="0.65" />}
+          {/* Line 2 */}
+          {filled >= 0.25 && <WallRect wall="left" g1={gy1 + 0.2} g2={gy1 + 0.2 + boardW * Math.min((filled - 0.1) / 0.6, 1)} h1={42} h2={44} fill={color} opacity="0.55" />}
+          {/* Line 3 */}
+          {filled >= 0.4 && <WallRect wall="left" g1={gy1 + 0.2} g2={gy1 + 0.2 + boardW * Math.min((filled - 0.2) / 0.6, 1)} h1={49} h2={51} fill={color} opacity="0.55" />}
+          {/* Line 4 — shorter */}
+          {filled >= 0.55 && <WallRect wall="left" g1={gy1 + 0.2} g2={gy1 + 0.2 + boardW * Math.min((filled - 0.3) / 0.6, 0.7)} h1={56} h2={58} fill={color} opacity="0.45" />}
+          {/* Line 5 — shorter */}
+          {filled >= 0.7 && <WallRect wall="left" g1={gy1 + 0.2} g2={gy1 + 0.2 + boardW * Math.min((filled - 0.4) / 0.6, 0.55)} h1={63} h2={65} fill={color} opacity="0.40" />}
+          {/* Line 6 */}
+          {filled >= 0.85 && <WallRect wall="left" g1={gy1 + 0.2} g2={gy1 + 0.2 + boardW * Math.min((filled - 0.5) / 0.5, 0.45)} h1={70} h2={72} fill={color} opacity="0.35" />}
+        </>
+      ) : (
+        <>
+          <WallRect wall="left" g1={gy1 + 0.2} g2={gy2 - 0.4} h1={60} h2={62} fill="#64748b" opacity="0.6" />
+          <WallRect wall="left" g1={gy1 + 0.2} g2={gy2 - 0.6} h1={66} h2={68} fill="#64748b" opacity="0.5" />
+          <WallRect wall="left" g1={gy1 + 0.5} g2={gy2 - 0.3} h1={72} h2={74} fill="#3b82f6" opacity="0.5" />
+          <WallRect wall="left" g1={gy1 + 0.3} g2={gy1 + 0.9} h1={40} h2={56} fill="#dbeafe" opacity="0.7" />
+          <WallRect wall="left" g1={gy1 + 1.1} g2={gy1 + 1.7} h1={40} h2={56} fill="#dcfce7" opacity="0.7" />
+        </>
+      )}
+      {/* Markers */}
       <WallRect wall="left" g1={gy1 + 0.15} g2={gy1 + 0.35} h1={22} h2={24} fill="#ef4444" />
-      <WallRect wall="left" g1={gy1 + 0.4} g2={gy1 + 0.6} h1={22} h2={24} fill="#3b82f6" />
+      <WallRect wall="left" g1={gy1 + 0.4} g2={gy1 + 0.6} h1={22} h2={24} fill={filled > 0 ? color : '#3b82f6'} />
     </g>
   )
 }
@@ -755,7 +782,7 @@ function RPlant({ gx, gy }: { gx: number; gy: number }) {
 }
 
 // ─── Work room background ─────────────────────────────────────────────
-function RoomBackground({ onDoorClick }: { onDoorClick: () => void }) {
+function RoomBackground({ onDoorClick, whiteBoardFill, whiteBoardColor }: { onDoorClick: () => void; whiteBoardFill?: number; whiteBoardColor?: string }) {
   const P = (pts: [number, number][]) => pts.map(v => v.join(',')).join(' ')
   const T = (x: number, y: number): [number, number] => [x, y]
   const leftWall = [T(sx(0, 0), sy(0, 0) - WH), T(sx(0, ROWS), sy(0, ROWS) - WH), T(sx(0, ROWS), sy(0, ROWS)), T(sx(0, 0), sy(0, 0))]
@@ -785,7 +812,7 @@ function RoomBackground({ onDoorClick }: { onDoorClick: () => void }) {
       {/* Wall decorations */}
       <ProjectorScreen />
       <Clapperboard gy={0.9} />
-      <Whiteboard gy1={7.8} gy2={9.8} />
+      <Whiteboard gy1={7.8} gy2={9.8} fillPct={whiteBoardFill} agentColor={whiteBoardColor} />
       <BigMoviePoster gx={0.5} color1="#78350f" color2="#d97706" accent="#fbbf24" />
       <BigMoviePoster gx={3.2} color1="#450a0a" color2="#dc2626" accent="#fbbf24" />
       <WindowSkyline gx1={6} gx2={10} />
@@ -1114,9 +1141,10 @@ interface Props {
   onCallAll: () => void
   onExitMeeting: () => void
   isRunning: boolean
+  messages?: Message[]
 }
 
-export default function OfficeScene({ inMeeting, agentStatus, onToggleAgent, onCallAll, onExitMeeting, isRunning }: Props) {
+export default function OfficeScene({ inMeeting, agentStatus, onToggleAgent, onCallAll, onExitMeeting, isRunning, messages = [] }: Props) {
   const svgRef = useRef<SVGSVGElement>(null)
   const moveStatesRef = useRef<Record<AgentId, AgentMoveState>>(initMoveStates())
   const [moveStates, setMoveStates] = useState<Record<AgentId, AgentMoveState>>(moveStatesRef.current)
@@ -1125,6 +1153,11 @@ export default function OfficeScene({ inMeeting, agentStatus, onToggleAgent, onC
   const [speechBubbles, setSpeechBubbles] = useState<Partial<Record<AgentId, string>>>({})
   const [forceShowMeeting, setForceShowMeeting] = useState(false)
   const [forceShowReception, setForceShowReception] = useState(false)
+
+  // ── T31: Whiteboard fill based on active pipeline message ─────────────
+  const activeMsg = messages.find(m => !m.done && m.role !== 'user')
+  const activeSpeakingAgent = activeMsg ? AGENTS.find(a => a.id === activeMsg.role) : null
+  const whiteBoardFill = activeMsg ? Math.min(activeMsg.content.length / 1200, 1) : 0
 
   // ── Cliente espelho ativo na sala de reunião ───────────────────────────
   const espelhoClientes = AGENTS.filter(a => a.reuniaoOnly)
@@ -1439,7 +1472,7 @@ export default function OfficeScene({ inMeeting, agentStatus, onToggleAgent, onC
 
           <g>
             <ReceptionBackground />
-            <RoomBackground onDoorClick={() => setForceShowMeeting(true)} />
+            <RoomBackground onDoorClick={() => setForceShowMeeting(true)} whiteBoardFill={whiteBoardFill} whiteBoardColor={activeSpeakingAgent?.color} />
             <MeetingRoomBackground theme={meetingTheme} />
 
             {AGENTS.map(agent => {
@@ -1488,6 +1521,24 @@ export default function OfficeScene({ inMeeting, agentStatus, onToggleAgent, onC
                     </motion.g>
                   )}
 
+                  {/* T33 — Mic ring for speaking in meeting mode */}
+                  {isIn && status === 'speaking' && (
+                    <g>
+                      <circle cx={22} cy={38} r={32} fill="none" stroke={agent.color} strokeWidth="2"
+                        opacity="0.5" className="animate-mic-ring" />
+                      <circle cx={22} cy={38} r={32} fill="none" stroke={agent.color} strokeWidth="1.5"
+                        opacity="0.3" className="animate-mic-ring" style={{ animationDelay: '0.4s' }} />
+                      {/* Mic icon above head */}
+                      <g transform="translate(22,-20)">
+                        <circle cx={0} cy={0} r={8} fill={agent.color} opacity="0.9" />
+                        <rect x={-2.5} y={-5} width={5} height={8} rx={2.5} fill="white" />
+                        <path d="M-4,3 Q0,7 4,3" stroke="white" strokeWidth="1.2" fill="none" strokeLinecap="round" />
+                        <line x1="0" y1="7" x2="0" y2="9" stroke="white" strokeWidth="1.2" />
+                        <line x1="-3" y1="9" x2="3" y2="9" stroke="white" strokeWidth="1.2" />
+                      </g>
+                    </g>
+                  )}
+
                   {/* Thinking balloon */}
                   {status === 'thinking' && (
                     <g transform="translate(36,-14)">
@@ -1496,10 +1547,26 @@ export default function OfficeScene({ inMeeting, agentStatus, onToggleAgent, onC
                     </g>
                   )}
 
-                  {/* Status dot */}
-                  {status !== 'idle' && (
+                  {/* T32 — Done badge ✓ */}
+                  {status === 'done' && (
+                    <g transform="translate(34,-2)">
+                      <circle cx={7} cy={7} r={7} fill="#10b981" stroke="white" strokeWidth="1.5" />
+                      <text x={7} y={11} textAnchor="middle" fontSize={8} fill="white" fontWeight="bold">✓</text>
+                    </g>
+                  )}
+
+                  {/* T32 — Error badge ✗ */}
+                  {status === 'error' && (
+                    <g transform="translate(34,-2)">
+                      <circle cx={7} cy={7} r={7} fill="#ef4444" stroke="white" strokeWidth="1.5" />
+                      <text x={7} y={11} textAnchor="middle" fontSize={8} fill="white" fontWeight="bold">✕</text>
+                    </g>
+                  )}
+
+                  {/* Status dot — only for thinking/speaking (done/error now have badges) */}
+                  {(status === 'speaking' || status === 'thinking') && (
                     <circle cx={38} cy={2} r={5.5}
-                      fill={status === 'speaking' ? '#f59e0b' : status === 'thinking' ? '#8b5cf6' : status === 'done' ? '#10b981' : '#ef4444'}
+                      fill={status === 'speaking' ? '#f59e0b' : '#8b5cf6'}
                       stroke="white" strokeWidth="1.5" />
                   )}
 
@@ -1517,6 +1584,8 @@ export default function OfficeScene({ inMeeting, agentStatus, onToggleAgent, onC
                         thinking={status === 'thinking'}
                         walking={ms.walking && !isIn}
                         sitting={isSitting}
+                        done={status === 'done'}
+                        error={status === 'error'}
                       />
                     </div>
                   </foreignObject>

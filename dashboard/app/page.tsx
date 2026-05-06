@@ -184,6 +184,7 @@ export default function Home() {
           onCallAll={callAll}
           onExitMeeting={exitMeeting}
           isRunning={isRunning}
+          messages={messages}
         />
       </main>
 

@@ -1,10 +1,10 @@
 'use client'
 import type { AgentId } from '@/lib/agents'
 
-interface Props { id: AgentId; size?: number; speaking?: boolean; thinking?: boolean; walking?: boolean; sitting?: boolean }
+interface Props { id: AgentId; size?: number; speaking?: boolean; thinking?: boolean; walking?: boolean; sitting?: boolean; done?: boolean; error?: boolean }
 
-export default function CharacterSprite({ id, size = 1, speaking, walking, sitting }: Props) {
-  const cls = speaking ? 'animate-talk-bob' : walking ? 'animate-walk' : sitting ? 'animate-seated' : 'animate-float'
+export default function CharacterSprite({ id, size = 1, speaking, walking, sitting, done, error }: Props) {
+  const cls = speaking ? 'animate-talk-bob' : error ? 'animate-error' : done ? 'animate-celebrate' : walking ? 'animate-walk' : sitting ? 'animate-seated' : 'animate-float'
   const W = 40, H = 72
 
   const sprites: Record<AgentId, React.ReactNode> = {
