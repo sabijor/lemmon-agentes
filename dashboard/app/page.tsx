@@ -18,6 +18,7 @@ import { AGENTS, type AgentId } from '@/lib/agents'
 import { useChat, type ImageData } from '@/lib/useChat'
 import { useHistory, type HistoryDetail } from '@/lib/useHistory'
 import { useReuniao } from '@/lib/useReuniao'
+import Link from 'next/link'
 import OfficeScene from '@/components/office/OfficeScene'
 import ChatPanel from '@/components/chat/ChatPanel'
 import HistoryPanel from '@/components/history/HistoryPanel'
@@ -131,6 +132,16 @@ export default function Home() {
             })}
           </div>
           <Clock />
+          <Link href="/saude" title="Dashboard de Saúde"
+            className="w-8 h-8 rounded-lg border border-stone-200 bg-white flex items-center justify-center hover:bg-stone-50 hover:border-stone-400 transition-all text-stone-500">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+            </svg>
+          </Link>
+          <Link href="/hall-of-fame" title="Hall of Fame"
+            className="w-8 h-8 rounded-lg border border-stone-200 bg-white flex items-center justify-center hover:bg-stone-50 hover:border-stone-400 transition-all text-stone-500 text-sm">
+            🏆
+          </Link>
           <button
             onClick={() => setHistoryOpen(v => !v)}
             className={`w-8 h-8 rounded-lg border flex items-center justify-center transition-all
