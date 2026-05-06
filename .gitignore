@@ -9,3 +9,7 @@ venv/
 node_modules/
 dashboard/.next/
 dashboard/out/
+dashboard/tsconfig.tsbuildinfo
+shares/
+backups/
+*.log
