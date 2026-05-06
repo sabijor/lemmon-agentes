@@ -961,7 +961,7 @@ async def chat(ws: WebSocket):
                     })
                     ctrl = await ws.receive_json()
                     if ctrl.get("type") == "autorizar_custo":
-                        custo_cap_autorizado += float(ctrl.get("valor", 0.5))
+                        custo_cap_autorizado += max(0.1, float(ctrl.get("valor", 0.5)))
                     else:
                         pipeline_cancelled = True
                         return False
