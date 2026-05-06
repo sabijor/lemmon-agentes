@@ -1,6 +1,6 @@
 # LEMMON AGENTES — Manual do Sistema
 
-**Versão atual:** v1.8
+**Versão atual:** v1.9
 **Última atualização:** 2026-05-06
 **Mantido por:** Calebe Alves / Lemmon Produções
 
@@ -11,6 +11,19 @@
 ## Histórico de versões
 
 > **Convenção:** versões mais novas no topo. Cada release lista o que mudou em relação à anterior, mantendo histórico completo.
+
+### v1.9 — 2026-05-06
+
+**FASE 3 — T45 a T50: robustez, UX e polish.**
+
+- **Piso no autorizar_custo (T45):** Valor 0 ou negativo no payload `autorizar_custo` agora é clampeado para mínimo $0.10, evitando loop infinito de "cap atingido".
+- **Risco vermelho Heitor via campo estruturado (T46):** Detecção lê `risco_geral` do `output_tecnico` (dict) antes de fazer fallback no emoji 🔴 — robusto a mudanças de formatação do modelo.
+- **Autocomplete session_id na calibragem (T47):** Página `/calibragem` busca `/historico` ao montar e alimenta `<datalist>` com últimas 20 sessões que incluíram Pedro. Entrada livre continua possível.
+- **Wizard idleQuote com placeholder TODO (T48):** `onboard_cliente.py` gera `idleQuote: 'TODO: defina a frase de fundo de {nome_curto}'` em vez de frase genérica — força o operador a personalizar antes de colar o snippet.
+- **Agendamento do Pulse semanal (T49):** §5.7 do manual tem instruções completas de `cron` e `launchd` para agendar o pulse toda segunda às 6h no macOS. O script já existia; a automação estava pendente de documentação.
+- **Página `/share/[token]` renderizada no Next.js (T50):** Novo endpoint `GET /share/{token}.json` retorna JSON puro. Página Next.js renderiza com branding Lemmon (header com logo, seções por agente, formulário de comentários). Sem redirecionamento para outro domínio. Endpoint HTML do FastAPI mantido como fallback.
+
+---
 
 ### v1.8 — 2026-05-06
 

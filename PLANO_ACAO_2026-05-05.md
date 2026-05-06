@@ -689,6 +689,274 @@ Quando puder:             T45, T46, T47, T48, T49, T50
 
 ---
 
+# FASE 4 — BUGS DESCOBERTOS NA BATERIA DE TESTES E2E
+
+**Adicionado:** 2026-05-06 (sessão 4)
+**Origem:** bateria de testes manual no Chrome em `localhost:4000` rodando 14 de 23 cenários planejados. Custo total da bateria: ~$1.19. Janela coincidiu com `overloaded_error` na API Anthropic — alguns achados podem estar amplificados, mas o padrão sistêmico de tratamento de erro persiste mesmo em janela limpa.
+**Estrutura:** 5 críticas, 4 médias, 1 cosmética agrupada.
+
+> **Padrão sistêmico identificado:** três endpoints auxiliares (`/sugerir_pipeline`, `/briefing_reverso`, `/cortes_prontos`) e o WebSocket de reunião não tratam erros LLM com mensagem amigável — frontend mostra "Failed to fetch" ou repr de dict cru. O endpoint `/transcrever` está correto (T21 passou) e serve de modelo. Vale **fazer T52 e T53 ANTES** das outras: muitos bugs aparentes podem ser sintoma de erro de upstream mascarado.
+
+---
+
+## CRÍTICAS
+
+### T51 — Parse de menções em reunião não casa nomes curtos com IDs compostos
+
+**Severidade:** crítica · **Onde:** `api_server.py:_parse_mentions` (~linha 1101)
+
+**Problema:**
+Quando o operador escreve `@pedro` no chat de reunião, o regex tenta casar com o id `pedro_abrahao` e falha. Como `mentioned` fica vazio e o modo manual não está ativo, **todos os agentes presentes respondem** em vez de só o Pedro. Foi exatamente o que aconteceu no teste T10: Otto e Heitor responderam, Pedro nunca respondeu.
+
+**O que fazer:**
+1. Construir mapping `nome_curto → id` a partir do `agents.ts` ou hardcoded em Python:
+   ```python
+   AGENTE_ALIAS = {
+       "otto": "otto", "heitor": "heitor", "salles": "salles",
+       "sonia": "sonia", "aya": "aya",
+       "pedro": "pedro_abrahao",  # alias do nome curto
+   }
+   ```
+2. `_parse_mentions` deve testar tanto o id direto quanto qualquer alias que aponte para um id presente em `agents`.
+3. Se um cliente novo for adicionado via wizard, o alias dele deve entrar nessa lista (documentar no onboard_cliente.py).
+
+**Critério de aceite:**
+- [ ] `@pedro o que você acha de X?` em reunião com Pedro presente faz **só Pedro** responder
+- [ ] `@pedro_abrahao` (id completo) também funciona
+- [ ] Outras menções (`@otto`, `@heitor`) seguem funcionando
+- [ ] Se mencionar agente não presente na sala, é ignorado (comportamento atual)
+
+---
+
+### T52 — Padronizar tratamento de erro 503 em endpoints LLM-based (sistêmico)
+
+**Severidade:** crítica · **Onde:** `api_server.py` em `/sugerir_pipeline`, `/briefing_reverso`, `/cortes_prontos`
+
+**Problema:**
+- `POST /briefing_reverso` retorna 503 sem detail → frontend mostra "Failed to fetch"
+- `POST /cortes_prontos` mesma coisa
+- `GET /sugerir_pipeline` mesma coisa, e botão fica sem feedback visual
+- Quando a API Anthropic falha (overloaded, rate limit, key inválida), os endpoints simplesmente quebram
+
+**Modelo a seguir:** `/transcrever` já faz certo:
+```python
+if not openai_key:
+    raise HTTPException(503, "OPENAI_API_KEY não configurada. ...")
+try:
+    ...
+except Exception as exc:
+    raise HTTPException(500, f"Erro na transcrição: {exc}")
+```
+
+**O que fazer:**
+1. Envolver as chamadas Anthropic em cada endpoint com try/except específico para `APIError`, `RateLimitError`, `AuthenticationError`.
+2. Cada exceção mapeia para um `HTTPException` com `detail` legível em pt-BR:
+   - `overloaded_error` → "API Anthropic temporariamente sobrecarregada. Tente em 30 segundos."
+   - `rate_limit_error` → "Limite de chamadas atingido. Aguarde alguns segundos."
+   - `authentication_error` → "Chave da API inválida. Verifique ANTHROPIC_API_KEY."
+3. Frontend de cada feature (briefing-reverso, cortes, sugerir-agentes) precisa renderizar `error.detail` em vez de "Failed to fetch".
+
+**Critério de aceite:**
+- [ ] Forçar overloaded_error (mockar) e ver mensagem humana em todos os 3 endpoints
+- [ ] Forçar key inválida e ver mensagem clara
+- [ ] Frontend de cada feature mostra a mensagem do `detail` em UI legível
+
+---
+
+### T53 — Erros da API Anthropic vazando como repr de dict no chat
+
+**Severidade:** crítica · **Onde:** `core/agente_base.py:_chamar_api` e `_chamar_api_stream` + `api_server.py /ws/reuniao` exception handler
+
+**Problema:**
+Durante o teste T10, o chat exibiu literalmente:
+```
+Erro da API Anthropic: {'type': 'error', 'error': {'details': None,
+'type': 'overloaded_error', 'message': 'Overloaded'}, 'request_id':
+'req_011CamaJsNtrMBEhTzRXHPM5'}
+```
+Isso é resultado de `f"Erro da API Anthropic: {e}"` onde `e` é um `APIError` com repr feio. Cliente não entende, expõe `request_id` interno, parece bug em vez de capacidade temporária.
+
+**O que fazer:**
+1. Em `core/agente_base.py` (ou criar helper `core/erros.py`):
+   ```python
+   def formatar_erro_anthropic(e):
+       msg = str(getattr(e, "message", "")) or str(e)
+       if "overloaded" in msg.lower():
+           return "API temporariamente sobrecarregada. Tente em 30s."
+       if "rate_limit" in msg.lower():
+           return "Limite de chamadas atingido. Aguarde."
+       return f"Erro temporário: {msg[:200]}"
+   ```
+2. Substituir `raise RuntimeError(f"Erro da API Anthropic: {e}")` pelo formatador em `_chamar_api`, `_chamar_api_stream` e em qualquer try/except de chamada Anthropic no `api_server.py`.
+3. Em `/ws/reuniao` e `/ws/chat`, ao mandar `agent_error`, o `error` enviado deve ser a string formatada, não o `str(exception)` cru.
+
+**Critério de aceite:**
+- [ ] Chat nunca mostra `{'type': 'error', ...}` como string Python
+- [ ] Mensagem clara em pt-BR para overloaded e rate_limit
+- [ ] `request_id` interno não aparece pro operador
+
+---
+
+### T54 — URL inconsistente entre header link e página de cortes-prontos
+
+**Severidade:** média/crítica de UX · **Onde:** `dashboard/app/page.tsx` (header) e `dashboard/app/cortes/...` ou `dashboard/app/cortes-prontos/...`
+
+**Problema:**
+Link do header aponta para `/cortes`, mas existe (ou deveria existir) `/cortes-prontos`. Resultado: 404 ao clicar no ícone ✂️.
+
+**O que fazer:**
+1. Decidir o nome canônico (sugiro `/cortes`, mais curto).
+2. Renomear pasta da página se necessário (`dashboard/app/cortes-prontos/` → `dashboard/app/cortes/`).
+3. Conferir se há outras referências a um ou outro nome (`grep -r "cortes-prontos\|/cortes" dashboard/`).
+4. Atualizar manual `§4` se citar nome antigo.
+
+**Critério de aceite:**
+- [ ] Click no ícone ✂️ no header abre a página
+- [ ] Sem 404 em nenhum link interno
+
+---
+
+### T55 — Tags sugeridas não estão sendo geradas (T15 documentado mas vazio)
+
+**Severidade:** crítica · **Onde:** `api_server.py /ws/chat` (~linha 1071)
+
+**Problema:**
+Pipeline 5 agentes do teste T1 concluiu normalmente, mas o JSON da sessão tem `"tags": []` e nenhum chip apareceu na UI. Manual diz que Aya/Haiku gera 3-5 tags ao final.
+
+**Hipóteses:**
+- O try/except do bloco está engolindo erros silenciosamente (linha 1090). Se Haiku falhar, nada acontece.
+- Pode ter coincidido com a janela de overloaded_error.
+
+**O que fazer:**
+1. Adicionar log explícito quando o bloco de tags falha (em vez de `except: pass`).
+2. Mandar evento `tags_sugeridas_falhou` para o frontend quando der erro, com `detail`.
+3. Reproduzir um pipeline limpo (sem overloaded). Se ainda assim não gerar tags, investigar o prompt do Haiku ou o parse das tags.
+4. Considerar fallback: se o Haiku falhar, mandar lista de tags inferidas heuristicamente do briefing (até como sinal mínimo).
+
+**Critério de aceite:**
+- [ ] Pipeline normal pós-fix gera 3-5 tags como chips na UI
+- [ ] Quando falha, log do servidor mostra a causa
+- [ ] Frontend recebe sinal de falha (não fica em estado pendente)
+
+---
+
+## MÉDIAS
+
+### T56 — Whiteboard ao vivo (T31) não está visível no DOM
+
+**Severidade:** média · **Onde:** `dashboard/components/office/OfficeScene.tsx`
+
+**Problema:**
+`querySelector('[class*=whiteboard]')` retorna 0 elementos. Manual v1.7 documenta que existe e funciona, mas durante o teste T2 não foi possível identificar o componente. Possíveis causas: classe CSS não inclui "whiteboard"; componente foi montado em outra sala (reunião) que não estava ativa; regrediu silenciosamente em alguma mudança.
+
+**O que fazer:**
+1. Localizar o componente: `grep -rn "whiteboard\|barra.*progresso" dashboard/components/office/`
+2. Se existe, conferir se renderiza condicionalmente em sala visível durante pipeline.
+3. Se classes CSS não incluem "whiteboard", adicionar `data-testid="whiteboard"` para facilitar QA futuro.
+4. Reproduzir o pipeline T1 e tirar screenshot do whiteboard funcionando.
+
+**Critério de aceite:**
+- [ ] Durante pipeline ativo, elemento com data-testid="whiteboard" existe no DOM
+- [ ] Barras coloridas se preenchem visivelmente
+- [ ] Screenshot anexado como prova
+
+---
+
+### T57 — TTS do dossiê (T22) sem áudio nem feedback
+
+**Severidade:** média · **Onde:** `dashboard/components/chat/ChatPanel.tsx` botão "ouvir dossiê"
+
+**Problema:**
+Botão `▶ ouvir dossiê` aparece corretamente. Click não cria `<audio>` no DOM, sem requests, sem áudio audível, sem mensagem de erro. Falha silente.
+
+**Hipóteses:**
+- `window.speechSynthesis` pode estar disponível mas com voz pt-BR não instalada — `speak()` retorna sem erro mas não emite som.
+- Browser pode estar bloqueando autoplay.
+
+**O que fazer:**
+1. Adicionar log no handler do botão: `console.log('voices:', window.speechSynthesis.getVoices())` antes do speak.
+2. Verificar `speechSynthesis.speaking` após chamar — se ficar false em 1s, tem problema.
+3. Se nenhuma voz pt-BR disponível, mostrar toast: "Seu sistema não tem voz pt-BR instalada. Tente Chrome ou instale uma voz no sistema."
+4. Botão deve mudar para "⏸ pausar" durante narração e voltar quando termina.
+
+**Critério de aceite:**
+- [ ] Click no botão narra (em browser que suporta) ou mostra mensagem clara
+- [ ] Estado visual do botão reflete narração ativa
+- [ ] Console log indica voz selecionada para debug
+
+---
+
+### T58 — Botão "sugerir agentes" sem feedback de loading (T11)
+
+**Severidade:** baixa/média · **Onde:** `dashboard/components/chat/ChatPanel.tsx` botão `✦ sugerir agentes`
+
+**Problema:**
+Click não muda estado visual. Se a request demora ou falha, operador não sabe. Combina mal com T52 — usuário acha que botão tá quebrado.
+
+**O que fazer:**
+1. Adicionar `isLoading` no estado local do botão.
+2. Durante request: trocar texto para "⌛ analisando…" e desabilitar.
+3. Em caso de erro (após T52 estar feito), mostrar `error.detail` em toast ou bubble.
+
+**Critério de aceite:**
+- [ ] Botão fica visualmente em estado loading durante request
+- [ ] Falha mostra mensagem amigável
+
+---
+
+### T59 — Telemetria de latência por agente (observabilidade)
+
+**Severidade:** média · **Onde:** `core/agente_base.py` (já tem `duracao` no retorno) + `api_server.py` (precisa salvar) + `dashboard/components/history/HistoryPanel.tsx` (exibir)
+
+**Problema:**
+Pipeline T1 levou ~17min com Heitor demorando 4min sozinho. Provavelmente agravado por overloaded_error e retries internos. Hoje não há visibilidade sobre tempo por agente — operador não sabe se foi lento por web search, retry, ou input grande.
+
+**O que fazer:**
+1. `_chamar_api` já calcula `duracao`. Garantir que cada agente registra isso no resultado.
+2. No `api_server.py`, ao salvar a sessão, incluir `duracoes_segundos` por agente no JSON:
+   ```python
+   "duracoes_segundos": {"otto": 12.4, "heitor": 248.7, ...}
+   ```
+3. No HistoryPanel detalhe da sessão, mostrar mini-gráfico ou lista com duração por agente.
+4. Bonus: alerta se algum agente passar de 120s (badge ⏱).
+
+**Critério de aceite:**
+- [ ] JSON da sessão tem `duracoes_segundos` por agente
+- [ ] HistoryPanel exibe a informação
+- [ ] Alerta visual para agente lento
+
+---
+
+## COSMÉTICOS
+
+### T60 — Pacote de polimento UI (3 fixes pequenos juntos)
+
+**Severidade:** cosmética · **Onde:** vários
+
+**Lista:**
+1. **Dashboard saúde — barra sem rótulo (`/saude`):** primeira barra de "Uso de agentes" mostra `8 / 67%` sem nome. Adicionar label do agente correspondente.
+2. **Pop "Dossiê pronto!" sobre impressora:** após pipeline, popup aparece sobre o sprite da impressora mas não é claramente clicável. Adicionar `cursor:pointer`, hover state, ou mover para área mais óbvia.
+3. **Outros pequenos achados visuais** que apareceram nos testes mas não foram detalhados — coletar enquanto faz os outros e juntar aqui.
+
+**Critério de aceite:**
+- [ ] Todas as barras de "Uso de agentes" têm label
+- [ ] Popup do dossiê tem affordance visível de "clique para abrir"
+
+---
+
+# ORDEM SUGERIDA DA FASE 4
+
+```
+Imediato:                  T52 + T53 (sistêmicos — destravam diagnóstico do resto)
+Em seguida:                T51 (Pedro reunião) + T54 (URL cortes) + T55 (tags)
+Quando puder:              T56, T57, T58, T59
+Polimento final:           T60
+```
+
+> **Antes de marcar T55 (tags) como concluída**, refazer a bateria de teste em janela sem `overloaded_error` na Anthropic. Se as tags voltarem a aparecer só com T52+T53 (mensageria correta), o "bug" T55 era sintoma — fechar como duplicata.
+
+---
+
 ## POLIMENTOS — fazer só se sobrar tempo
 
 Lista curta, sem detalhamento — cada um vira tarefa numerada quando for atacado.
@@ -742,3 +1010,10 @@ Quando voltar à conversa, eu (o assistente daqui) vou:
 | T41 — XSS escape | ✅ concluído | 2026-05-06 | html_escape em todos os campos; max_length autor/texto; guard vazio; cap 20 comentários. Testado: &lt;script&gt; aparece como texto literal. **Nota:** T40 e T41 landed no mesmo commit (7cf0992) por terem sido implementados antes do primeiro commit |
 | T42 — PDFs manual | ✅ concluído | 2026-05-06 | Opção A documentada no CHANGELOG; MANUAL_v1.7 e v1.8 existem em releases/ |
 | T43 — registro execução | ✅ concluído | 2026-05-06 | Esta tabela atualizada com todos os épicos e FASE 3 bloco crítico |
+| T44 — bug A/B Salles | ✅ concluído | 2026-05-06 | Backend envia salles_v1/v2/v3; frontend faz fallback no AGENT_MAP. 3 bolhas distintas sem colisão |
+| T45 — piso autorizar_custo | ✅ concluído | 2026-05-06 | `max(0.1, float(valor))` — uma linha |
+| T46 — risco vermelho Heitor | ✅ concluído | 2026-05-06 | Lê `risco_geral` do dict output_tecnico; emoji 🔴 como fallback |
+| T47 — autocomplete calibragem | ✅ concluído | 2026-05-06 | datalist alimentado por /historico filtrado em sessões com Pedro |
+| T48 — idleQuote wizard | ✅ concluído | 2026-05-06 | Placeholder TODO visível no snippet gerado pelo onboard_cliente.py |
+| T49 — pulse agendado | ✅ concluído | 2026-05-06 | Instruções de cron e launchd adicionadas ao §5.7 do manual |
+| T50 — share Next.js | ✅ concluído | 2026-05-06 | GET /share/{token}.json + página Next.js com branding Lemmon; sem redirect |
