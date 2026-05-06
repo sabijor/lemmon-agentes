@@ -1,6 +1,6 @@
 # LEMMON AGENTES — Manual do Sistema
 
-**Versão atual:** v1.1
+**Versão atual:** v1.2
 **Última atualização:** 2026-05-06
 **Mantido por:** Calebe Alves / Lemmon Produções
 
@@ -11,6 +11,15 @@
 ## Histórico de versões
 
 > **Convenção:** versões mais novas no topo. Cada release lista o que mudou em relação à anterior, mantendo histórico completo.
+
+### v1.2 — 2026-05-06
+
+**Épico B — Pedro como gate de qualidade.**
+
+- **Gate espelho (T9):** Após o Salles e antes da Sônia, Pedro pode validar automaticamente se o roteiro está fiel à voz/posicionamento do cliente. Configurável por sessão no painel do Salles: `off` (padrão, sem gate), `auto` (bloqueia se veredicto 🔴), `manual` (sempre pede aprovação). O veredicto aparece no chat com badge 🟢/🟡/🔴. Em modo `auto`, roteiros com 🔴 bloqueiam o pipeline e o operador decide se continua.
+- **Mesa redonda stress test (T10):** Botão `⊞ mesa` no toolbar de reunião. Escreva a tese no campo de input e clique para que cada agente presente questione a tese no seu ângulo específico (estratégia, compliance, roteiro, performance, cliente espelho). Aya sintetiza uma ata executiva. Endpoint: `GET /ws/mesa_redonda`.
+
+---
 
 ### v1.1 — 2026-05-06
 
@@ -428,7 +437,7 @@ done
 
 O `PLANO_ACAO_2026-05-05.md` na raiz do projeto contém o plano completo com 9 épicos e 39 tarefas. Resumo do que está no horizonte:
 
-**Próximos passos imediatos.** ~~Família de espelhos de cliente~~ ✅ (v1.1), Pedro como gate de qualidade (validação automática entre Salles e Sônia), Pulse semanal automatizado (relatório institucional toda segunda).
+**Próximos passos imediatos.** ~~Família de espelhos de cliente~~ ✅ (v1.1), ~~Pedro como gate de qualidade~~ ✅ (v1.2), Pulse semanal automatizado (relatório institucional toda segunda).
 
 **Médio prazo.** Novos agentes (Marcia/pós-produção, Felipe/concorrente, Renata/distribuição, Lia/voz Lemmon). Workflows novos (modo remix, briefing reverso, comparativo A/B no Salles, cortes-prontos).
 
