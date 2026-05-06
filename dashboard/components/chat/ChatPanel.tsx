@@ -340,6 +340,7 @@ export default function ChatPanel({
   const [tagsAceitas, setTagsAceitas] = useState<string[]>([])
   const [sugestao, setSugestao] = useState<{ agentes: AgentId[]; razoes: Record<string, string> } | null>(null)
   const [loadingSugestao, setLoadingSugestao] = useState(false)
+  const [sugestaoError, setSugestaoError] = useState('')
 
   useEffect(() => { setTagsAceitas(tagsSugeridas) }, [tagsSugeridas])
 
@@ -348,12 +349,17 @@ export default function ChatPanel({
     if (!q || loadingSugestao) return
     setLoadingSugestao(true)
     setSugestao(null)
+    setSugestaoError('')
     try {
       const res = await fetch(`${API_URL}/sugerir_pipeline?briefing=${encodeURIComponent(q)}`)
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.detail ?? 'Falha ao sugerir pipeline')
+      }
       const data = await res.json()
       setSugestao(data)
-    } catch {
-      setSugestao(null)
+    } catch (e) {
+      setSugestaoError((e as Error).message)
     } finally {
       setLoadingSugestao(false)
     }
@@ -459,6 +465,8 @@ export default function ChatPanel({
   const [audioError, setAudioError] = useState('')
   const [shareToken, setShareToken] = useState<string | null>(null)
   const [sharingState, setSharingState] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
+  const [ttsSpeaking, setTtsSpeaking] = useState(false)
+  const [ttsError, setTtsError] = useState('')
   const recognitionRef = useRef<ISpeechRecognition | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -1138,24 +1146,43 @@ export default function ChatPanel({
 
               {/* T35 — TTS: narrar Aya */}
               {messages.some(m => m.role === 'aya' && m.done && m.content) && (
-                <div className="border-t border-stone-200/60 pt-2 flex items-center justify-between">
-                  <span className="text-[8px] font-mono text-stone-400 uppercase tracking-widest">Narração (TTS)</span>
-                  <button
-                    onClick={() => {
-                      const ayaMsg = messages.find(m => m.role === 'aya' && m.done && m.content)
-                      if (!ayaMsg) return
-                      if (window.speechSynthesis.speaking) { window.speechSynthesis.cancel(); return }
-                      const utt = new SpeechSynthesisUtterance(ayaMsg.content)
-                      utt.lang = 'pt-BR'
-                      utt.rate = 0.92
-                      window.speechSynthesis.speak(utt)
-                    }}
-                    className="flex items-center gap-1 px-2 py-1 rounded-lg border border-stone-200 bg-white text-[9px] font-mono text-stone-500 hover:border-stone-400 hover:text-stone-700 transition-all">
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <polygon points="5 3 19 12 5 21 5 3"/>
-                    </svg>
-                    ouvir dossiê
-                  </button>
+                <div className="border-t border-stone-200/60 pt-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[8px] font-mono text-stone-400 uppercase tracking-widest">Narração (TTS)</span>
+                    <button
+                      onClick={() => {
+                        setTtsError('')
+                        if (ttsSpeaking) { window.speechSynthesis.cancel(); setTtsSpeaking(false); return }
+                        const ayaMsg = messages.find(m => m.role === 'aya' && m.done && m.content)
+                        if (!ayaMsg) return
+                        const voices = window.speechSynthesis.getVoices()
+                        console.log('[TTS] vozes disponíveis:', voices.map(v => `${v.name} (${v.lang})`))
+                        const ptVoice = voices.find(v => v.lang.startsWith('pt'))
+                        if (!ptVoice && voices.length > 0) {
+                          setTtsError('Nenhuma voz pt-BR disponível. Tente Chrome ou instale uma voz no sistema.')
+                          return
+                        }
+                        const utt = new SpeechSynthesisUtterance(ayaMsg.content)
+                        utt.lang = 'pt-BR'
+                        utt.rate = 0.92
+                        if (ptVoice) utt.voice = ptVoice
+                        utt.onstart = () => setTtsSpeaking(true)
+                        utt.onend = () => setTtsSpeaking(false)
+                        utt.onerror = (e) => { setTtsSpeaking(false); setTtsError(`Erro TTS: ${e.error}`) }
+                        window.speechSynthesis.speak(utt)
+                      }}
+                      className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-[9px] font-mono transition-all
+                        ${ttsSpeaking
+                          ? 'bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100'
+                          : 'border-stone-200 bg-white text-stone-500 hover:border-stone-400 hover:text-stone-700'}`}>
+                      {ttsSpeaking ? (
+                        <><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg> pausar</>
+                      ) : (
+                        <><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="5 3 19 12 5 21 5 3"/></svg> ouvir dossiê</>
+                      )}
+                    </button>
+                  </div>
+                  {ttsError && <p className="text-[9px] font-mono text-red-500 mt-1">{ttsError}</p>}
                 </div>
               )}
 
@@ -1385,6 +1412,9 @@ export default function ChatPanel({
                     className="text-[8px] font-mono text-violet-500 hover:text-violet-700 transition-colors disabled:opacity-50 flex items-center gap-1">
                     {loadingSugestao ? '⟳ analisando...' : '✦ sugerir agentes'}
                   </button>
+                )}
+                {sugestaoError && (
+                  <span className="text-[8px] font-mono text-red-500">{sugestaoError}</span>
                 )}
               </div>
               {referencias && referencias.length > 0 && (
