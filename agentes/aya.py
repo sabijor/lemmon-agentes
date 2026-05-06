@@ -351,6 +351,12 @@ Use `compilar_resumos_lemmon`.
         elif agente == "sonia":
             analise = output_tecnico.get("analise_master", {})
             consolidada = output_tecnico.get("analise_consolidada", {})
+            if isinstance(consolidada, str):
+                try:
+                    import json as _json_local
+                    consolidada = _json_local.loads(consolidada)
+                except Exception:
+                    consolidada = {}
             return {
                 "nota_master": analise.get("nota_geral", 0),
                 "num_cortes": len(output_tecnico.get("cortes_autonomos", [])),
