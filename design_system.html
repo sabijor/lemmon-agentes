@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AURA DEFINITIVE EDITION</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@100;200;300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter'], mono: ['JetBrains Mono'], display: ['Space Grotesk'] },
+                    animation: { 'spin-slow': 'spin 12s linear infinite', float: 'float 6s ease-in-out infinite' },
+                    keyframes: { float: { '0%, 100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-15px)' } } },
+                    colors: { pure: '#ffffff', stone: { 50:'#fafaf9', 100:'#f5f5f4', 200:'#e7e5e4', 300:'#d6d3d1', 400:'#a8a29e', 500:'#78716c', 600:'#57534e', 700:'#44403c', 800:'#292524', 900:'#1c1917' } }
+                }
+            }
+        }
+    </script>
+    <style>
+        :root { --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1); --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1); }
+        body { background: #fdfdfd; color: #111; overflow-x: hidden; }
+        
+        /* Background & Utilities */
+        .noise { position: fixed; inset: 0; pointer-events: none; opacity: 0.2; z-index: 999; mix-blend-mode: overlay; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+        .glass { background: rgba(255,255,255,0.6); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.8); }
+        .glass-dark { background: rgba(28,25,23,0.85); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); }
+        
+        /* Hero Interactions */
+        .text-transparent-stroke {
+            color: transparent; -webkit-text-stroke: 1.5px rgba(0,0,0,0.1);
+            background: linear-gradient(0deg, #1c1917, #1c1917); background-size: 100% 0%;
+            background-repeat: no-repeat; background-position: bottom;
+            -webkit-background-clip: text; transition: all 1s var(--ease-out-expo);
+        }
+        .text-transparent-stroke:hover { background-size: 100% 100%; -webkit-text-stroke: 1.5px transparent; }
+        .flashlight-card { position: relative; overflow: hidden; }
+        .flashlight-card::before {
+            content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+            background: radial-gradient(800px circle at var(--x, -999px) var(--y, -999px), rgba(255,255,255,1) 0%, transparent 40%);
+            opacity: 0; transition: opacity 0.5s;
+        }
+        .flashlight-card:hover::before { opacity: 1; }
+        
+        /* Magnetic Button */
+        .magnetic-wrap { display: inline-block; padding: 20px; }
+        .magnetic-btn { transition: transform 0.3s var(--ease-out-expo); cursor: pointer; }
+
+        /* Sweep Border Button */
+        .btn-sweep {
+            position: relative; overflow: hidden; border: 1px solid transparent; 
+            transition: color 0.4s ease;
+        }
+        .btn-sweep::before, .btn-sweep::after {
+            content:''; position: absolute; width: 0; height: 1px; background: #1c1917; transition: all 0.4s var(--ease-out-expo);
+        }
+        .btn-sweep::before { top: 0; left: 0; } .btn-sweep::after { bottom: 0; right: 0; }
+        .btn-sweep span::before, .btn-sweep span::after {
+            content:''; position: absolute; width: 1px; height: 0; background: #1c1917; transition: all 0.4s var(--ease-out-expo);
+        }
+        .btn-sweep span::before { top: 0; right: 0; } .btn-sweep span::after { bottom: 0; left: 0; }
+        .btn-sweep:hover::before, .btn-sweep:hover::after { width: 100%; }
+        .btn-sweep:hover span::before, .btn-sweep:hover span::after { height: 100%; }
+
+        /* Slide Icon Button */
+        .btn-icon-slide { overflow: hidden; display: flex; align-items: center; gap: 8px; transition: all 0.3s ease; }
+        .btn-icon-slide iconify-icon { transition: transform 0.4s var(--ease-bounce), opacity 0.4s ease; transform: translateX(-20px); opacity: 0; width: 0; }
+        .btn-icon-slide:hover iconify-icon { transform: translateX(0); opacity: 1; width: 16px; }
+        .btn-icon-slide:hover { padding-left: 1.5rem; }
+
+        /* Liquid Glow Button */
+        .btn-glow {
+            position: relative; z-index: 1; transition: transform 0.3s ease;
+        }
+        .btn-glow::after {
+            content: ''; position: absolute; inset: -4px; z-index: -1; border-radius: inherit;
+            background: linear-gradient(45deg, #1c1917, #a8a29e, #1c1917); background-size: 200% 200%;
+            animation: shimmer 3s infinite linear; filter: blur(8px); opacity: 0; transition: opacity 0.5s ease;
+        }
+        .btn-glow:hover::after { opacity: 0.6; }
+        .btn-glow:hover { transform: scale(1.05); }
+
+        @keyframes shimmer { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+
+        /* Forms */
+        .float-input { position: relative; }
+        .float-input input, .float-input textarea { 
+            width: 100%; border: 1px solid #d6d3d1; border-radius: 8px; padding: 16px 16px 8px; outline: none; transition: all 0.3s ease;
+        }
+        .float-input input:focus, .float-input textarea:focus { border-color: #1c1917; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        .float-input label {
+            position: absolute; left: 16px; top: 18px; font-size: 14px; color: #a8a29e; transition: all 0.3s var(--ease-out-expo); pointer-events: none;
+        }
+        .float-input input:focus ~ label, .float-input input:not(:placeholder-shown) ~ label {
+            top: 4px; font-size: 10px; font-weight: 600; color: #1c1917; text-transform: uppercase; letter-spacing: 0.05em;
+        }
+
+        /* Animated Checkbox */
+        .custom-check { display: none; }
+        .check-box { width: 24px; height: 24px; border: 2px solid #d6d3d1; border-radius: 6px; position: relative; cursor: pointer; transition: all 0.3s; }
+        .check-box svg { position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; fill: none; stroke: #fff; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 20; stroke-dashoffset: 20; transition: stroke-dashoffset 0.4s var(--ease-bounce); }
+        .custom-check:checked + .check-box { background: #1c1917; border-color: #1c1917; }
+        .custom-check:checked + .check-box svg { stroke-dashoffset: 0; }
+
+        /* Custom Toggle Switch */
+        .toggle-switch { width: 44px; height: 24px; background: #e7e5e4; border-radius: 999px; position: relative; cursor: pointer; transition: background 0.3s; }
+        .toggle-knob { width: 20px; height: 20px; background: #fff; border-radius: 50%; position: absolute; top: 2px; left: 2px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); transition: transform 0.4s var(--ease-bounce); }
+        input:checked + .toggle-switch { background: #1c1917; }
+        input:checked + .toggle-switch .toggle-knob { transform: translateX(20px); }
+
+        /* Observers */
+        .reveal { opacity: 0; transform: translateY(40px); transition: all 1.2s var(--ease-out-expo); }
+        .reveal.active { opacity: 1; transform: translateY(0); }
+        .stagger-1 { transition-delay: 0.1s; } .stagger-2 { transition-delay: 0.2s; } .stagger-3 { transition-delay: 0.3s; }
+
+        /* Icons Hover Physcis */
+        .icon-bounce:hover iconify-icon { animation: bounce 0.5s var(--ease-bounce); }
+        .icon-swing:hover iconify-icon { animation: swing 0.8s ease-in-out; }
+        .icon-spin:hover iconify-icon { transform: rotate(180deg); transition: transform 0.6s var(--ease-out-expo); }
+        .icon-color:hover iconify-icon { color: #f59e0b; filter: drop-shadow(0 0 10px rgba(245,158,11,0.5)); transition: all 0.3s; }
+        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+        @keyframes swing { 20% { transform: rotate(15deg); } 40% { transform: rotate(-10deg); } 60% { transform: rotate(5deg); } 80% { transform: rotate(-5deg); } 100% { transform: rotate(0deg); } }
+
+    </style>
+</head>
+<body class="selection:bg-stone-900 selection:text-white">
+    <div class="noise"></div>
+    <div class="fixed inset-0 z-0 pointer-events-none opacity-20 bg-[url('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80')] mix-blend-multiply bg-cover opacity-[0.03]"></div>
+
+    <!-- Navigation -->
+    <header class="fixed top-0 w-full z-50 glass border-b border-stone-200/50">
+        <div class="max-w-[1440px] mx-auto px-6 py-4 flex justify-between items-center">
+            <div class="font-display font-bold text-xl tracking-tighter">AURA<span class="font-light">MAX</span></div>
+            <nav class="hidden md:flex gap-8 text-xs font-mono uppercase tracking-[0.15em] text-stone-500">
+                <a href="#type" class="hover:text-stone-900 transition-colors">Typography</a>
+                <a href="#colors" class="hover:text-stone-900 transition-colors">Colors</a>
+                <a href="#ui" class="hover:text-stone-900 transition-colors">Components</a>
+                <a href="#cards" class="hover:text-stone-900 transition-colors">Layouts</a>
+                <a href="#icons" class="hover:text-stone-900 transition-colors">Iconography</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="relative z-10 pt-20">
+        <!-- 1. HERO -->
+        <section class="min-h-[90vh] flex flex-col justify-center px-6 md:px-12 max-w-[1440px] mx-auto relative border-b border-stone-200/50 pb-20">
+            <div class="absolute top-[20%] right-[10%] w-[600px] h-[600px] bg-stone-200 rounded-full blur-[100px] animate-float opacity-50 z-0 pointer-events-none"></div>
+            
+            <div class="relative z-10 reveal active">
+                <span class="inline-flex items-center gap-2 px-3 py-1 bg-white border border-stone-200 rounded-full text-[10px] font-mono uppercase tracking-widest mb-10 shadow-sm">
+                    <span class="w-1.5 h-1.5 bg-stone-900 rounded-full animate-pulse"></span>
+                    Definitive Edition
+                </span>
+                
+                <h1 class="text-7xl md:text-[10rem] font-display font-medium leading-[0.8] tracking-tighter mb-8">
+                    Absolute<br>
+                    <span class="text-transparent-stroke" data-text="Potential">Potential</span>
+                </h1>
+                
+                <p class="text-xl text-stone-500 max-w-2xl font-light leading-relaxed mb-12">
+                    Nenhuma desculpa. Nenhum atalho. Este é o poder massivo de um sistema focado puramente em interações físicas, tipografia impecável e dezenas de utilitários micro-animados.
+                </p>
+
+                <div class="flex flex-wrap items-center gap-6">
+                    <div class="magnetic-wrap">
+                        <button class="magnetic-btn px-8 py-4 bg-stone-900 text-white rounded-full font-mono text-xs uppercase tracking-widest shadow-2xl hover:shadow-stone-900/30">
+                            Explore Interface
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. TYPOGRAPHY EXHAUSTIVE -->
+        <section id="type" class="py-24 px-6 md:px-12 max-w-[1440px] mx-auto border-b border-stone-200/50">
+            <div class="mb-16 reveal">
+                <h2 class="text-xs font-mono uppercase tracking-[0.2em] text-stone-400 mb-2">01 / Foundation</h2>
+                <h3 class="text-4xl font-display font-medium tracking-tight">Typography Matrix</h3>
+            </div>
+
+            <!-- Inter Weights Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12 mb-20">
+                <div class="space-y-4 reveal stagger-1">
+                    <h4 class="text-[10px] font-mono text-stone-400 uppercase tracking-widest border-b border-stone-200 pb-2">Inter / Sans</h4>
+                    <p class="text-4xl font-sans font-[100]">Thin 100</p>
+                    <p class="text-4xl font-sans font-[200]">ExtraLight 200</p>
+                    <p class="text-4xl font-sans font-[300]">Light 300</p>
+                    <p class="text-4xl font-sans font-[400] text-stone-900">Regular 400</p>
+                    <p class="text-4xl font-sans font-[500] text-stone-900">Medium 500</p>
+                    <p class="text-4xl font-sans font-[600] text-stone-900">SemiBold 600</p>
+                    <p class="text-4xl font-sans font-[700] text-stone-900">Bold 700</p>
+                    <p class="text-4xl font-sans font-[800] text-stone-900">ExtraBold 800</p>
+                    <p class="text-4xl font-sans font-[900] text-stone-900">Black 900</p>
+                </div>
+
+                <div class="space-y-4 reveal stagger-2">
+                    <h4 class="text-[10px] font-mono text-stone-400 uppercase tracking-widest border-b border-stone-200 pb-2">Space Grotesk / Display</h4>
+                    <p class="text-4xl font-display font-[300]">Light 300</p>
+                    <p class="text-4xl font-display font-[400] text-stone-900">Regular 400</p>
+                    <p class="text-4xl font-display font-[500] text-stone-900">Medium 500</p>
+                    <p class="text-4xl font-display font-[600] text-stone-900">SemiBold 600</p>
+                    <p class="text-4xl font-display font-[700] text-stone-900">Bold 700</p>
+                </div>
+
+                <div class="space-y-8 reveal stagger-3">
+                    <div>
+                        <h4 class="text-[10px] font-mono text-stone-400 uppercase tracking-widest border-b border-stone-200 pb-2 mb-4">Letter Spacing (Tracking)</h4>
+                        <p class="text-xl font-sans tracking-tighter">Tighter (-0.05em)</p>
+                        <p class="text-xl font-sans tracking-tight">Tight (-0.025em)</p>
+                        <p class="text-xl font-sans tracking-normal">Normal (0em)</p>
+                        <p class="text-xl font-sans tracking-wide">Wide (0.025em)</p>
+                        <p class="text-xl font-sans tracking-[0.2em] uppercase text-xs mt-2">Extreme (0.2em)</p>
+                    </div>
+                    <div>
+                        <h4 class="text-[10px] font-mono text-stone-400 uppercase tracking-widest border-b border-stone-200 pb-2 mb-4">Line Height (Leading)</h4>
+                        <div class="space-y-6">
+                            <p class="text-sm font-sans leading-none bg-stone-100 p-2">None (1)<br>The quick brown fox<br>jumps over the lazy dog.</p>
+                            <p class="text-sm font-sans leading-relaxed bg-stone-100 p-2">Relaxed (1.625)<br>The quick brown fox<br>jumps over the lazy dog.</p>
+                            <p class="text-sm font-sans leading-[2.5] bg-stone-100 p-2">Loose (2.5)<br>The quick brown fox<br>jumps over the lazy dog.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Blockquotes & Contexts -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-12 reveal">
+                <div>
+                    <h4 class="text-[10px] font-mono text-stone-400 uppercase tracking-widest border-b border-stone-200 pb-2 mb-6">Editorial Blockquote</h4>
+                    <blockquote class="border-l-4 borderx-stone-900 pl-6 py-2 relative">
+                        <iconify-icon icon="solar:quote-left-bold" class="absolute -top-4 -left-2 text-4xl text-stone-200 -z-10"></iconify-icon>
+                        <p class="text-2xl font-display font-medium text-stone-800 leading-tight mb-4">
+                            "A design system is not a project, it's a product serving products."
+                        </p>
+                        <cite class="text-xs font-mono uppercase tracking-widest text-stone-400 not-italic">Nathan Curtis</cite>
+                    </blockquote>
+                </div>
+                <div>
+                    <h4 class="text-[10px] font-mono text-stone-400 uppercase tracking-widest border-b border-stone-200 pb-2 mb-6">Drop Caps & Paragraph</h4>
+                    <p class="text-base text-stone-600 leading-relaxed font-sans text-justify">
+                        <span class="float-left text-7xl font-display font-bold leading-[0.8] pr-2 text-stone-900 mt-1">E</span>
+                        loquent design requires an uncompromising dedication to hierarchy. By utilizing drop caps, we guide the user's eye directly to the beginning of majestic narratives. The spacing, the weights, the rhythm—everything collaborates to build cognitive ease. This paragraph demonstrates a fully justified alignment, showcasing how the tracking adjusts beautifully across lines.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 3. COLOR SYSTEM -->
+        <section id="colors" class="py-24 px-6 md:px-12 max-w-[1440px] mx-auto border-b border-stone-200/50">
+            <div class="mb-16 reveal">
+                <h2 class="text-xs font-mono uppercase tracking-[0.2em] text-stone-400 mb-2">02 / Spectrum</h2>
+                <h3 class="text-4xl font-display font-medium tracking-tight">Color Architecture</h3>
+                <p class="text-stone-500 mt-4 max-w-xl">A paleta utiliza uma base "Stone" neutralizada, fundos imaculados e sombras interativas.</p>
+            </div>
+
+            <!-- 3D Swatches Grid -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-6 reveal">
+                <!-- Pure White -->
+                <div class="group relative h-48 [perspective:1000px]">
+                    <div class="absolute inset-0 bg-white border border-stone-200 rounded-2xl p-6 flex flex-col justify-between shadow-sm transition-all duration-500 group-hover:-translate-y-2 group-hover:[transform:rotateX(10deg)_rotateY(-10deg)] group-hover:shadow-[20px_20px_30px_-10px_rgba(0,0,0,0.1)]">
+                        <div class="w-10 h-10 rounded-full border border-stone-100 bg-white shadow-sm flex items-center justify-center">
+                            <span class="w-3 h-3 rounded-full bg-stone-900 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-sm text-stone-900">Pure Light</h4>
+                            <div class="text-[10px] font-mono text-stone-400 mt-2 uppercase tracking-widest">Base / System</div>
+                            <div class="text-[10px] font-mono text-stone-400 mt-1">#FFFFFF</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stone 100 -->
+                <div class="group relative h-48 [perspective:1000px]">
+                    <div class="absolute inset-0 bg-[#f5f5f4] border border-stone-200 rounded-2xl p-6 flex flex-col justify-between shadow-sm transition-all duration-500 group-hover:-translate-y-2 group-hover:[transform:rotateX(10deg)_rotateY(-10deg)] group-hover:shadow-[20px_20px_30px_-10px_rgba(0,0,0,0.1)] stagger-1">
+                        <div class="w-10 h-10 rounded-full border border-stone-200 bg-[#f5f5f4] flex items-center justify-center"></div>
+                        <div>
+                            <h4 class="font-bold text-sm text-stone-900">Stone Surface</h4>
+                            <div class="text-[10px] font-mono text-stone-400 mt-2 uppercase tracking-widest">Hover / Input</div>
+                            <div class="text-[10px] font-mono text-stone-400 mt-1">#F5F5F4</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stone 500 -->
+                <div class="group relative h-48 [perspective:1000px]">
+                    <div class="absolute inset-0 bg-stone-500 rounded-2xl p-6 flex flex-col justify-between shadow-sm transition-all duration-500 group-hover:-translate-y-2 group-hover:[transform:rotateX(10deg)_rotateY(-10deg)] group-hover:shadow-[20px_20px_40px_-10px_rgba(120,113,108,0.4)] stagger-2">
+                        <div class="w-10 h-10 rounded-full bg-stone-400 border border-stone-400 flex items-center justify-center"></div>
+                        <div>
+                            <h4 class="font-bold text-sm text-white">Stone Muted</h4>
+                            <div class="text-[10px] font-mono text-stone-300 mt-2 uppercase tracking-widest">Outlines / Muted</div>
+                            <div class="text-[10px] font-mono text-stone-300 mt-1">#78716C</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stone 900 -->
+                <div class="group relative h-48 [perspective:1000px]">
+                    <div class="absolute inset-0 bg-stone-900 rounded-2xl p-6 flex flex-col justify-between shadow-lg transition-all duration-500 group-hover:-translate-y-2 group-hover:[transform:rotateX(10deg)_rotateY(-10deg)] group-hover:shadow-[20px_20px_40px_-10px_rgba(28,25,23,0.5)] stagger-3">
+                        <div class="w-10 h-10 rounded-full bg-black border border-stone-800 flex items-center justify-center"></div>
+                        <div>
+                            <h4 class="font-bold text-sm text-white">Stone Apex</h4>
+                            <div class="text-[10px] font-mono text-stone-400 mt-2 uppercase tracking-widest">Primary Text</div>
+                            <div class="text-[10px] font-mono text-stone-400 mt-1">#1C1917</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gradients Showcase -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6 reveal">
+                <!-- Dark Gradient -->
+                <div class="relative h-40 rounded-2xl overflow-hidden group">
+                    <div class="absolute inset-0 bg-gradient-to-r from-stone-900 via-stone-800 to-stone-600 opacity-90 transition-opacity duration-500 group-hover:opacity-100"></div>
+                    <div class="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80')] bg-cover mix-blend-overlay opacity-20"></div>
+                    <div class="relative z-10 p-8 flex flex-col justify-center h-full text-white">
+                        <span class="text-[10px] font-mono uppercase tracking-widest text-stone-300 mb-2">Overlay Context</span>
+                        <h4 class="text-2xl font-display font-medium">Kinetic Dark Gradient</h4>
+                    </div>
+                </div>
+                
+                <!-- Light Gradient / Glass -->
+                <div class="relative h-40 rounded-2xl overflow-hidden group border border-stone-200">
+                    <div class="absolute inset-0 bg-gradient-to-tr from-white via-white to-stone-100 transition-transform duration-1000 group-hover:scale-105"></div>
+                    <div class="absolute top-0 right-0 w-32 h-32 bg-stone-200 rounded-full blur-[40px] opacity-50 group-hover:opacity-80 transition-opacity duration-500"></div>
+                    <div class="relative z-10 p-8 flex flex-col justify-center h-full">
+                        <span class="text-[10px] font-mono uppercase tracking-widest text-stone-500 mb-2">Surface Context</span>
+                        <h4 class="text-2xl font-display font-medium text-stone-900">Soft Surface Blur</h4>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 4. BUTTONS MATRIX (8+ Kinds) -->
+        <section id="ui" class="py-24 px-6 md:px-12 max-w-[1440px] mx-auto border-b border-stone-200/50 bg-[#fafaf9]">
+            <div class="mb-16 reveal">
+                <h2 class="text-xs font-mono uppercase tracking-[0.2em] text-stone-400 mb-2">03 / Interaction</h2>
+                <h3 class="text-4xl font-display font-medium tracking-tight">The Button Matrix</h3>
+                <p class="text-stone-500 mt-4 max-w-xl">Every possible physical interaction state simulated with high precision CSS logic.</p>
+            </div>
+
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-8 reveal">
+                <!-- 1. Primary Solid -->
+                <div class="flex flex-col items-start gap-4">
+                    <span class="text-[10px] font-mono text-stone-400 uppercase">1. Elevate Pull</span>
+                    <button class="px-6 py-3 bg-stone-900 text-white rounded-lg text-sm font-medium hover:-translate-y-1 hover:shadow-xl hover:shadow-stone-900/20 active:translate-y-0 active:scale-95 transition-all">Primary Action</button>
+                </div>
+                
+                <!-- 2. Sweep Border -->
+                <div class="flex flex-col items-start gap-4">
+                    <span class="text-[10px] font-mono text-stone-400 uppercase">2. Sweep Outline</span>
+                    <button class="btn-sweep px-6 py-3 text-sm font-medium text-stone-600 hover:text-stone-900">
+                        <span>Ghost Sweep</span>
+                    </button>
+                </div>
+
+                <!-- 3. Liquid Glow -->
+                <div class="flex flex-col items-start gap-4">
+                    <span class="text-[10px] font-mono text-stone-400 uppercase">3. Liquid Glow</span>
+                    <button class="btn-glow px-6 py-3 bg-stone-100 border border-stone-200 text-stone-900 rounded-lg text-sm font-medium">
+                        Radiant Press
+                    </button>
+                </div>
+
+                <!-- 4. Icon Slide -->
+                <div class="flex flex-col items-start gap-4">
+                    <span class="text-[10px] font-mono text-stone-400 uppercase">4. Icon Slide</span>
+                    <button class="btn-icon-slide px-6 py-3 bg-stone-900 text-white rounded-full text-sm font-medium">
+                        Submit Data
+                        <iconify-icon icon="solar:arrow-right-linear" class="text-lg"></iconify-icon>
+                    </button>
+                </div>
+
+                <!-- 5. 3D Glass Push -->
+                <div class="flex flex-col items-start gap-4">
+                    <span class="text-[10px] font-mono text-stone-400 uppercase">5. 3D Neumorphism</span>
+                    <button class="px-6 py-3 bg-[#e7e5e4] text-stone-900 rounded-xl text-sm font-semibold shadow-[4px_4px_10px_#cbc9c8,-4px_-4px_10px_#ffffff] active:shadow-[inset_4px_4px_10px_#cbc9c8,inset_-4px_-4px_10px_#ffffff] transition-shadow">
+                        Tactile Push
+                    </button>
+                </div>
+
+                <!-- 6. Magnetic Aura -->
+                <div class="flex flex-col items-start gap-4">
+                    <span class="text-[10px] font-mono text-stone-400 uppercase">6. Magnetic Action</span>
+                    <div class="magnetic-wrap p-0">
+                        <button class="magnetic-btn px-6 py-3 border border-stone-300 rounded-full text-sm font-medium hover:border-stone-900">
+                            Snap to me
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 7. Disabled Glass -->
+                <div class="flex flex-col items-start gap-4">
+                    <span class="text-[10px] font-mono text-stone-400 uppercase">7. Disabled State</span>
+                    <button disabled class="px-6 py-3 bg-stone-200 text-stone-400 rounded-lg text-sm font-medium cursor-not-allowed opacity-70">
+                        Unavailable
+                    </button>
+                </div>
+
+                <!-- 8. Loading Infinite -->
+                <div class="flex flex-col items-start gap-4">
+                    <span class="text-[10px] font-mono text-stone-400 uppercase">8. Processing Step</span>
+                    <button class="px-6 py-3 bg-stone-900 text-white rounded-lg text-sm font-medium flex items-center gap-3 cursor-wait">
+                        <iconify-icon icon="solar:spinner-line-duotone" class="animate-spin text-lg"></iconify-icon>
+                        Authenticating
+                    </button>
+                </div>
+            </div>
+
+            <!-- FORMS & ADVANCED INPUTS -->
+            <div class="mt-20 border-t border-stone-200 pt-16 reveal">
+                <h3 class="text-2xl font-display font-medium tracking-tight mb-12">Forms & Toggles Matrix</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12">
+                    
+                    <!-- Floating Labels -->
+                    <div class="space-y-6">
+                        <div class="float-input">
+                            <input type="text" id="fname" placeholder=" " />
+                            <label for="fname">First Name</label>
+                        </div>
+                        <div class="float-input">
+                            <input type="email" id="email" placeholder=" " />
+                            <label for="email">Work Email</label>
+                            <iconify-icon icon="solar:check-circle-bold" class="absolute right-4 top-4 text-green-500"></iconify-icon>
+                        </div>
+                    </div>
+
+                    <!-- Custom Switches & Checks -->
+                    <div class="space-y-8 glass p-6 rounded-2xl">
+                        <label class="flex items-center gap-4 cursor-pointer group">
+                            <input type="checkbox" class="custom-check" />
+                            <div class="check-box">
+                                <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            </div>
+                            <span class="text-sm font-medium text-stone-700 group-hover:text-stone-900">Accept Analytics</span>
+                        </label>
+                        
+                        <label class="flex items-center gap-4 cursor-pointer">
+                            <input type="checkbox" class="hidden" checked />
+                            <div class="toggle-switch">
+                                <div class="toggle-knob"></div>
+                            </div>
+                            <span class="text-sm font-medium text-stone-700">Push Notifications</span>
+                        </label>
+                    </div>
+
+                    <!-- Search Mock -->
+                    <div class="relative group">
+                        <input type="text" placeholder="Search knowledge base..." class="w-full bg-white border border-stone-200 rounded-xl pl-12 pr-12 py-4 text-sm font-medium focus:border-stone-900 outline-none transition-colors shadow-sm focus:shadow-md">
+                        <iconify-icon icon="solar:magnifer-linear" class="absolute left-4 top-4 text-xl text-stone-400 group-focus-within:text-stone-900 transition-colors"></iconify-icon>
+                        <div class="absolute right-4 top-3.5 bg-stone-100 text-[10px] font-mono text-stone-500 px-2 py-1 rounded border border-stone-200">⌘K</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 5. CARDS & LAYOUTS -->
+        <section id="cards" class="py-24 px-6 md:px-12 max-w-[1440px] mx-auto border-b border-stone-200/50">
+            <div class="mb-16 reveal">
+                <h2 class="text-xs font-mono uppercase tracking-[0.2em] text-stone-400 mb-2">04 / Layouts</h2>
+                <h3 class="text-4xl font-display font-medium tracking-tight">Containers & Physics</h3>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <!-- Data Card -->
+                <div class="flashlight-card bg-white border border-stone-200 rounded-3xl p-8 reveal stagger-1">
+                    <div class="flex justify-between items-start mb-12">
+                        <div class="w-12 h-12 bg-stone-900 text-white rounded-2xl flex items-center justify-center text-2xl shadow-lg">
+                            <iconify-icon icon="solar:chart-square-bold-duotone"></iconify-icon>
+                        </div>
+                        <span class="px-2 py-1 bg-green-50 text-green-700 text-[10px] uppercase font-bold rounded-full">+24.5%</span>
+                    </div>
+                    <p class="text-[10px] font-mono text-stone-400 uppercase mb-1">Monthly Revenue</p>
+                    <h4 class="text-4xl font-display font-medium mb-4">$124,500</h4>
+                    <div class="h-2 w-full bg-stone-100 rounded-full overflow-hidden">
+                        <div class="h-full bg-stone-900 w-[70%]"></div>
+                    </div>
+                </div>
+
+                <!-- Pricing Premium -->
+                <div class="bg-stone-900 text-white border border-stone-800 rounded-3xl p-8 relative overflow-hidden reveal stagger-2 scale-[1.02] shadow-2xl">
+                    <div class="absolute top-0 right-0 py-1 px-10 bg-gradient-to-r from-amber-500 to-orange-500 text-[10px] font-bold uppercase rotate-45 translate-x-[30%] translate-y-[50%]">Popular</div>
+                    <div class="absolute -top-20 -right-20 w-40 h-40 bg-white opacity-5 blur-[50px] rounded-full"></div>
+                    <p class="text-[10px] font-mono text-stone-400 uppercase mb-4">Enterprise</p>
+                    <h4 class="text-5xl font-display font-bold mb-2">$299<span class="text-lg font-sans font-normal text-stone-500">/mo</span></h4>
+                    <p class="text-sm text-stone-400 mb-8 border-b border-stone-800 pb-8">Advanced features for scaling massive teams globally.</p>
+                    <ul class="space-y-4 mb-8 text-sm">
+                        <li class="flex items-center gap-3"><iconify-icon icon="solar:check-circle-bold" class="text-white"></iconify-icon> Unlimited Analytics</li>
+                        <li class="flex items-center gap-3"><iconify-icon icon="solar:check-circle-bold" class="text-white"></iconify-icon> 24/7 Priority Support</li>
+                        <li class="flex items-center gap-3"><iconify-icon icon="solar:check-circle-bold" class="text-white"></iconify-icon> Custom Domains</li>
+                    </ul>
+                    <button class="w-full py-4 bg-white text-stone-900 rounded-xl text-sm font-bold hover:bg-stone-200 transition-colors">Start Free Trial</button>
+                </div>
+
+                <!-- Testimonial Glass -->
+                <div class="relative rounded-3xl overflow-hidden reveal stagger-3 group">
+                    <div class="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80')] bg-cover bg-center transition-transform duration-1000 group-hover:scale-110"></div>
+                    <div class="absolute inset-0 bg-stone-900/60"></div>
+                    <div class="relative z-10 p-8 h-full flex flex-col justify-end">
+                        <iconify-icon icon="solar:quote-right-bold" class="text-4xl text-white/20 absolute top-8 right-8"></iconify-icon>
+                        <p class="text-white font-medium text-lg mb-6 leading-relaxed">
+                            "The sheer level of detail and physics-based interactions in this system changed our product entirely."
+                        </p>
+                        <div>
+                            <h5 class="text-white font-bold">Sarah Jenkins</h5>
+                            <span class="text-stone-300 text-xs font-mono">Lead Designer at Vorta</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 6. ICON WALL (40 ICONS) -->
+        <section id="icons" class="py-24 px-6 md:px-12 max-w-[1440px] mx-auto mb-20">
+            <div class="mb-16 reveal flex flex-col md:flex-row justify-between md:items-end gap-6">
+                <div>
+                    <h2 class="text-xs font-mono uppercase tracking-[0.2em] text-stone-400 mb-2">05 / Iconography</h2>
+                    <h3 class="text-4xl font-display font-medium tracking-tight">The 40-Icon Matrix</h3>
+                </div>
+                <div class="text-xs font-mono text-stone-500 bg-stone-100 px-4 py-2 rounded">
+                    Hover physical states: Bounce, Swing, Spin, Color Shift
+                </div>
+            </div>
+
+            <!-- Wall Grid -->
+            <div class="grid grid-cols-4 md:grid-cols-10 border-t border-l border-stone-200 reveal bg-white">
+                <!-- Interface - Bounce -->
+                <div class="aspect-square border-r border-b border-stone-200 flex flex-col items-center justify-center gap-2 group icon-bounce cursor-pointer"><iconify-icon icon="solar:home-smile-linear" class="text-2xl text-stone-400 group-hover:text-stone-900"></iconify-icon></div>
+                <div class="aspect-square border-r border-b border-stone-200 flex flex-col items-center justify-center gap-2 group icon-bounce cursor-pointer"><iconify-icon icon="solar:user-linear" class="text-2xl text-stone-400 group-hover:text-stone-900"></iconify-icon></div>
+                <div class="aspect-square border-r border-b border-stone-200 flex flex-col items-center justify-center gap-2 group icon-bounce cursor-pointer"><iconify-icon icon="solar:magnifer-linear" class="text-2xl text-stone-400 group-hover:text-stone-900"></iconify-icon></div>
+                <div class="aspect-square border-r border-b border-stone-200 flex flex-col items-center justify-center gap-2 group icon-bounce cursor-pointer"><iconify-icon icon="solar:heart-linear" class="text-2xl text-stone-400 group-hover:text-stone-900"></iconify-icon></div>
+                <div class="aspect-square border-r border-b border-stone-200 flex flex-col items-center justify-center gap-2 group icon-bounce cursor-pointer"><iconify-icon icon="solar:bookmark-linear" class="text-2xl text-stone-400 group-hover:text-stone-900"></iconify-icon></div>
+                <div class="aspect-square border-r border-b border-stone-200 flex flex-col items-center justify-center gap-2 group icon-bounce cursor-pointer"><iconify-icon icon="solar:star-linear" class="text-2xl text-stone-400 group-hover:text-stone-900"></iconify-icon></div>
+                <div class="aspect-square border-r border-b border-stone-200 flex flex-col items-center justify-center gap-2 group icon-bounce cursor-pointer"><iconify-icon icon="solar:camera-linear" class="text-2xl text-stone-400 group-hover:text-stone-900"></iconify-icon></div>
+                <div class="aspect-square border-r border-b border-stone-200 flex flex-col items-center justify-center gap-2 group icon-bounce cursor-pointer"><iconify-icon icon="solar:map-point-linear" class="text-2xl text-stone-400 group-hover:text-stone-900"></iconify-icon></div>
+                <div class="aspect-square border-r border-b border-stone-200 flex flex-col items-center justify-center gap-2 group icon-bounce cursor-pointer"><iconify-icon icon="solar:phone-linear" class="text-2xl text-stone-400 group-hover:text-stone-900"></iconify-icon></div>
+                <div class="aspect-square border-r border-b border-stone-200 flex flex-col items-center justify-center gap-2 group icon-bounce cursor-pointer"><iconify-icon icon="solar:letter-linear" class="text-2xl text-stone-400 group-hover:text-stone-900"></iconify-icon></div>
+
+                <!-- Notifications & Actions - Swing -->
+                <div class="aspect-square border-r border-b border-stone-200 flex flex-col items-center justify-center gap-2 group icon-swing cursor-pointer"><iconify-icon icon="solar:bell-linear" class="text-2xl text-stone-400 group-hover:text-stone-900"></iconify-icon></div>
+                <div class="aspect-square border-r border-b border-stone-200 flex flex-col items-center justify-center gap-2 group icon-swing cursor-pointer"><iconify-icon icon="solar:chat-round-line-linear" class="text-2xl text-stone-400 group-hover:text-stone-900"></iconify-icon></div>
+                <div class="aspect-square border-r border-b border-stone-200 flex flex-col items-center justify-center gap-2 group icon-swing cursor-pointer"><iconify-icon icon="solar:share-linear" class="text-2xl text-stone-400 group-hover:text-stone-900"></iconify-icon></div>
+                <div class="aspect-square border-r border-b border-stone-200 flex flex-col items-center justify-center gap-2 group icon-swing cursor-pointer"><iconify-icon icon="solar:download-linear" class="text-2xl text-stone-400 group-hover:text-stone-900"></iconify-icon></div>
+                <div class="aspect-square border-r border-b border-stone-200 flex flex-col items-center justify-center gap-2 group icon-swing cursor-pointer"><iconify-icon icon="solar:upload-linear" class="text-2xl text-stone-400 group-hover:text-stone-900"></iconify-icon></div>
+                <div class="aspect-square border-r border-b border-stone-200 flex flex-col items-center justify-center gap-2 group icon-swing cursor-pointer"><iconify-icon icon="solar:trash-bin-trash-linear" class="text-2xl text-stone-400 group-hover:text-stone-900"></iconify-icon></div>
+                <div class="aspect-square border-r border-b border-stone-200 flex flex-col items-center justify-center gap-2 group icon-swing cursor-pointer"><iconify-icon icon="solar:pen-linear" class="text-2xl text-stone-400 group-hover:text-stone-900"></iconify-icon></div>
+                <div class="aspect-square border-r border-b border-stone-200 flex flex-col items-center justify-center gap-2 group icon-swing cursor-pointer"><iconify-icon icon="solar:copy-linear" class="text-2xl text-stone-400 group-hover:text-stone-900"></iconify-icon></div>
+                <div class="aspect-square border-r border-b border-stone-200 flex flex-col items-center justify-center gap-2 group icon-swing cursor-pointer"><iconify-icon icon="solar:clipboard-list-linear" class="text-2xl text-stone-400 group-hover:text-stone-900"></iconify-icon></div>
+                <div class="aspect-square border-r border-b border-stone-200 flex flex-col items-center justify-center gap-2 group icon-swing cursor-pointer"><iconify-icon icon="solar:calendar-linear" class="text-2xl text-stone-400 group-hover:text-stone-900"></iconify-icon></div>
+
+                <!-- Settings & Media - Spin -->
+                <div class="aspect-square border-r border-b border-stone-200 flex flex-col items-center justify-center gap-2 group icon-spin cursor-pointer"><iconify-icon icon="solar:settings-linear" class="text-2xl text-stone-400 group-hover:text-stone-900"></iconify-icon></div>
+                <div class="aspect-square border-r border-b border-stone-200 flex flex-col items-center justify-center gap-2 group icon-spin cursor-pointer"><iconify-icon icon="solar:restart-linear" class="text-2xl text-stone-400 group-hover:text-stone-900"></iconify-icon></div>
+                <div class="aspect-square border-r border-b border-stone-200 flex flex-col items-center justify-center gap-2 group icon-spin cursor-pointer"><iconify-icon icon="solar:refresh-linear" class="text-2xl text-stone-400 group-hover:text-stone-900"></iconify-icon></div>
+                <div class="aspect-square border-r border-b border-stone-200 flex flex-col items-center justify-center gap-2 group icon-spin cursor-pointer"><iconify-icon icon="solar:history-linear" class="text-2xl text-stone-400 group-hover:text-stone-900"></iconify-icon></div>
+                <div class="aspect-square border-r border-b border-stone-200 flex flex-col items-center justify-center gap-2 group icon-spin cursor-pointer"><iconify-icon icon="solar:clock-circle-linear" class="text-2xl text-stone-400 group-hover:text-stone-900"></iconify-icon></div>
+                <div class="aspect-square border-r border-b border-stone-200 flex flex-col items-center justify-center gap-2 group icon-spin cursor-pointer"><iconify-icon icon="solar:play-circle-linear" class="text-2xl text-stone-400 group-hover:text-stone-900"></iconify-icon></div>
+                <div class="aspect-square border-r border-b border-stone-200 flex flex-col items-center justify-center gap-2 group icon-spin cursor-pointer"><iconify-icon icon="solar:pause-circle-linear" class="text-2xl text-stone-400 group-hover:text-stone-900"></iconify-icon></div>
+                <div class="aspect-square border-r border-b border-stone-200 flex flex-col items-center justify-center gap-2 group icon-spin cursor-pointer"><iconify-icon icon="solar:stop-circle-linear" class="text-2xl text-stone-400 group-hover:text-stone-900"></iconify-icon></div>
+                <div class="aspect-square border-r border-b border-stone-200 flex flex-col items-center justify-center gap-2 group icon-spin cursor-pointer"><iconify-icon icon="solar:volume-loud-linear" class="text-2xl text-stone-400 group-hover:text-stone-900"></iconify-icon></div>
+                <div class="aspect-square border-r border-b border-stone-200 flex flex-col items-center justify-center gap-2 group icon-spin cursor-pointer"><iconify-icon icon="solar:microphone-linear" class="text-2xl text-stone-400 group-hover:text-stone-900"></iconify-icon></div>
+
+                <!-- Abstract/Elements - Color Shift -->
+                <div class="aspect-square border-r border-b border-stone-200 flex flex-col items-center justify-center gap-2 group icon-color cursor-pointer"><iconify-icon icon="solar:bolt-circle-bold-duotone" class="text-2xl text-stone-300"></iconify-icon></div>
+                <div class="aspect-square border-r border-b border-stone-200 flex flex-col items-center justify-center gap-2 group icon-color cursor-pointer"><iconify-icon icon="solar:fire-bold-duotone" class="text-2xl text-stone-300"></iconify-icon></div>
+                <div class="aspect-square border-r border-b border-stone-200 flex flex-col items-center justify-center gap-2 group icon-color cursor-pointer"><iconify-icon icon="solar:stars-minimalistic-bold-duotone" class="text-2xl text-stone-300"></iconify-icon></div>
+                <div class="aspect-square border-r border-b border-stone-200 flex flex-col items-center justify-center gap-2 group icon-color cursor-pointer"><iconify-icon icon="solar:atom-bold-duotone" class="text-2xl text-stone-300"></iconify-icon></div>
+                <div class="aspect-square border-r border-b border-stone-200 flex flex-col items-center justify-center gap-2 group icon-color cursor-pointer"><iconify-icon icon="solar:planet-3-bold-duotone" class="text-2xl text-stone-300"></iconify-icon></div>
+                <div class="aspect-square border-r border-b border-stone-200 flex flex-col items-center justify-center gap-2 group icon-color cursor-pointer"><iconify-icon icon="solar:moon-bold-duotone" class="text-2xl text-stone-300"></iconify-icon></div>
+                <div class="aspect-square border-r border-b border-stone-200 flex flex-col items-center justify-center gap-2 group icon-color cursor-pointer"><iconify-icon icon="solar:sun-bold-duotone" class="text-2xl text-stone-300"></iconify-icon></div>
+                <div class="aspect-square border-r border-b border-stone-200 flex flex-col items-center justify-center gap-2 group icon-color cursor-pointer"><iconify-icon icon="solar:shield-check-bold-duotone" class="text-2xl text-stone-300"></iconify-icon></div>
+                <div class="aspect-square border-r border-b border-stone-200 flex flex-col items-center justify-center gap-2 group icon-color cursor-pointer"><iconify-icon icon="solar:crown-bold-duotone" class="text-2xl text-stone-300"></iconify-icon></div>
+                <div class="aspect-square border-b border-stone-200 flex flex-col items-center justify-center gap-2 group icon-color cursor-pointer"><iconify-icon icon="solar:diamond-bold-duotone" class="text-2xl text-stone-300"></iconify-icon></div>
+            </div>
+        </section>
+    </main>
+
+    <!-- JS Physics & Observers -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+
+            // Scroll Reveal Observer
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if(entry.isIntersecting) {
+                        entry.target.classList.add('active');
+                    }
+                });
+            }, { threshold: 0.1, rootMargin: "0px 0px -50px 0px" });
+            document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+            // Flashlight Effect
+            document.querySelectorAll('.flashlight-card').forEach(card => {
+                card.addEventListener('mousemove', (e) => {
+                    const rect = card.getBoundingClientRect();
+                    card.style.setProperty('--x', `${e.clientX - rect.left}px`);
+                    card.style.setProperty('--y', `${e.clientY - rect.top}px`);
+                });
+            });
+
+            // Magnetic Button Logic
+            document.querySelectorAll('.magnetic-wrap').forEach(wrap => {
+                const btn = wrap.querySelector('.magnetic-btn');
+                wrap.addEventListener('mousemove', (e) => {
+                    const rect = wrap.getBoundingClientRect();
+                    const centerX = rect.left + rect.width / 2;
+                    const centerY = rect.top + rect.height / 2;
+                    const x = (e.clientX - centerX) * 0.3; // Strength factor
+                    const y = (e.clientY - centerY) * 0.3;
+                    btn.style.transform = `translate(${x}px, ${y}px)`;
+                });
+                wrap.addEventListener('mouseleave', () => {
+                    btn.style.transform = 'translate(0px, 0px)';
+                });
+            });
+
+        });
+    </script>
+</body>
+</html>
