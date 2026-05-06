@@ -1,10 +1,14 @@
 """FastAPI + WebSocket backend para o Lemmon Dashboard."""
 import asyncio
 import json
+import logging
 import re
 import sys
+from collections import Counter
 from datetime import datetime
 from pathlib import Path
+
+_log = logging.getLogger("lemmon.api")
 
 import base64
 import os
@@ -1104,8 +1108,18 @@ async def chat(ws: WebSocket):
                     raw_tags = next((b.text for b in _haiku.content if hasattr(b, "text")), "")
                     tags_sugeridas = [t.strip().lower().replace(" ", "-") for t in raw_tags.split(",") if t.strip()][:5]
                     await ws.send_json({"type": "tags_sugeridas", "tags": tags_sugeridas, "session_id": session_id})
-                except Exception:
-                    pass
+                except Exception as _tag_err:
+                    _log.warning("tags_sugeridas falhou (%s): %s", type(_tag_err).__name__, _tag_err)
+                    # fallback heurístico: palavras mais frequentes do briefing
+                    _STOPWORDS = {"de", "da", "do", "e", "o", "a", "os", "as", "em", "um", "uma",
+                                  "para", "com", "que", "se", "por", "na", "no", "ao", "mais",
+                                  "este", "essa", "isso", "como", "mas", "ou", "seu", "sua"}
+                    _palavras = [w.lower() for w in re.findall(r'\b[a-záéíóúãõâêîôûç]{4,}\b', briefing)]
+                    _freq = Counter(w for w in _palavras if w not in _STOPWORDS)
+                    _tags_fb = [f"auto:{w}" for w, _ in _freq.most_common(3)]
+                    if _tags_fb:
+                        await ws.send_json({"type": "tags_sugeridas", "tags": _tags_fb, "session_id": session_id})
+                    await ws.send_json({"type": "tags_sugeridas_falhou", "detail": str(_tag_err)[:200]})
 
             await ws.send_json({"type": "pipeline_done", "session_id": session_id})
 
@@ -1115,8 +1129,25 @@ async def chat(ws: WebSocket):
 
 # ─── Reunião conversacional ───────────────────────────────────────────
 
+AGENTE_ALIAS: dict[str, str] = {
+    "otto": "otto",
+    "heitor": "heitor",
+    "salles": "salles",
+    "sonia": "sonia",
+    "aya": "aya",
+    "pedro": "pedro_abrahao",
+}
+
 def _parse_mentions(text: str, agents: list[str]) -> list[str]:
-    return [a for a in agents if re.search(rf'@{re.escape(a)}\b', text, re.IGNORECASE)]
+    mencionados: set[str] = set()
+    for token, agent_id in AGENTE_ALIAS.items():
+        if agent_id in agents and re.search(rf'@{re.escape(token)}\b', text, re.IGNORECASE):
+            mencionados.add(agent_id)
+    # id completo também funciona (ex: @pedro_abrahao)
+    for a in agents:
+        if re.search(rf'@{re.escape(a)}\b', text, re.IGNORECASE):
+            mencionados.add(a)
+    return list(mencionados)
 
 def _make_agent(name: str):
     mapping = {"otto": Otto, "heitor": Heitor, "salles": Salles, "sonia": Sonia, "aya": Aya, "pedro_abrahao": PedroAbrahao}
