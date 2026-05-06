@@ -1,6 +1,6 @@
 # LEMMON AGENTES — Manual do Sistema
 
-**Versão atual:** v1.5
+**Versão atual:** v1.6
 **Última atualização:** 2026-05-06
 **Mantido por:** Calebe Alves / Lemmon Produções
 
@@ -11,6 +11,17 @@
 ## Histórico de versões
 
 > **Convenção:** versões mais novas no topo. Cada release lista o que mudou em relação à anterior, mantendo histórico completo.
+
+### v1.6 — 2026-05-06
+
+**Épico H — Multimodal e aprovação de cliente.**
+
+- **Upload de áudio como briefing (T34):** Botão 🎵 no textarea do input aceita arquivos `.mp3`, `.m4a`, `.wav`, `.ogg`. Transcrição automática via Whisper (OpenAI API). Requer `OPENAI_API_KEY` no `.env`. O texto transcrito preenche o input automaticamente. Endpoint: `POST /transcrever` (multipart form). Se a chave não estiver configurada, retorna erro 503 com instruções claras.
+- **Narração TTS do dossiê (T35):** Botão "ouvir dossiê" aparece na área de avaliação quando Aya tem resposta pronta. Usa `window.speechSynthesis` nativo do browser em pt-BR — sem API externa, sem custo adicional. Clicar novamente cancela a narração.
+- **Link de aprovação de cliente (T36):** Botão "Gerar link de aprovação" na área de avaliação do pipeline. Cria token de sessão e exibe URL copiável. O cliente abre o link e vê uma página HTML limpa (sem custos, sem dados técnicos) com o briefing, as respostas dos agentes e um formulário de comentários. Comentários ficam persistidos e visíveis. Endpoints: `POST /share`, `GET /share/{token}`, `POST /share/{token}/comentar`. Dados em `historico/../shares/`. Rota dashboard: `/share/[token]`.
+- **Calibragem espelho IA × real (T37):** Página `/calibragem` (ícone 🎯 no header). Registra divergências entre o que o Pedro IA previu e o que o Pedro real disse/reagiu. Cada registro tem: sessão, elemento, predição IA, feedback real, nota de acerto 1–5. Painel exibe KPIs (total, média, % precisão) e histórico completo. Uso: após entregar conteúdo ao Pedro, registrar aqui o feedback real para calibrar o espelho ao longo do tempo. Endpoints: `POST /calibragem_pedro`, `GET /calibragem_pedro`.
+
+---
 
 ### v1.5 — 2026-05-06
 
@@ -503,9 +514,9 @@ done
 
 O `PLANO_ACAO_2026-05-05.md` na raiz do projeto contém o plano completo com 9 épicos e 39 tarefas. Resumo do que está no horizonte:
 
-**Concluídos.** ~~Família de espelhos de cliente~~ ✅ (v1.1), ~~Pedro como gate de qualidade~~ ✅ (v1.2), ~~Memória institucional e saúde~~ ✅ (v1.3), ~~Workflows avançados~~ ✅ (v1.4), ~~Inteligência operacional / custo-cap~~ ✅ (v1.5).
+**Concluídos.** ~~Família de espelhos de cliente~~ ✅ (v1.1), ~~Pedro como gate de qualidade~~ ✅ (v1.2), ~~Memória institucional e saúde~~ ✅ (v1.3), ~~Workflows avançados~~ ✅ (v1.4), ~~Inteligência operacional / custo-cap~~ ✅ (v1.5), ~~Multimodal e aprovação de cliente~~ ✅ (v1.6).
 
-**Próximo: Épico H — Multimodal.** Upload de áudio como briefing (Whisper), output TTS, link de aprovação compartilhável com cliente, calibragem dinâmica do espelho IA × feed real do cliente.
+**Próximo: Épico G — Camada visual.** Whiteboards que se preenchem em tempo real, sprites com status físico mais expressivo, mesa de reunião com mic destacado quando alguém fala.
 
 **Camada visual (Épico G).** Whiteboards que se preenchem em tempo real, sprites com status físico mais expressivo, mesa de reunião com mic destacado quando alguém fala.
 
