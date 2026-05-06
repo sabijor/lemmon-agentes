@@ -1,6 +1,6 @@
 # LEMMON AGENTES — Manual do Sistema
 
-**Versão atual:** v1.4
+**Versão atual:** v1.5
 **Última atualização:** 2026-05-06
 **Mantido por:** Calebe Alves / Lemmon Produções
 
@@ -11,6 +11,16 @@
 ## Histórico de versões
 
 > **Convenção:** versões mais novas no topo. Cada release lista o que mudou em relação à anterior, mantendo histórico completo.
+
+### v1.5 — 2026-05-06
+
+**Épico F — Inteligência operacional e controle de custos.**
+
+- **Sugestor de pipeline (T28):** Botão `✦ sugerir agentes` aparece abaixo do textarea quando o input tem mais de 30 caracteres (modo pipeline). Chama `GET /sugerir_pipeline?briefing=...` — Haiku analisa o briefing e recomenda quais agentes faz sentido convocar. Resultado exibido como chips coloridos com razão curta para cada agente. Botão "Usar sugestão" sobrescreve a seleção atual e dispensa o card. Endpoint disponível também como API standalone para integrações externas.
+- **Routing condicional por risco (T29):** Se Heitor retorna risco 🔴 no compliance check, o pipeline envia automaticamente um evento `routing_condicional` com alerta no chat (via bubble Aya). Salles recebe instrução adicional de segurança no prompt ("cuidado redobrado com termos médicos/legais"), reduzindo retrabalho por roteiros que cruzam linhas de compliance.
+- **Custo-cap por sessão (T30):** Controle de orçamento na aba de Configurações do chat. Campo "Limite USD por sessão" — se atingido, pipeline pausa e exibe modal bloqueante com custo acumulado e opções: autorizar +$0.50, +$2.00 ou encerrar. Aviso âmbar não-bloqueante aparece quando custo passa de 80% do cap. Endpoints WS: `custo_aviso` (alerta precoce), `custo_cap_atingido` (pausa); ação cliente: `autorizar_custo` (retoma com novo cap) ou `cancel` (encerra).
+
+---
 
 ### v1.4 — 2026-05-06
 
@@ -493,15 +503,11 @@ done
 
 O `PLANO_ACAO_2026-05-05.md` na raiz do projeto contém o plano completo com 9 épicos e 39 tarefas. Resumo do que está no horizonte:
 
-**Próximos passos imediatos.** ~~Família de espelhos de cliente~~ ✅ (v1.1), ~~Pedro como gate de qualidade~~ ✅ (v1.2), ~~Memória institucional e saúde~~ ✅ (v1.3), ~~Workflows avançados~~ ✅ (v1.4). Próximo: Épico F — inteligência de pipeline (sugestor, routing condicional, custo-cap).
+**Concluídos.** ~~Família de espelhos de cliente~~ ✅ (v1.1), ~~Pedro como gate de qualidade~~ ✅ (v1.2), ~~Memória institucional e saúde~~ ✅ (v1.3), ~~Workflows avançados~~ ✅ (v1.4), ~~Inteligência operacional / custo-cap~~ ✅ (v1.5).
 
-**Médio prazo.** Novos agentes (Marcia/pós-produção, Felipe/concorrente, Renata/distribuição, Lia/voz Lemmon). Roteamento condicional baseado em Heitor. Custo-cap por sessão.
+**Próximo: Épico H — Multimodal.** Upload de áudio como briefing (Whisper), output TTS, link de aprovação compartilhável com cliente, calibragem dinâmica do espelho IA × feed real do cliente.
 
-**Sugeridor de pipeline.** Heitor ou Otto podem sugerir a sequência ideal de agentes baseado no tipo de projeto detectado no briefing.
-
-**Camada visual.** Whiteboards que se preenchem em tempo real, sprites com status físico mais expressivo, mesa de reunião com mic destacado, salas customizáveis por cliente.
-
-**Multimodal.** Memo de voz como briefing (upload de áudio), output como áudio (TTS), link de aprovação compartilhável com cliente.
+**Camada visual (Épico G).** Whiteboards que se preenchem em tempo real, sprites com status físico mais expressivo, mesa de reunião com mic destacado quando alguém fala.
 
 > Cada épico fechado deve atualizar este manual e gerar nova versão de PDF em `docs/releases/`.
 
