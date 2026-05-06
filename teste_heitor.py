@@ -43,10 +43,10 @@ def main():
             print("\nArquivo não existe. Cole o conteúdo (linha 'FIM' pra terminar):")
             linhas = []
             while True:
-                l = input()
-                if l.strip() == "FIM":
+                linha = input()
+                if linha.strip() == "FIM":
                     break
-                linhas.append(l)
+                linhas.append(linha)
             conteudo = "\n".join(linhas)
 
     elif modo == "cadeia":

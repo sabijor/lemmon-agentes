@@ -24,10 +24,10 @@ def main():
     print("\nDigite sua pergunta/comando (linha 'FIM' pra terminar):")
     linhas = []
     while True:
-        l = input()
-        if l.strip() == "FIM":
+        linha = input()
+        if linha.strip() == "FIM":
             break
-        linhas.append(l)
+        linhas.append(linha)
     pergunta = "\n".join(linhas)
 
     if not pergunta.strip():
@@ -39,10 +39,10 @@ def main():
         print("\nCole o texto a avaliar (linha 'FIM' pra terminar):")
         linhas = []
         while True:
-            l = input()
-            if l.strip() == "FIM":
+            linha = input()
+            if linha.strip() == "FIM":
                 break
-            linhas.append(l)
+            linhas.append(linha)
         contexto = "\n".join(linhas)
         if not contexto.strip():
             print("⚠️ Sem texto pra validar — modo consulta.")

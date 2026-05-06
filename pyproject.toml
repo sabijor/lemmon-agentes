@@ -7,6 +7,10 @@ exclude = ["dashboard", ".venv", "__pycache__"]
 select = ["E", "F", "I"]
 ignore = ["E501"]  # linha longa — controlada por line-length
 
+[tool.ruff.lint.per-file-ignores]
+"onboard_cliente.py" = ["F821"]  # {nome_curto} é interpolação Python dentro de template TS — falso positivo
+"scripts/pulse_semanal.py" = ["E402", "I001"]  # import após sys.path.insert obrigatório
+
 [tool.mypy]
 python_version = "3.11"
 ignore_missing_imports = true

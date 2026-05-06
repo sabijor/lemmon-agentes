@@ -41,10 +41,10 @@ def main():
             print("\nArquivo não existe. Cole roteiro (linha 'FIM' pra terminar):")
             linhas = []
             while True:
-                l = input()
-                if l.strip() == "FIM":
+                linha = input()
+                if linha.strip() == "FIM":
                     break
-                linhas.append(l)
+                linhas.append(linha)
             roteiro = "\n".join(linhas)
 
     elif modo == "cadeia":
