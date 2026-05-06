@@ -22,7 +22,7 @@ from agentes.salles import Salles
 from agentes.sonia import Sonia
 from agentes.aya import Aya
 from agentes.pedro_abrahao import PedroAbrahao
-from core.config import HISTORICO_DIR, OUTPUTS_DIR, AYA_GERAR_HTML, AYA_GERAR_PDF, AYA_PDF_ENGINE
+from core.config import HISTORICO_DIR, OUTPUTS_DIR, AYA_GERAR_HTML, AYA_GERAR_PDF, AYA_PDF_ENGINE, MODELO_PADRAO as LEMMON_MODELO_PADRAO
 from core.exportador_aya import exportar_dossie
 from core.discussao import construir_prompt_questionamento_mesa, construir_prompt_ata_mesa
 from core.exemplares import salvar_exemplar, carregar_exemplares, remover_exemplar
@@ -289,6 +289,66 @@ async def salvar_tags(payload: TagsPayload):
     return {"ok": True}
 
 
+class BriefingReversoPayload(BaseModel):
+    transcricao: str
+
+
+@app.post("/briefing_reverso")
+async def analisar_briefing_reverso(payload: BriefingReversoPayload):
+    """T23: dado um vídeo/texto pronto, infere o briefing e tese original."""
+    loop = asyncio.get_running_loop()
+    system_p = (
+        "Você é Otto, estrategista criativo da Lemmon Produções. "
+        "Dado um vídeo ou texto já produzido, você deve reconstruir: "
+        "qual era o briefing original que gerou este conteúdo, qual é a tese criativa "
+        "subjacente e qual o posicionamento de marca implícito.\n\n"
+        "Responda em markdown com 3 seções:\n"
+        "## Briefing inferido\n## Tese criativa\n## Posicionamento de marca"
+    )
+    resp = await loop.run_in_executor(
+        None,
+        lambda: _anthropic_client.messages.create(
+            model=LEMMON_MODELO_PADRAO,
+            max_tokens=1200,
+            system=system_p,
+            messages=[{"role": "user", "content": f"Analise este conteúdo:\n\n{payload.transcricao[:8000]}"}],
+        ),
+    )
+    texto = next((b.text for b in resp.content if hasattr(b, "text")), "")
+    custo = (resp.usage.input_tokens * 3e-6 + resp.usage.output_tokens * 1.5e-5)
+    return {"resultado": texto, "custo_total_usd": round(custo, 6)}
+
+
+class CortesProntosPayload(BaseModel):
+    transcricao: str
+    duracoes: list[int] = [15, 30, 60]
+
+
+@app.post("/cortes_prontos")
+async def gerar_cortes_prontos(payload: CortesProntosPayload):
+    """T25: a partir de transcrição, propõe cortes autônomos com timestamps."""
+    loop = asyncio.get_running_loop()
+    durs = ", ".join([f"{d}s" for d in payload.duracoes[:4]])
+    system_p = (
+        "Você é Sônia, especialista em performance de conteúdo para redes sociais. "
+        "Dado o texto de um vídeo longo, proponha cortes autônomos prontos para edição. "
+        f"Durações alvo: {durs}. Para cada corte: início/fim aproximado, texto da legenda "
+        "principal, hook de abertura e CTA final. Use formato markdown com tabela por duração."
+    )
+    resp = await loop.run_in_executor(
+        None,
+        lambda: _anthropic_client.messages.create(
+            model=LEMMON_MODELO_PADRAO,
+            max_tokens=2000,
+            system=system_p,
+            messages=[{"role": "user", "content": f"Transcrição:\n\n{payload.transcricao[:10000]}"}],
+        ),
+    )
+    texto = next((b.text for b in resp.content if hasattr(b, "text")), "")
+    custo = (resp.usage.input_tokens * 3e-6 + resp.usage.output_tokens * 1.5e-5)
+    return {"cortes": texto, "custo_total_usd": round(custo, 6)}
+
+
 async def _stream(ws: WebSocket, agent: str, text: str):
     words = text.split(" ")
     chunk_size = 10
@@ -380,6 +440,8 @@ async def chat(ws: WebSocket):
                     pass  # não bloqueia se a visão falhar
 
             manual_mode: bool = data.get("manual_mode", False)
+            fast_track: bool = data.get("fast_track", False)
+            sandbox: bool = data.get("sandbox", False)
             config: dict = data.get("config", {})
             loop = asyncio.get_running_loop()
 
@@ -407,6 +469,10 @@ async def chat(ws: WebSocket):
             cfg_heitor = config.get("heitor", {})
             cfg_salles = config.get("salles", {})
             cfg_sonia = config.get("sonia", {})
+
+            # T26: Fast-track força Otto resumido
+            if fast_track:
+                cfg_otto = {**cfg_otto, "modo_visual": "resumido"}
 
             async def _run_agent_step(name: str) -> tuple[str, float] | None:
                 """Executa um agente e retorna (text, cost) ou None se cancelado/pulado."""
@@ -605,14 +671,74 @@ async def chat(ws: WebSocket):
                     await ws.send_json({"type": "agent_error", "agent": "gate_espelho", "error": str(e)})
                     return True  # gate falhou, não bloqueia
 
+            async def _run_salles_alternativas() -> bool:
+                """T24: roda Salles 3x com variações e combina para Sônia. Retorna False se cancelado."""
+                nonlocal roteiro_salles, pipeline_cancelled
+                variacoes = [
+                    ("padrão", ""),
+                    ("impactante e direto", " [VARIAÇÃO: estilo mais impactante, hooks agressivos, ritmo acelerado, foco em conversão]"),
+                    ("emocional e pessoal", " [VARIAÇÃO: estilo emocional e testemunhal, tom íntimo, foco em conexão humana]"),
+                ]
+                formato = cfg_salles.get("formato", "auto")
+                todos_textos: list[str] = []
+                for idx, (label, hint) in enumerate(variacoes):
+                    bv = briefing + hint
+                    await ws.send_json({"type": "agent_start", "agent": "salles"})
+                    try:
+                        ag_s = Salles()
+                        res_s = await loop.run_in_executor(
+                            None,
+                            lambda bv=bv: ag_s.executar(
+                                briefing=bv,
+                                formato=formato,
+                                analise_otto_existente=analise_otto,
+                                diretrizes_heitor=diretrizes_heitor,
+                            ),
+                        )
+                        texto_s = f"**Variante {idx+1} — {label}**\n\n" + res_s.get("output_humano", "")
+                        custo_s = res_s.get("custo_total_usd", 0)
+                        todos_textos.append(res_s.get("output_humano", ""))
+                        custos[f"salles_v{idx+1}"] = custo_s
+                        await _stream(ws, "salles", texto_s)
+                        if manual_mode and idx == len(variacoes) - 1:
+                            await ws.send_json({"type": "agent_done", "agent": "salles", "cost": custo_s, "awaiting_approval": True})
+                            ctrl = await ws.receive_json()
+                            if ctrl.get("type") == "cancel":
+                                pipeline_cancelled = True
+                                return False
+                        else:
+                            await ws.send_json({"type": "agent_done", "agent": "salles", "cost": custo_s})
+                    except Exception as e:
+                        await ws.send_json({"type": "agent_error", "agent": "salles", "error": str(e)})
+                        return True
+                roteiro_salles = "\n\n---\n\n".join(
+                    [f"## Variante {i+1}\n\n{t}" for i, t in enumerate(todos_textos)]
+                )
+                respostas["salles"] = roteiro_salles
+                return True
+
             for name in names:
                 if name == "aya":
                     continue
-                ok = await _execute_with_approval(name)
+
+                # T26: Fast-track — pula Heitor com aviso
+                if fast_track and name == "heitor":
+                    aviso = "⚡ **Fast-track ativo** — Heitor pulado. Valide compliance manualmente antes de publicar."
+                    respostas["heitor"] = aviso
+                    await ws.send_json({"type": "agent_start", "agent": "heitor"})
+                    await _stream(ws, "heitor", aviso)
+                    await ws.send_json({"type": "agent_done", "agent": "heitor", "cost": 0})
+                    continue
+
+                # T24: A/B alternativas para Salles
+                if name == "salles" and int(cfg_salles.get("alternativas", 0)) >= 3 and not pipeline_cancelled:
+                    ok = await _run_salles_alternativas()
+                else:
+                    ok = await _execute_with_approval(name)
                 if not ok:
                     break
-                # Gate de espelho Pedro entre Salles e Sônia
-                if name == "salles" and not pipeline_cancelled:
+                # Gate de espelho Pedro entre Salles e Sônia (skip em fast_track)
+                if name == "salles" and not pipeline_cancelled and not fast_track:
                     ok = await _run_gate_espelho()
                     if not ok:
                         break
@@ -633,11 +759,15 @@ async def chat(ws: WebSocket):
                 "custos_usd": custos,
                 "agentes_usados": all_agents,
             }
-            session_path = _salvar_sessao(briefing, all_agents, respostas, custos, contexto_tecnico)
-            session_id = session_path.stem
+            # T27: sandbox — não salva no histórico
+            if not sandbox:
+                session_path = _salvar_sessao(briefing, all_agents, respostas, custos, contexto_tecnico)
+                session_id = session_path.stem
+            else:
+                session_id = None
 
-            # Sugerir tags automaticamente via Aya (T15)
-            if not pipeline_cancelled and respostas:
+            # Sugerir tags automaticamente via Aya (T15) — nunca em sandbox
+            if not pipeline_cancelled and respostas and not sandbox:
                 try:
                     _haiku = _anthropic_client.messages.create(
                         model="claude-haiku-4-5-20251001",
