@@ -1,6 +1,6 @@
 # LEMMON AGENTES — Manual do Sistema
 
-**Versão atual:** v1.7
+**Versão atual:** v1.8
 **Última atualização:** 2026-05-06
 **Mantido por:** Calebe Alves / Lemmon Produções
 
@@ -11,6 +11,16 @@
 ## Histórico de versões
 
 > **Convenção:** versões mais novas no topo. Cada release lista o que mudou em relação à anterior, mantendo histórico completo.
+
+### v1.8 — 2026-05-06
+
+**FASE 3 — Bloco crítico (T40+T41+T42): QA e segurança do link de aprovação.**
+
+- **Corrigir endpoint `/share` (T40):** `POST /share` retornava sempre 404 porque o loop buscava sessões em `HISTORICO_DIR/` (raiz) usando campo `session_id` que não existe nos JSONs. Corrigido para leitura direta em `HISTORICO_DIR/dashboard/{session_id}.json`. Toda a feature de link de aprovação (T36) agora funciona.
+- **Escape XSS no `/share/{token}` (T41):** Briefing, respostas dos agentes, nome do autor e texto dos comentários eram interpolados no HTML sem escape — vulnerabilidade XSS direta. Aplicado `html_escape()` em todos os campos. Adicionada validação no `ComentarioPayload`: `autor` máx 80 chars, `texto` máx 2000 chars. Guard: comentário vazio após `.strip()` retorna 400. Cap: máx 20 comentários por share.
+- **Regularizar versionamento de PDFs (T42):** Decisão Opção A documentada no CHANGELOG — ausência de PDFs v1.3 a v1.6 é aceita; estado consolidado em `MANUAL_v1.7`. A partir desta versão, todo bump de manual deve gerar PDF imediatamente com `python docs/gerar_pdf.py`.
+
+---
 
 ### v1.7 — 2026-05-06
 

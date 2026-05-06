@@ -431,6 +431,264 @@ Longo prazo / estética:    ÉPICO G (visual) + ÉPICO H (multimodal)
 
 ---
 
+# FASE 3 — QA E CORREÇÕES PÓS-IMPLEMENTAÇÃO
+
+**Adicionado:** 2026-05-06 (sessão 3)
+**Origem:** auditoria QA completa após Épicos C/E/F/G/H/I (manual em v1.7).
+**Estrutura:** 3 tarefas críticas (bloqueiam uso com cliente externo) + 8 médias (qualidade). Atacar em ordem.
+
+> **Princípio especial desta fase:** as tarefas críticas (T40, T41) precisam ser fechadas **antes** de gerar qualquer link de aprovação real para o Hator ou outro cliente externo. Hoje a feature está implementada mas insegura e quebrada.
+
+---
+
+## CRÍTICAS (bloqueiam uso com cliente real)
+
+### T40 — Corrigir endpoint `/share` quebrado (T36 inteiro não funciona)
+
+**Severidade:** crítica · **Onde:** `api_server.py`, função `criar_share` (~linha 445)
+
+**Problema:**
+- Linha 449 faz `for f in sorted(HISTORICO_DIR.glob("*.json"), reverse=True)` — **path errado**: as sessões estão em `HISTORICO_DIR / "dashboard"`, não na raiz.
+- Linha 452 compara com `data.get("session_id")` — campo que **não existe nos JSONs salvos** (o session_id vem do nome do arquivo, não do conteúdo).
+- Resultado: `POST /share` sempre retorna 404 "Sessão não encontrada". Toda T36 (link de aprovação) está broken.
+
+**O que fazer:**
+1. Trocar o loop de busca por leitura direta:
+   ```python
+   session_dir = HISTORICO_DIR / "dashboard"
+   sessao_path = session_dir / f"{payload.session_id}.json"
+   if not sessao_path.exists():
+       raise HTTPException(404, "Sessão não encontrada")
+   sessao = json.loads(sessao_path.read_text(encoding="utf-8"))
+   ```
+2. O resto da função (gerar token, salvar share JSON) permanece igual.
+
+**Critério de aceite:**
+- [ ] `POST /share` com session_id válido retorna `{token: "..."}`
+- [ ] Abrir `GET /share/{token}` no navegador mostra a página de aprovação preenchida
+- [ ] Sem mudança no formato do JSON salvo em `historico/`
+
+---
+
+### T41 — Escapar HTML no `/share/{token}` para prevenir XSS
+
+**Severidade:** crítica · **Onde:** `api_server.py`, função `ver_share` (~linha 476) e `comentar_share`
+
+**Problema:**
+Briefing, respostas de agentes, autor e texto de comentários são interpolados direto no HTML sem escape:
+```python
+blocos_html += f"<pre class='agent-content'>{txt}</pre>"
+<div class="briefing">{briefing[:500]}</div>
+<strong>{c["autor"]}</strong>: {c["texto"]}
+```
+Um briefing ou comentário com `<script>...</script>` é executado no browser do próximo visitante. Risco direto: o link compartilhado com cliente fica vulnerável.
+
+**O que fazer:**
+1. Importar `from html import escape as html_escape`.
+2. Aplicar `html_escape(...)` em **toda string interpolada no HTML** de `ver_share`: briefing, txt (resposta do agente), autor e texto dos comentários.
+3. Em `comentar_share`, validar payload:
+   - rejeitar se `len(texto) > 2000` ou `len(autor) > 80`
+   - rejeitar texto vazio (após strip)
+4. Considerar adicionar rate limit simples por token (ex: máx 20 comentários por share) — opcional mas recomendado.
+
+**Critério de aceite:**
+- [ ] Comentário com `<script>alert('xss')</script>` aparece como texto literal, não executa
+- [ ] Briefing com HTML é renderizado escapado
+- [ ] Comentário com 5000 chars retorna erro 400
+- [ ] Comentário vazio retorna erro 400
+
+---
+
+### T42 — Regularizar versionamento de PDFs do manual
+
+**Severidade:** crítica de processo · **Onde:** `docs/releases/`
+
+**Problema:**
+Manual está em v1.7 mas `docs/releases/` só tem v1.0, v1.1 e v1.2. Os épicos C/E/F/G/H foram entregues sem gerar PDF correspondente. Quebra a regra que o próprio manual define em §9.3.
+
+**O que fazer:**
+1. Rodar `python docs/gerar_pdf.py` agora — gera `MANUAL_v1.7_2026-05-06.pdf`. Esse é o estado atual.
+2. **Decisão a tomar:**
+   - **Opção A (pragmática, recomendada):** aceitar que houve "salto" v1.2 → v1.7 e seguir adiante. PDFs intermediários ficam ausentes para sempre. Adicionar nota no CHANGELOG explicando.
+   - **Opção B (purista):** voltar manualmente o cabeçalho do markdown a v1.3, gerar PDF; v1.4, gerar; v1.5, gerar; v1.6, gerar. Trabalho extra de ~5 minutos por versão. Resultado: histórico íntegro.
+3. Adicionar gancho automático no fluxo de "fechar épico": commit que muda versão do manual deve obrigar geração do PDF (pode ser hook git ou simplesmente disciplina + checklist).
+
+**Critério de aceite:**
+- [ ] `docs/releases/MANUAL_v1.7_2026-05-06.pdf` existe e abre corretamente
+- [ ] Decisão A ou B documentada no CHANGELOG
+- [ ] Nenhum PDF antigo apagado (v1.0/v1.1/v1.2 preservados)
+
+---
+
+## MÉDIAS (qualidade e robustez)
+
+### T43 — Atualizar `REGISTRO DE EXECUÇÃO` no plano
+
+**Severidade:** média de processo · **Onde:** este arquivo, tabela final
+
+**Problema:** Tabela só lista T1-T5 + T38 + T39. Mas T6, T7, T8, T9, T10, T11-T17, T22-T27, T28-T30, T31-T33, T34-T37 foram implementados (manual confirma). Plano fica como fonte enganosa.
+
+**O que fazer:**
+1. Adicionar uma linha por tarefa concluída na tabela.
+2. Para épicos inteiros, agrupar: `T11-T17 (Épico C)`, `T22-T27 (Épico E)`, etc.
+3. Marcar quais ficaram parcialmente implementadas (ex: T11 manual, sem cron — ver T49 abaixo).
+
+**Critério de aceite:**
+- [ ] Tabela reflete o estado real
+- [ ] Tarefas com pendência têm coluna "Observações" preenchida
+
+---
+
+### T44 — Bug de UI no comparativo A/B do Salles
+
+**Severidade:** média · **Onde:** backend `api_server.py:_run_salles_alternativas`, frontend `dashboard/lib/useChat.ts:153-159`
+
+**Problema:**
+Backend manda `agent_start salles` 3 vezes (uma por variante). Frontend faz `currentMsgId.current[data.agent] = msgId` toda vez — **só o último ID persiste**. As 3 variantes streamadas viram conteúdo da última bolha; as duas primeiras viram fantasmas no array.
+
+**O que fazer (escolher uma das opções):**
+- **Opção A — backend muda agent ids:** mandar `salles_v1`, `salles_v2`, `salles_v3` em `agent_start` e `token`. Frontend trata como 3 agentes distintos. Mais limpo.
+- **Opção B — frontend deduplica via msg_id:** receber um campo `msg_id` único do backend em cada `agent_start` e usar isso como chave em vez do `agent`.
+
+**Antes de mexer:** rodar pipeline com `alternativas: 3` no navegador e confirmar visualmente o bug. Se as 3 mensagens aparecem corretas, o bug pode estar mascarado pela ordem de eventos React e a tarefa vira só validação.
+
+**Critério de aceite:**
+- [ ] Pipeline com 3 variantes mostra 3 bolhas distintas, cada uma com seu texto
+- [ ] Custos das 3 variantes aparecem somados no total da sessão
+- [ ] Sônia continua recebendo as 3 versões para ranqueamento
+
+---
+
+### T45 — Validar valor positivo no `autorizar_custo`
+
+**Severidade:** baixa · **Onde:** `api_server.py:_verificar_custo_cap` (~linha 966)
+
+**Problema:**
+`custo_cap_autorizado += float(ctrl.get("valor", 0.5))` aceita qualquer valor. Se o cliente mandar `valor: 0` ou negativo, o cap não sobe e cai em loop infinito de "cap atingido".
+
+**O que fazer:**
+Adicionar piso mínimo:
+```python
+incremento = max(0.1, float(ctrl.get("valor", 0.5)))
+custo_cap_autorizado += incremento
+```
+
+**Critério de aceite:**
+- [ ] Mandar `autorizar_custo` com valor 0 incrementa pelo menos $0.10
+- [ ] Comportamento normal (0.5/2.0) inalterado
+
+---
+
+### T46 — Heurística de risco vermelho do Heitor mais robusta
+
+**Severidade:** média · **Onde:** `api_server.py:763`
+
+**Problema:**
+Detecção atual: `if "🔴" in output_humano or "risco_geral: vermelho" in str(diretrizes_heitor or ""):`. Frágil: se Heitor trocar emoji por palavra, ou se `output_tecnico` mudar formato, o gate condicional para de funcionar silenciosamente.
+
+**O que fazer:**
+Ler do output_tecnico estruturado:
+```python
+risco = (diretrizes_heitor or {}).get("risco_geral", "").lower()
+if risco in ("vermelho", "red", "high"):
+    heitor_risco_vermelho = True
+```
+Manter o emoji como fallback se necessário.
+
+**Critério de aceite:**
+- [ ] Heitor com `risco_geral: "vermelho"` no JSON técnico ativa routing condicional
+- [ ] Heitor com emoji 🔴 mas sem campo técnico ainda funciona (fallback)
+
+---
+
+### T47 — Calibragem do Pedro com autocomplete de session_id
+
+**Severidade:** média de UX · **Onde:** `dashboard/app/calibragem/page.tsx`
+
+**Problema:**
+Campo `session_id` é input texto livre. Operador digita errado, ou esquece. Risco: registros de calibragem desconectados de sessões reais.
+
+**O que fazer:**
+1. Buscar `GET /historico` ao montar a página, filtrar últimas 20 sessões com Pedro envolvido.
+2. Trocar input por combo (datalist/select) com session_id + briefing truncado.
+3. Permitir mesmo assim entrada livre (caso a sessão seja antiga e não esteja na lista).
+
+**Critério de aceite:**
+- [ ] Dropdown mostra últimas 20 sessões com Pedro
+- [ ] Selecionar uma preenche o campo automaticamente
+- [ ] Entrada manual continua possível
+
+---
+
+### T48 — Onboard wizard com `idleQuote` placeholder
+
+**Severidade:** baixa · **Onde:** `onboard_cliente.py:177`
+
+**Problema:**
+Snippet TS gerado tem hardcoded `'Avaliando pela ótica do cliente...'` — duplicado do Pedro. Operador colando 3 clientes novos termina com 3 frases iguais.
+
+**O que fazer:**
+Trocar para placeholder explícito que force atenção:
+```python
+idleQuote: 'TODO: defina a frase de fundo de {nome_curto}',
+```
+
+**Critério de aceite:**
+- [ ] Wizard novo gera snippet com `TODO:` visível
+- [ ] Operador vê e personaliza antes de colar
+
+---
+
+### T49 — Documentar automação do Pulse semanal
+
+**Severidade:** baixa de processo · **Onde:** `docs/MANUAL_SISTEMA.md` §5 ou §8
+
+**Problema:**
+T11 do plano original pedia "automatizado, toda segunda 6h". Script `pulse_semanal.py` existe e roda manual, mas a parte "automático" não está cumprida.
+
+**O que fazer:**
+1. Adicionar seção no manual com snippet de cron (Linux/Mac):
+   ```
+   0 6 * * 1 cd /Users/calebe/Documents/lemmon-agentes && python scripts/pulse_semanal.py
+   ```
+2. Alternativa launchd para Mac (criar `com.lemmon.pulse.plist`).
+3. Alternativa GitHub Actions/scheduled-task se um dia for hospedado.
+
+**Critério de aceite:**
+- [ ] Manual tem instrução clara de como agendar
+- [ ] Calebe consegue rodar o snippet e ver pulse aparecendo na segunda seguinte
+
+---
+
+### T50 — Página `/share/[token]` renderizada no Next.js
+
+**Severidade:** baixa (depende de plano de hosting) · **Onde:** `dashboard/app/share/[token]/page.tsx`
+
+**Problema:**
+Página atual faz `window.location.replace(\`${API_URL}/share/${token}\`)` — manda o cliente para o backend FastAPI direto. Em dev local funciona. Em produção, se backend e dashboard ficarem em domínios diferentes, o cliente externo termina em URL sem branding da Lemmon.
+
+**O que fazer:**
+1. Criar endpoint backend `GET /share/{token}.json` (puro JSON, sem HTML).
+2. Página Next.js puxa via fetch e renderiza com componentes próprios (Tailwind, branding Lemmon).
+3. Endpoint HTML atual (`GET /share/{token}` retornando HTMLResponse) pode ficar como fallback ou ser removido.
+
+**Critério de aceite:**
+- [ ] Cliente abrindo `/share/<token>` no domínio do dashboard vê página renderizada com identidade Lemmon
+- [ ] Sem redirecionamento para outro domínio
+- [ ] Comentários continuam funcionando (POST para backend)
+
+---
+
+# ORDEM SUGERIDA DA FASE 3
+
+```
+Imediato (mesmo dia):     T40 + T41 + T42 (críticas — bloqueiam cliente real)
+Próxima sessão:           T43 (registro) + T44 (bug A/B Salles)
+Quando puder:             T45, T46, T47, T48, T49, T50
+```
+
+---
+
 ## POLIMENTOS — fazer só se sobrar tempo
 
 Lista curta, sem detalhamento — cada um vira tarefa numerada quando for atacado.
@@ -473,3 +731,14 @@ Quando voltar à conversa, eu (o assistente daqui) vou:
 | T5 — streaming nativo | ✅ concluído | 2026-05-05 | Reunião streama nativamente. Pipeline mantém fake stream (todos os agentes usam tool_use forçado). Branch: `feature/streaming-nativo` |
 | T38 — gerar_pdf.py | ✅ concluído | 2026-05-06 | Migrado de reportlab (não instalado) para weasyprint+markdown; gera PDF com estilo Lemmon; `docs/releases/MANUAL_v1.0_2026-05-05.pdf` regenerado |
 | T39 — hábito manual | ✅ concluído | 2026-05-06 | Processo documentado em §9 do manual (já existia); convenção estabelecida |
+| T6-T8 (Épico A) | ✅ concluído | 2026-05-06 | `EspelhoCliente` base class extraída; wizard `onboard_cliente.py` criado; sala customizável por cliente no OfficeScene |
+| T9-T10 (Épico B) | ✅ concluído | 2026-05-06 | Pedro como gate automático entre Salles e Sônia; stress test mesa redonda validado |
+| T11-T17 (Épico C) | ✅ concluído | 2026-05-06 | Pulse semanal (manual, sem cron — ver T49); few-shot sessões ⭐5; busca semântica; Hall of Fame; tags semi-automáticas; dashboard de saúde; histórico filtrável |
+| T22-T27 (Épico E) | ✅ concluído | 2026-05-06 | Modo remix; briefing reverso; comparativo A/B Salles; cortes-prontos Sônia; fast-track; modo sandbox |
+| T28-T30 (Épico F) | ✅ concluído | 2026-05-06 | Sugestor de pipeline; conditional routing Heitor; custo-cap por sessão |
+| T31-T33 (Épico G) | ✅ concluído | 2026-05-06 | Whiteboard ao vivo; sprites expressivos (celebrate/error); mic destaque em reunião |
+| T34-T37 (Épico H) | ✅ concluído | 2026-05-06 | Upload áudio (Whisper); TTS dossiê; link aprovação cliente; calibragem Pedro |
+| T40 — /share path | ✅ concluído | 2026-05-06 | Loop HISTORICO_DIR.glob substituído por leitura direta em dashboard/{session_id}.json. Testado: POST /share + abrir no browser |
+| T41 — XSS escape | ✅ concluído | 2026-05-06 | html_escape em todos os campos; max_length autor/texto; guard vazio; cap 20 comentários. Testado: &lt;script&gt; aparece como texto literal. **Nota:** T40 e T41 landed no mesmo commit (7cf0992) por terem sido implementados antes do primeiro commit |
+| T42 — PDFs manual | ✅ concluído | 2026-05-06 | Opção A documentada no CHANGELOG; MANUAL_v1.7 e v1.8 existem em releases/ |
+| T43 — registro execução | ✅ concluído | 2026-05-06 | Esta tabela atualizada com todos os épicos e FASE 3 bloco crítico |
