@@ -1821,3 +1821,4 @@ Quando voltar à conversa, eu (o assistente daqui) vou:
 | T59 — telemetria latência | ✅ concluído | 2026-05-06 | duracoes_segundos por agente em session JSON; HistoryPanel exibe ⏱ Xs (amber >120s); guard ?? {} para sessões antigas |
 | T60 — polimento UI | ✅ concluído | 2026-05-06 | Saúde: labels visíveis (stone-300 + bolinha colorida, fix Aya #18181b invisível); speech bubble: cursor-pointer + hover CSS; sem outros achados nessa rodada |
 | Manual v1.12+v1.13 | ✅ concluído | 2026-05-06 | v1.12 documenta T56-T59; v1.13 documenta T60; PDF gerado docs/releases/MANUAL_v1.13_2026-05-06.pdf |
+| T88 — GitHub push | ✅ concluído | 2026-05-06 | Repo privado https://github.com/sabijor/lemmon-agentes; gh CLI instalado via homebrew; main como default branch; log local == remoto; .next/ removido do tracking; shares/ + backups/ adicionados ao .gitignore |
