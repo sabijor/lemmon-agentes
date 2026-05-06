@@ -11,6 +11,7 @@ PROMPTS_DIR = BASE_DIR / "prompts"
 OUTPUTS_DIR = BASE_DIR / "outputs"
 HISTORICO_DIR = BASE_DIR / "historico"
 INPUTS_DIR = BASE_DIR / "inputs"
+ESPELHO_CLIENTES_DIR = INPUTS_DIR / "clientes"  # inputs/clientes/<id>/
 
 # API
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
@@ -150,3 +151,37 @@ AYA_AGENTES_PADRAO = ["otto", "heitor", "salles", "sonia"]
 
 # Tamanho do resumo de cada agente na página 1 (chars máximos)
 AYA_RESUMO_AGENTE_MAX_CHARS = 400
+
+# ============================================================================
+# LIMITES DO PEDRO (CONSULTOR CLIENTE — Dr. Pedro Abrahão / Hator Clinic)
+# ============================================================================
+
+PEDRO_PREVISAO_RANGE_USD = (0.05, 0.20)
+PEDRO_AVISO_AMARELO_USD = 0.25
+PEDRO_AVISO_VERMELHO_USD = 0.40
+PEDRO_PEDIR_CONFIRMACAO_ACIMA_USD = None
+
+# Limites de tamanho
+PEDRO_INPUT_MAX_CHARS = 20000
+PEDRO_CONTEXTO_OPCIONAL_MAX_CHARS = 15000
+PEDRO_RESPOSTA_MAX_TOKENS = 4096
+
+# Pasta com material primário do cliente (legado — novo padrão: ESPELHO_CLIENTES_DIR / "pedro")
+PEDRO_MATERIAL_DIR = ESPELHO_CLIENTES_DIR / "pedro"
+
+# ============================================================================
+# AYA EXPORT v1.1 (HTML + PDF) — Design System AURA
+# ============================================================================
+
+# Caminho do design system AURA (referência visual)
+AYA_DESIGN_SYSTEM_PATH = BASE_DIR / "design_system.html"
+
+# Configurações de export
+AYA_GERAR_HTML = True
+AYA_GERAR_PDF = True
+
+# Engine de PDF: 'weasyprint' (padrão) | 'playwright' (fallback)
+AYA_PDF_ENGINE = "weasyprint"
+
+# Tamanho máximo aceitável do PDF (alerta se passar)
+AYA_PDF_MAX_SIZE_MB = 10
