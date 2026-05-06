@@ -212,7 +212,8 @@ class Aya(AgenteBase):
         outputs = {}
 
         for agente in AYA_AGENTES_PADRAO:
-            if outputs_diretos and agente in outputs_diretos:
+            if outputs_diretos is not None and agente in outputs_diretos:
+                # None = ausente nesta sessão; pula busca no disco
                 outputs[agente] = outputs_diretos[agente]
                 continue
 
@@ -350,6 +351,12 @@ Use `compilar_resumos_lemmon`.
         elif agente == "sonia":
             analise = output_tecnico.get("analise_master", {})
             consolidada = output_tecnico.get("analise_consolidada", {})
+            if isinstance(consolidada, str):
+                try:
+                    import json as _json_local
+                    consolidada = _json_local.loads(consolidada)
+                except Exception:
+                    consolidada = {}
             return {
                 "nota_master": analise.get("nota_geral", 0),
                 "num_cortes": len(output_tecnico.get("cortes_autonomos", [])),
@@ -422,25 +429,25 @@ Use `compilar_resumos_lemmon`.
 
         if outputs.get("otto"):
             partes.append(f"## {secao_num}. Otto — Estratégia\n\n")
-            partes.append(outputs["otto"].get("output_humano", "(sem output humano)") + "\n\n")
+            partes.append(str(outputs["otto"].get("output_humano", "(sem output humano)")) + "\n\n")
             partes.append("---\n\n")
             secao_num += 1
 
         if outputs.get("heitor"):
             partes.append(f"## {secao_num}. Heitor — Compliance\n\n")
-            partes.append(outputs["heitor"].get("output_humano", "(sem output humano)") + "\n\n")
+            partes.append(str(outputs["heitor"].get("output_humano", "(sem output humano)")) + "\n\n")
             partes.append("---\n\n")
             secao_num += 1
 
         if outputs.get("salles"):
             partes.append(f"## {secao_num}. Salles — Roteiro\n\n")
-            partes.append(outputs["salles"].get("output_humano", "(sem output humano)") + "\n\n")
+            partes.append(str(outputs["salles"].get("output_humano", "(sem output humano)")) + "\n\n")
             partes.append("---\n\n")
             secao_num += 1
 
         if outputs.get("sonia"):
             partes.append(f"## {secao_num}. Sonia — Performance\n\n")
-            partes.append(outputs["sonia"].get("output_humano", "(sem output humano)") + "\n\n")
+            partes.append(str(outputs["sonia"].get("output_humano", "(sem output humano)")) + "\n\n")
             partes.append("---\n\n")
 
         # RODAPÉ MÍNIMO

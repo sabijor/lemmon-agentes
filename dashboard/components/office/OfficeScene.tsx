@@ -2,8 +2,29 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, animate } from 'framer-motion'
 import { AGENTS, type AgentId } from '@/lib/agents'
-import { type AgentStatus } from '@/lib/useChat'
+import { type AgentStatus, type Message } from '@/lib/useChat'
 import CharacterSprite from './CharacterSprite'
+
+// ─── Meeting room themes per cliente espelho ─────────────────────────
+interface MeetingTheme { floor: string[]; glow: string; screenAccent: string; wallTone: string }
+const MEETING_THEMES: Record<string, MeetingTheme> = {
+  pedro_abrahao: {
+    floor: ['#0d4440', '#0a3a37', '#10524e', '#083530', '#0e4e4a', '#0d5450'],
+    glow: '#0f766e',
+    screenAccent: '#14b8a6',
+    wallTone: '#0f766e',
+  },
+  // Future clients added here automatically via onboard_cliente.py
+}
+const DEFAULT_THEME: MeetingTheme = {
+  floor: ['#7c1d1d', '#6b1818', '#8b2020', '#5c1414', '#701c1c', '#7c2020'],
+  glow: '#fbbf24',
+  screenAccent: '#3b82f6',
+  wallTone: '#9a6030',
+}
+function getMeetingTheme(clientId: string): MeetingTheme {
+  return MEETING_THEMES[clientId] ?? DEFAULT_THEME
+}
 
 // ─── Work room constants ──────────────────────────────────────────────
 const TW = 64, TH = 32, WH = 96
@@ -14,12 +35,19 @@ const sy = (gx: number, gy: number) => OY + (gx + gy) * (TH / 2)
 
 // ─── Meeting room constants ────────────────────────────────────────────
 // MEET_OX=1560 ensures NO overlap with work room (right edge≈868) after camera pan
-// CAMERA_MEETING = -(msx(6,4.5) - 480) = -(1608 - 480) = -1128
+// CAMERA_MEETING = msx(6,4.5) - 480 = 1608 - 480 = 1128  (meeting room is at positive x)
 const MEET_OX = 1560, MEET_OY = 120
 const MEET_COLS = 12, MEET_ROWS = 9
 const msx = (gx: number, gy: number) => MEET_OX + (gx - gy) * (TW / 2)
 const msy = (gx: number, gy: number) => MEET_OY + (gx + gy) * (TH / 2)
-const CAMERA_MEETING = -1128
+const CAMERA_MEETING = 1128
+
+// ─── Reception room constants ─────────────────────────────────────────
+const RECEP_OX = -480, RECEP_OY = 180
+const RECEP_COLS = 8, RECEP_ROWS = 7
+const rsx = (gx: number, gy: number) => RECEP_OX + (gx - gy) * (TW / 2)
+const rsy = (gx: number, gy: number) => RECEP_OY + (gx + gy) * (TH / 2)
+const CAMERA_RECEP = -944
 
 // ─── Roles ───────────────────────────────────────────────────────────
 const ROLES: Record<AgentId, string> = {
@@ -28,6 +56,7 @@ const ROLES: Record<AgentId, string> = {
   salles: 'Roteiri.',
   sonia: 'Perform.',
   aya: 'Assistente',
+  pedro_abrahao: 'Consultor',
 }
 
 // ─── Idle speech quotes ──────────────────────────────────────────────
@@ -37,6 +66,7 @@ const IDLE_QUOTES: Record<AgentId, string[]> = {
   salles: ['Isso tem alma.', 'Mais tensão aqui.', 'E se abrirmos com...', '...mais café.'],
   sonia:  ['CTR +23%!', 'Novo criativo: GO!', 'ROI aprovado!', 'Métricas no verde!'],
   aya:    ['Compilando outputs.', 'Dossiê pronto.', 'Fluxos conectados.', 'Processando...'],
+  pedro_abrahao: ['Faz sentido pra mim.', 'Como paciente...', 'Isso ressoa.', 'Autenticidade.'],
 }
 
 // ─── Speech bubble ───────────────────────────────────────────────────
@@ -52,9 +82,10 @@ function SpeechBubble({ text }: { text: string }) {
   if (cur) lines.push(cur.trim())
   const PH = 13, PAD = 7, bW = 116, bH = lines.length * PH + PAD * 2
   return (
-    <g>
+    <g style={{ cursor: 'pointer' }} className="speech-bubble-group">
       <rect x={-bW / 2} y={-bH - 10} width={bW} height={bH} rx={7}
-        fill="white" stroke="#d6d3d1" strokeWidth="1" opacity="0.97" />
+        fill="white" stroke="#d6d3d1" strokeWidth="1" opacity="0.97"
+        className="speech-bubble-rect" />
       <polygon points={`-5,-10 5,-10 0,-3`} fill="white" stroke="#d6d3d1" strokeWidth="1" />
       {lines.map((line, i) => (
         <text key={i} x={0} y={-bH - 10 + PAD + (i + 1) * PH - 2}
@@ -151,6 +182,49 @@ function MWallRect({ wall, g1, g2, h1, h2, fill, opacity }: {
       [msx(0, g2), msy(0, g2) - h1], [msx(0, g1), msy(0, g1) - h1]]
     : [[msx(g1, 0), msy(g1, 0) - h2], [msx(g2, 0), msy(g2, 0) - h2],
       [msx(g2, 0), msy(g2, 0) - h1], [msx(g1, 0), msy(g1, 0) - h1]]
+  return <polygon points={pts.map(p => p.join(',')).join(' ')} fill={fill ?? 'none'} opacity={opacity} />
+}
+
+// ─── Reception room primitives ───────────────────────────────────────
+function RBox({ gx, gy, w = 1, d = 1, h = 32, top, left, right }: {
+  gx: number; gy: number; w?: number; d?: number; h?: number
+  top: string; left: string; right: string
+}) {
+  const p = (arr: [number, number][]) => arr.map(v => v.join(',')).join(' ')
+  const T = (x: number, y: number): [number, number] => [x, y]
+  const bk = T(rsx(gx, gy), rsy(gx, gy) - h)
+  const rt = T(rsx(gx + w, gy), rsy(gx + w, gy) - h)
+  const lf = T(rsx(gx, gy + d), rsy(gx, gy + d) - h)
+  const fr = T(rsx(gx + w, gy + d), rsy(gx + w, gy + d) - h)
+  const rtB = T(rsx(gx + w, gy), rsy(gx + w, gy))
+  const lfB = T(rsx(gx, gy + d), rsy(gx, gy + d))
+  const frB = T(rsx(gx + w, gy + d), rsy(gx + w, gy + d))
+  return (
+    <g>
+      <polygon points={p([rt, fr, frB, rtB])} fill={right} />
+      <polygon points={p([lf, fr, frB, lfB])} fill={left} />
+      <polygon points={p([bk, rt, fr, lf])} fill={top} />
+    </g>
+  )
+}
+
+function RTile({ gx, gy, fill }: { gx: number; gy: number; fill: string }) {
+  const x = rsx(gx, gy), y = rsy(gx, gy)
+  return (
+    <polygon points={`${x},${y} ${x + TW / 2},${y + TH / 2} ${x},${y + TH} ${x - TW / 2},${y + TH / 2}`}
+      fill={fill} stroke="#b8b8b0" strokeWidth="0.4" />
+  )
+}
+
+function RWallRect({ wall, g1, g2, h1, h2, fill, opacity }: {
+  wall: 'left' | 'right'; g1: number; g2: number
+  h1: number; h2: number; fill?: string; opacity?: string | number
+}) {
+  const pts = wall === 'left'
+    ? [[rsx(0, g1), rsy(0, g1) - h2], [rsx(0, g2), rsy(0, g2) - h2],
+      [rsx(0, g2), rsy(0, g2) - h1], [rsx(0, g1), rsy(0, g1) - h1]]
+    : [[rsx(g1, 0), rsy(g1, 0) - h2], [rsx(g2, 0), rsy(g2, 0) - h2],
+      [rsx(g2, 0), rsy(g2, 0) - h1], [rsx(g1, 0), rsy(g1, 0) - h1]]
   return <polygon points={pts.map(p => p.join(',')).join(' ')} fill={fill ?? 'none'} opacity={opacity} />
 }
 
@@ -281,18 +355,45 @@ function TV({ gx, gy }: { gx: number; gy: number }) {
   )
 }
 
-function Whiteboard({ gy1, gy2 }: { gy1: number; gy2: number }) {
+function Whiteboard({ gy1, gy2, fillPct, agentColor }: { gy1: number; gy2: number; fillPct?: number; agentColor?: string }) {
+  const boardW = gy2 - gy1 - 0.16
+  const filled = fillPct ?? 0
+  const color = agentColor ?? '#1e3a8a'
+
   return (
-    <g>
+    <g data-testid="whiteboard">
       <WallRect wall="left" g1={gy1} g2={gy2} h1={20} h2={82} fill="#292524" />
       <WallRect wall="left" g1={gy1 + 0.08} g2={gy2 - 0.08} h1={24} h2={79} fill="#f8fafc" />
-      <WallRect wall="left" g1={gy1 + 0.2} g2={gy2 - 0.4} h1={60} h2={62} fill="#64748b" opacity="0.6" />
-      <WallRect wall="left" g1={gy1 + 0.2} g2={gy2 - 0.6} h1={66} h2={68} fill="#64748b" opacity="0.5" />
-      <WallRect wall="left" g1={gy1 + 0.5} g2={gy2 - 0.3} h1={72} h2={74} fill="#3b82f6" opacity="0.5" />
-      <WallRect wall="left" g1={gy1 + 0.3} g2={gy1 + 0.9} h1={40} h2={56} fill="#dbeafe" opacity="0.7" />
-      <WallRect wall="left" g1={gy1 + 1.1} g2={gy1 + 1.7} h1={40} h2={56} fill="#dcfce7" opacity="0.7" />
+      {/* Content fill bars — appear as pipeline runs */}
+      {filled > 0 ? (
+        <>
+          {/* Background tint */}
+          <WallRect wall="left" g1={gy1 + 0.12} g2={gy2 - 0.12} h1={26} h2={78} fill={color} opacity="0.07" />
+          {/* Line 1 */}
+          {filled >= 0.15 && <WallRect wall="left" g1={gy1 + 0.2} g2={gy1 + 0.2 + boardW * Math.min(filled, 0.4) * 2} h1={35} h2={37} fill={color} opacity="0.65" />}
+          {/* Line 2 */}
+          {filled >= 0.25 && <WallRect wall="left" g1={gy1 + 0.2} g2={gy1 + 0.2 + boardW * Math.min((filled - 0.1) / 0.6, 1)} h1={42} h2={44} fill={color} opacity="0.55" />}
+          {/* Line 3 */}
+          {filled >= 0.4 && <WallRect wall="left" g1={gy1 + 0.2} g2={gy1 + 0.2 + boardW * Math.min((filled - 0.2) / 0.6, 1)} h1={49} h2={51} fill={color} opacity="0.55" />}
+          {/* Line 4 — shorter */}
+          {filled >= 0.55 && <WallRect wall="left" g1={gy1 + 0.2} g2={gy1 + 0.2 + boardW * Math.min((filled - 0.3) / 0.6, 0.7)} h1={56} h2={58} fill={color} opacity="0.45" />}
+          {/* Line 5 — shorter */}
+          {filled >= 0.7 && <WallRect wall="left" g1={gy1 + 0.2} g2={gy1 + 0.2 + boardW * Math.min((filled - 0.4) / 0.6, 0.55)} h1={63} h2={65} fill={color} opacity="0.40" />}
+          {/* Line 6 */}
+          {filled >= 0.85 && <WallRect wall="left" g1={gy1 + 0.2} g2={gy1 + 0.2 + boardW * Math.min((filled - 0.5) / 0.5, 0.45)} h1={70} h2={72} fill={color} opacity="0.35" />}
+        </>
+      ) : (
+        <>
+          <WallRect wall="left" g1={gy1 + 0.2} g2={gy2 - 0.4} h1={60} h2={62} fill="#64748b" opacity="0.6" />
+          <WallRect wall="left" g1={gy1 + 0.2} g2={gy2 - 0.6} h1={66} h2={68} fill="#64748b" opacity="0.5" />
+          <WallRect wall="left" g1={gy1 + 0.5} g2={gy2 - 0.3} h1={72} h2={74} fill="#3b82f6" opacity="0.5" />
+          <WallRect wall="left" g1={gy1 + 0.3} g2={gy1 + 0.9} h1={40} h2={56} fill="#dbeafe" opacity="0.7" />
+          <WallRect wall="left" g1={gy1 + 1.1} g2={gy1 + 1.7} h1={40} h2={56} fill="#dcfce7" opacity="0.7" />
+        </>
+      )}
+      {/* Markers */}
       <WallRect wall="left" g1={gy1 + 0.15} g2={gy1 + 0.35} h1={22} h2={24} fill="#ef4444" />
-      <WallRect wall="left" g1={gy1 + 0.4} g2={gy1 + 0.6} h1={22} h2={24} fill="#3b82f6" />
+      <WallRect wall="left" g1={gy1 + 0.4} g2={gy1 + 0.6} h1={22} h2={24} fill={filled > 0 ? color : '#3b82f6'} />
     </g>
   )
 }
@@ -620,8 +721,69 @@ function MGlobe({ gx, gy }: { gx: number; gy: number }) {
   )
 }
 
+// ─── Reception room furniture ─────────────────────────────────────────
+function ReceptionCounter({ gx, gy }: { gx: number; gy: number }) {
+  return (
+    <g>
+      <RBox gx={gx} gy={gy} w={3.5} d={1} h={26} top="#e8e4dc" left="#d4d0c8" right="#dcdad0" />
+      <RBox gx={gx + 0.1} gy={gy + 0.05} w={3.3} d={0.06} h={36} top="#f5f3ef" left="#e8e4dc" right="#f0eee8" />
+      <RBox gx={gx + 0.4} gy={gy + 0.1} w={0.05} d={0.2} h={28} top="#374151" left="#1f2937" right="#374151" />
+      <RBox gx={gx + 0.3} gy={gy + 0.1} w={0.8} d={0.06} h={52} top="#0f172a" left="#020617" right="#0f172a" />
+      <RBox gx={gx + 0.32} gy={gy + 0.11} w={0.76} d={0.05} h={48} top="#1e3a8a" left="#172554" right="#1e3a8a" />
+      <RBox gx={gx + 2.8} gy={gy + 0.2} w={0.25} d={0.25} h={32} top="#f0fdf4" left="#dcfce7" right="#f0fdf4" />
+    </g>
+  )
+}
+
+function ReceptionistChair({ gx, gy }: { gx: number; gy: number }) {
+  return (
+    <g>
+      <RBox gx={gx} gy={gy} w={0.7} d={0.7} h={14} top="#374151" left="#1f2937" right="#374151" />
+      <RBox gx={gx + 0.05} gy={gy + 0.58} w={0.6} d={0.1} h={44} top="#374151" left="#1f2937" right="#374151" />
+    </g>
+  )
+}
+
+function ReceptionSofa({ gx, gy }: { gx: number; gy: number }) {
+  return (
+    <g>
+      <RBox gx={gx} gy={gy} w={2.2} d={0.2} h={44} top="#6b7280" left="#4b5563" right="#52606e" />
+      <RBox gx={gx} gy={gy} w={0.2} d={1.2} h={32} top="#6b7280" left="#4b5563" right="#52606e" />
+      <RBox gx={gx + 2.0} gy={gy} w={0.2} d={1.2} h={32} top="#6b7280" left="#4b5563" right="#52606e" />
+      <RBox gx={gx} gy={gy} w={2.2} d={1.2} h={20} top="#9ca3af" left="#6b7280" right="#7c8a99" />
+      <RBox gx={gx + 0.2} gy={gy + 0.1} w={0.85} d={0.9} h={25} top="#d1d5db" left="#9ca3af" right="#b0b8c4" />
+      <RBox gx={gx + 1.15} gy={gy + 0.1} w={0.85} d={0.9} h={25} top="#d1d5db" left="#9ca3af" right="#b0b8c4" />
+    </g>
+  )
+}
+
+function ReceptionTable({ gx, gy }: { gx: number; gy: number }) {
+  return (
+    <g>
+      <RBox gx={gx} gy={gy} w={1.2} d={0.8} h={14} top="#f5f3ef" left="#e8e4dc" right="#eeece4" />
+      <RBox gx={gx + 0.15} gy={gy + 0.1} w={0.5} d={0.4} h={16} top="#1e40af" left="#1e3a8a" right="#1e40af" />
+      <RBox gx={gx + 0.8} gy={gy + 0.25} w={0.18} d={0.18} h={20} top="#bae6fd" left="#7dd3fc" right="#93c5fd" />
+    </g>
+  )
+}
+
+function RPlant({ gx, gy }: { gx: number; gy: number }) {
+  const x = rsx(gx, gy) + TW / 2 - 4, y = rsy(gx, gy) + TH / 2
+  return (
+    <g>
+      <polygon points={`${x - 8},${y - 5} ${x + 8},${y - 5} ${x + 6},${y + 1} ${x - 6},${y + 1}`} fill="#92400e" />
+      <polygon points={`${x - 10},${y - 10} ${x + 10},${y - 10} ${x + 8},${y - 5} ${x - 8},${y - 5}`} fill="#b45309" />
+      <line x1={x} y1={y - 10} x2={x - 4} y2={y - 44} stroke="#15803d" strokeWidth="2" />
+      <line x1={x} y1={y - 10} x2={x + 5} y2={y - 40} stroke="#15803d" strokeWidth="1.5" />
+      <ellipse cx={x - 9} cy={y - 40} rx={13} ry={6} fill="#16a34a" transform={`rotate(-28,${x - 9},${y - 40})`} />
+      <ellipse cx={x + 10} cy={y - 38} rx={13} ry={6} fill="#15803d" transform={`rotate(28,${x + 10},${y - 38})`} />
+      <ellipse cx={x} cy={y - 48} rx={11} ry={5.5} fill="#22c55e" />
+    </g>
+  )
+}
+
 // ─── Work room background ─────────────────────────────────────────────
-function RoomBackground({ onDoorClick }: { onDoorClick: () => void }) {
+function RoomBackground({ onDoorClick, whiteBoardFill, whiteBoardColor }: { onDoorClick: () => void; whiteBoardFill?: number; whiteBoardColor?: string }) {
   const P = (pts: [number, number][]) => pts.map(v => v.join(',')).join(' ')
   const T = (x: number, y: number): [number, number] => [x, y]
   const leftWall = [T(sx(0, 0), sy(0, 0) - WH), T(sx(0, ROWS), sy(0, ROWS) - WH), T(sx(0, ROWS), sy(0, ROWS)), T(sx(0, 0), sy(0, 0))]
@@ -651,7 +813,7 @@ function RoomBackground({ onDoorClick }: { onDoorClick: () => void }) {
       {/* Wall decorations */}
       <ProjectorScreen />
       <Clapperboard gy={0.9} />
-      <Whiteboard gy1={7.8} gy2={9.8} />
+      <Whiteboard gy1={7.8} gy2={9.8} fillPct={whiteBoardFill} agentColor={whiteBoardColor} />
       <BigMoviePoster gx={0.5} color1="#78350f" color2="#d97706" accent="#fbbf24" />
       <BigMoviePoster gx={3.2} color1="#450a0a" color2="#dc2626" accent="#fbbf24" />
       <WindowSkyline gx1={6} gx2={10} />
@@ -734,7 +896,7 @@ function RoomBackground({ onDoorClick }: { onDoorClick: () => void }) {
 }
 
 // ─── Meeting room background ─────────────────────────────────────────
-function MeetingRoomBackground() {
+function MeetingRoomBackground({ theme = DEFAULT_THEME }: { theme?: MeetingTheme }) {
   const P = (pts: [number, number][]) => pts.map(v => v.join(',')).join(' ')
   const T = (x: number, y: number): [number, number] => [x, y]
   const leftWall = [T(msx(0, 0), msy(0, 0) - WH), T(msx(0, MEET_ROWS), msy(0, MEET_ROWS) - WH), T(msx(0, MEET_ROWS), msy(0, MEET_ROWS)), T(msx(0, 0), msy(0, 0))]
@@ -743,8 +905,7 @@ function MeetingRoomBackground() {
   const tiles: { gx: number; gy: number }[] = []
   for (let gx = 0; gx < MEET_COLS; gx++) for (let gy = 0; gy < MEET_ROWS; gy++) tiles.push({ gx, gy })
   tiles.sort((a, b) => (a.gx + a.gy) - (b.gx + b.gy))
-  const carpet = ['#7c1d1d', '#6b1818', '#8b2020', '#5c1414', '#701c1c', '#7c2020']
-  const carpetFill = (gx: number, gy: number) => carpet[(gx * 2 + gy * 3) % carpet.length]
+  const carpetFill = (gx: number, gy: number) => theme.floor[(gx * 2 + gy * 3) % theme.floor.length]
 
   return (
     <>
@@ -791,10 +952,10 @@ function MeetingRoomBackground() {
       <MWallRect wall="right" g1={7.2} g2={7.4} h1={68} h2={72} fill="#fbbf24" opacity="0.9" />
       <MWallRect wall="right" g1={9.0} g2={9.2} h1={44} h2={48} fill="#fbbf24" opacity="0.8" />
 
-      {/* Spotlight glows */}
-      <ellipse cx={msx(6, 4.5)} cy={msy(6, 4.5)} rx={150} ry={60} fill="#fbbf24" opacity="0.04" />
-      <ellipse cx={msx(6, 4.5)} cy={msy(6, 4.5)} rx={90} ry={36} fill="#fbbf24" opacity="0.04" />
-      <ellipse cx={msx(3, 5)} cy={msy(3, 5) + 16} rx={80} ry={30} fill="#3b82f6" opacity="0.07" />
+      {/* Spotlight glows — tinted by client theme */}
+      <ellipse cx={msx(6, 4.5)} cy={msy(6, 4.5)} rx={150} ry={60} fill={theme.glow} opacity="0.06" />
+      <ellipse cx={msx(6, 4.5)} cy={msy(6, 4.5)} rx={90} ry={36} fill={theme.glow} opacity="0.05" />
+      <ellipse cx={msx(3, 5)} cy={msy(3, 5) + 16} rx={80} ry={30} fill={theme.screenAccent} opacity="0.08" />
 
       {/* Floor tiles */}
       {tiles.map(({ gx, gy }) => (
@@ -827,21 +988,78 @@ function MeetingRoomBackground() {
   )
 }
 
+// ─── Reception room background ───────────────────────────────────────
+function ReceptionBackground() {
+  const P = (pts: [number, number][]) => pts.map(v => v.join(',')).join(' ')
+  const T = (x: number, y: number): [number, number] => [x, y]
+  const leftWall = [T(rsx(0, 0), rsy(0, 0) - WH), T(rsx(0, RECEP_ROWS), rsy(0, RECEP_ROWS) - WH), T(rsx(0, RECEP_ROWS), rsy(0, RECEP_ROWS)), T(rsx(0, 0), rsy(0, 0))]
+  const rightWall = [T(rsx(0, 0), rsy(0, 0) - WH), T(rsx(RECEP_COLS, 0), rsy(RECEP_COLS, 0) - WH), T(rsx(RECEP_COLS, 0), rsy(RECEP_COLS, 0)), T(rsx(0, 0), rsy(0, 0))]
+
+  const tiles: { gx: number; gy: number }[] = []
+  for (let gx = 0; gx < RECEP_COLS; gx++) for (let gy = 0; gy < RECEP_ROWS; gy++) tiles.push({ gx, gy })
+  tiles.sort((a, b) => (a.gx + a.gy) - (b.gx + b.gy))
+
+  return (
+    <>
+      <polygon points={P(rightWall)} fill="#c8c0b8" />
+      <polygon points={P(leftWall)} fill="#b8b0a8" />
+      {Array.from({ length: RECEP_COLS }, (_, i) => (
+        <line key={`rrw${i}`} x1={rsx(i, 0)} y1={rsy(i, 0) - WH} x2={rsx(i + 1, 0)} y2={rsy(i + 1, 0) - WH} stroke="#a8a098" strokeWidth="0.6" opacity="0.5" />
+      ))}
+      {Array.from({ length: RECEP_ROWS }, (_, i) => (
+        <line key={`rlw${i}`} x1={rsx(0, i)} y1={rsy(0, i) - WH} x2={rsx(0, i + 1)} y2={rsy(0, i + 1) - WH} stroke="#989088" strokeWidth="0.6" opacity="0.5" />
+      ))}
+      <line x1={rsx(0, 0)} y1={rsy(0, 0) - WH} x2={rsx(0, RECEP_ROWS)} y2={rsy(0, RECEP_ROWS) - WH} stroke="#888078" strokeWidth="2" />
+      <line x1={rsx(0, 0)} y1={rsy(0, 0) - WH} x2={rsx(RECEP_COLS, 0)} y2={rsy(RECEP_COLS, 0) - WH} stroke="#888078" strokeWidth="2" />
+
+      <RWallRect wall="left" g1={1} g2={4} h1={50} h2={82} fill="#1c1917" />
+      <RWallRect wall="left" g1={1.1} g2={3.9} h1={54} h2={79} fill="#f8fafc" opacity="0.95" />
+      <RWallRect wall="left" g1={1.3} g2={2.0} h1={60} h2={73} fill="#d97706" opacity="0.8" />
+      <RWallRect wall="left" g1={2.2} g2={3.7} h1={62} h2={66} fill="#1c1917" opacity="0.7" />
+      <RWallRect wall="left" g1={2.2} g2={3.7} h1={68} h2={72} fill="#1c1917" opacity="0.5" />
+
+      <RWallRect wall="right" g1={1} g2={5} h1={18} h2={82} fill="#4a3828" />
+      <RWallRect wall="right" g1={1.1} g2={4.9} h1={22} h2={79} fill="#0f172a" />
+      <RWallRect wall="right" g1={1.1} g2={4.9} h1={22} h2={50} fill="#1e3a5f" opacity="0.7" />
+      <RWallRect wall="right" g1={1.2} g2={2.4} h1={22} h2={65} fill="#0a0e1a" />
+      <RWallRect wall="right" g1={2.6} g2={3.8} h1={22} h2={74} fill="#0a0e1a" />
+      <RWallRect wall="right" g1={4.0} g2={4.8} h1={22} h2={58} fill="#0a0e1a" />
+      <RWallRect wall="right" g1={1.5} g2={1.7} h1={52} h2={56} fill="#fbbf24" opacity="0.8" />
+      <RWallRect wall="right" g1={3.2} g2={3.4} h1={60} h2={64} fill="#fbbf24" opacity="0.7" />
+
+      {tiles.map(({ gx, gy }) => {
+        const fill = (gx + gy) % 2 === 0 ? '#e8e4dc' : '#dddad0'
+        return <RTile key={`rt${gx}-${gy}`} gx={gx} gy={gy} fill={fill} />
+      })}
+
+      <RPlant gx={0} gy={0} />
+      <RPlant gx={7} gy={0} />
+      <ReceptionCounter gx={0.5} gy={0} />
+      <ReceptionistChair gx={1.8} gy={1.3} />
+      <ReceptionSofa gx={5} gy={0.5} />
+      <ReceptionTable gx={4.8} gy={3} />
+      <RPlant gx={0} gy={6} />
+    </>
+  )
+}
+
 // ─── Character positions ──────────────────────────────────────────────
 const DESK_POS: Record<AgentId, { gx: number; gy: number }> = {
-  otto:   { gx: 10.2, gy: 2.45 },
-  heitor: { gx: 12.7, gy: 2.45 },
-  salles: { gx: 2.2,  gy: 8.45 },
-  sonia:  { gx: 11.2, gy: 7.45 },
-  aya:    { gx: 7.2,  gy: 2.45 },
+  otto:          { gx: 10.2, gy: 2.45 },
+  heitor:        { gx: 12.7, gy: 2.45 },
+  salles:        { gx: 2.2,  gy: 8.45 },
+  sonia:         { gx: 11.2, gy: 7.45 },
+  aya:           { gx: 7.2,  gy: 2.45 },
+  pedro_abrahao: { gx: 5.5,  gy: 2.0  },
 }
 
 const MEET_CHAR_POS: Record<AgentId, { gx: number; gy: number }> = {
-  aya:    { gx: 5.6, gy: 2.0 },
-  otto:   { gx: 2.2, gy: 4.5 },
-  heitor: { gx: 9.3, gy: 4.5 },
-  salles: { gx: 3.5, gy: 7.5 },
-  sonia:  { gx: 8.1, gy: 7.5 },
+  aya:           { gx: 5.6, gy: 2.0 },
+  otto:          { gx: 2.2, gy: 4.5 },
+  heitor:        { gx: 9.3, gy: 4.5 },
+  salles:        { gx: 3.5, gy: 7.5 },
+  sonia:         { gx: 8.1, gy: 7.5 },
+  pedro_abrahao: { gx: 7.5, gy: 2.0 },
 }
 
 // charY: sprite hip (~y=49 of 72 sprite, local offset=53) should sit on chair seat (h=13)
@@ -851,6 +1069,8 @@ function charX(gx: number, gy: number) { return sx(gx, gy) - 22 }
 function charY(gx: number, gy: number) { return sy(gx, gy) - 70 }
 function charMeetX(gx: number, gy: number) { return msx(gx, gy) - 22 }
 function charMeetY(gx: number, gy: number) { return msy(gx, gy) - 70 }
+function charRecepX(gx: number, gy: number) { return rsx(gx, gy) - 22 }
+function charRecepY(gx: number, gy: number) { return rsy(gx, gy) - 70 }
 
 // ─── Move state ──────────────────────────────────────────────────────────
 interface AgentMoveState {
@@ -879,11 +1099,12 @@ function makePath(fromGx: number, fromGy: number, toGx: number, toGy: number): {
 
 // ─── Routine destinations (personality-based) ────────────────────────────
 const ROUTINE_DESTS: Record<AgentId, { gx: number; gy: number }[]> = {
-  otto:   [{ gx: 10.2, gy: 2.45 }, { gx: 5.8, gy: 4.2 }, { gx: 7.0, gy: 3.8 }, { gx: 10.2, gy: 2.45 }],
-  heitor: [{ gx: 12.7, gy: 2.45 }, { gx: 1.8, gy: 3.5 }, { gx: 2.5, gy: 5.0 }, { gx: 12.7, gy: 2.45 }],
-  salles: [{ gx: 2.2,  gy: 8.45 }, { gx: 3.0, gy: 6.5 }, { gx: 2.8, gy: 7.5 }, { gx: 3.5, gy: 2.5 }, { gx: 2.2, gy: 8.45 }],
-  sonia:  [{ gx: 11.2, gy: 7.45 }, { gx: 9.0, gy: 4.8 }, { gx: 6.5, gy: 5.2 }, { gx: 11.2, gy: 7.45 }],
-  aya:    [{ gx: 7.2,  gy: 2.45 }, { gx: 5.8, gy: 4.2 }, { gx: 9.5, gy: 4.8 }, { gx: 5.0, gy: 6.2 }, { gx: 7.2, gy: 2.45 }],
+  otto:          [{ gx: 10.2, gy: 2.45 }, { gx: 5.8, gy: 4.2 }, { gx: 7.0, gy: 3.8 }, { gx: 10.2, gy: 2.45 }],
+  heitor:        [{ gx: 12.7, gy: 2.45 }, { gx: 1.8, gy: 3.5 }, { gx: 2.5, gy: 5.0 }, { gx: 12.7, gy: 2.45 }],
+  salles:        [{ gx: 2.2,  gy: 8.45 }, { gx: 3.0, gy: 6.5 }, { gx: 2.8, gy: 7.5 }, { gx: 3.5, gy: 2.5 }, { gx: 2.2, gy: 8.45 }],
+  sonia:         [{ gx: 11.2, gy: 7.45 }, { gx: 9.0, gy: 4.8 }, { gx: 6.5, gy: 5.2 }, { gx: 11.2, gy: 7.45 }],
+  aya:           [{ gx: 7.2,  gy: 2.45 }, { gx: 5.8, gy: 4.2 }, { gx: 9.5, gy: 4.8 }, { gx: 5.0, gy: 6.2 }, { gx: 7.2, gy: 2.45 }],
+  pedro_abrahao: [{ gx: 5.5, gy: 2.0 }, { gx: 4.8, gy: 3.5 }, { gx: 6.0, gy: 1.5 }, { gx: 5.5, gy: 2.0 }],
 }
 
 // ─── Pair conversations ──────────────────────────────────────────────────
@@ -897,7 +1118,11 @@ const PAIR_CONVO: Record<string, [string, string][]> = {
   'heitor-sonia': [['Criativo aprovado.', 'Go go go!'], ['Compliance ok.', 'CTR vai subir!']],
   'salles-sonia': [['Script tem garra!', 'Vai fazer voar!'], ['Finalizei o roteiro.', 'No A/B test!']],
   'aya-salles':   [['Roteiro recebido.', 'Compilando.'], ['Mais café?', 'Sim pls!']],
-  'aya-sonia':    [['Métricas no verde!', 'Registrando.'], ['ROI aprovado!', 'Dossiê completo.']],
+  'aya-sonia':          [['Métricas no verde!', 'Registrando.'], ['ROI aprovado!', 'Dossiê completo.']],
+  'aya-pedro_abrahao':  [['Dossiê pronto!', 'Incrível...'], ['Compilando.', 'Aguardando.']],
+  'otto-pedro_abrahao': [['Estratégia traçada.', 'Faz sentido!'], ['ROI projetado.', 'Convencido.']],
+  'pedro_abrahao-salles': [['Roteiro pronto.', 'Emocionou!'], ['Narrativa forte!', 'Me identifiquei.']],
+  'pedro_abrahao-sonia':  [['CTR vai bem!', 'Percebo isso.'], ['Dados bons.', 'Autêntico.']],
 }
 
 function initMoveStates(): Record<AgentId, AgentMoveState> {
@@ -917,9 +1142,10 @@ interface Props {
   onCallAll: () => void
   onExitMeeting: () => void
   isRunning: boolean
+  messages?: Message[]
 }
 
-export default function OfficeScene({ inMeeting, agentStatus, onToggleAgent, onCallAll, onExitMeeting, isRunning }: Props) {
+export default function OfficeScene({ inMeeting, agentStatus, onToggleAgent, onCallAll, onExitMeeting, isRunning, messages = [] }: Props) {
   const svgRef = useRef<SVGSVGElement>(null)
   const moveStatesRef = useRef<Record<AgentId, AgentMoveState>>(initMoveStates())
   const [moveStates, setMoveStates] = useState<Record<AgentId, AgentMoveState>>(moveStatesRef.current)
@@ -927,12 +1153,24 @@ export default function OfficeScene({ inMeeting, agentStatus, onToggleAgent, onC
   const lastConvoRef = useRef<Record<string, number>>({})
   const [speechBubbles, setSpeechBubbles] = useState<Partial<Record<AgentId, string>>>({})
   const [forceShowMeeting, setForceShowMeeting] = useState(false)
+  const [forceShowReception, setForceShowReception] = useState(false)
+
+  // ── T31: Whiteboard fill based on active pipeline message ─────────────
+  const activeMsg = messages.find(m => !m.done && m.role !== 'user')
+  const activeSpeakingAgent = activeMsg ? AGENTS.find(a => a.id === activeMsg.role) : null
+  const whiteBoardFill = activeMsg ? Math.min(activeMsg.content.length / 1200, 1) : 0
+
+  // ── Cliente espelho ativo na sala de reunião ───────────────────────────
+  const espelhoClientes = AGENTS.filter(a => a.reuniaoOnly)
+  const [clienteAtivoId, setClienteAtivoId] = useState<string>(espelhoClientes[0]?.id ?? '')
+  const clienteAtivo = AGENTS.find(a => a.id === clienteAtivoId)
+  const meetingTheme = getMeetingTheme(clienteAtivoId)
 
   // ── Pan & zoom state ──────────────────────────────────────────────────
   const camXRef = useRef(0)
   const userOffsetRef = useRef({ x: 0, y: 0 })
   const zoomRef = useRef(1)
-  const [zoomDisplay, setZoomDisplay] = useState(1)
+  const [zoomDisplay, setZoomDisplay] = useState(100)
   const isDraggingRef = useRef(false)
   const hasDraggedRef = useRef(false)
   const lastPtrRef = useRef({ x: 0, y: 0 })
@@ -979,10 +1217,14 @@ export default function OfficeScene({ inMeeting, agentStatus, onToggleAgent, onC
 
   const showMeeting = inMeeting.size > 0 || forceShowMeeting
 
-  // ── ViewBox camera pan (work room ↔ meeting room) ─────────────────────
+  // ── ViewBox camera pan (work room ↔ meeting room ↔ reception) ────────
+  const cameraTarget = showMeeting ? CAMERA_MEETING : forceShowReception ? CAMERA_RECEP : 0
   useEffect(() => {
-    const target = showMeeting ? 1128 : 0
-    const ctrl = animate(camXRef.current, target, {
+    // Reset pan and zoom when switching rooms
+    userOffsetRef.current = { x: 0, y: 0 }
+    zoomRef.current = 1
+    setZoomDisplay(100)
+    const ctrl = animate(camXRef.current, cameraTarget, {
       type: 'spring', stiffness: 48, damping: 16,
       onUpdate: (v) => {
         camXRef.current = Math.round(v)
@@ -990,7 +1232,7 @@ export default function OfficeScene({ inMeeting, agentStatus, onToggleAgent, onC
       },
     })
     return () => ctrl.stop()
-  }, [showMeeting])
+  }, [cameraTarget])
 
   useEffect(() => { inMeetingRef.current = inMeeting }, [inMeeting])
 
@@ -1113,32 +1355,68 @@ export default function OfficeScene({ inMeeting, agentStatus, onToggleAgent, onC
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-stone-900 animate-pulse" />
           <span className="font-display font-semibold text-sm tracking-tight">
-            {showMeeting ? 'Sala de Reunião' : 'Estúdio Lemmon'}
+            {showMeeting ? 'Sala de Reunião' : forceShowReception ? 'Recepção' : 'Estúdio Lemmon'}
           </span>
         </div>
         <div className="flex items-center gap-3">
           <span className="text-[10px] font-mono uppercase tracking-widest text-stone-400">
-            {inMeeting.size === 0 && !forceShowMeeting
-              ? 'Clique na porta ou nos agentes'
-              : `${inMeeting.size} na sala de reunião`}
+            {showMeeting
+              ? `${inMeeting.size} na sala de reunião`
+              : forceShowReception
+              ? `${clienteAtivo?.name ?? 'Cliente'} · aguardando`
+              : 'Clique na porta ou nos agentes'}
           </span>
+
+          {/* Cliente espelho selector — visible in meeting + reception */}
+          {(showMeeting || forceShowReception) && espelhoClientes.length > 0 && (
+            <div className="flex items-center gap-1.5 bg-white/80 border border-stone-200 rounded-full px-3 py-1">
+              <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: clienteAtivo?.color ?? '#999' }} />
+              <span className="text-[10px] font-mono text-stone-700">{clienteAtivo?.name ?? '—'}</span>
+              {espelhoClientes.length > 1 && (
+                <button
+                  onClick={() => {
+                    const idx = espelhoClientes.findIndex(c => c.id === clienteAtivoId)
+                    const next = espelhoClientes[(idx + 1) % espelhoClientes.length]
+                    setClienteAtivoId(next.id)
+                  }}
+                  className="ml-1 text-[9px] font-mono text-stone-400 hover:text-stone-700 transition-colors">
+                  trocar ↻
+                </button>
+              )}
+            </div>
+          )}
+
           {showMeeting ? (
-            <button
-              onClick={handleExitMeeting}
+            <button onClick={handleExitMeeting}
               className="px-4 py-1.5 rounded-full text-[11px] font-mono uppercase tracking-widest bg-stone-200 text-stone-700
-                hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 transition-all duration-200"
-            >
+                hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 transition-all duration-200">
               ← Baias de trabalho
             </button>
-          ) : (
-            <button
-              onClick={onCallAll} disabled={isRunning}
-              className="px-4 py-1.5 rounded-full text-[11px] font-mono uppercase tracking-widest bg-stone-900 text-white
-                hover:-translate-y-0.5 hover:shadow-lg hover:shadow-stone-900/20 active:translate-y-0
-                transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              ⚔ Convocar Todos
+          ) : forceShowReception ? (
+            <button onClick={() => setForceShowReception(false)}
+              className="px-4 py-1.5 rounded-full text-[11px] font-mono uppercase tracking-widest bg-stone-200 text-stone-700
+                hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 transition-all duration-200">
+              ← Estúdio
             </button>
+          ) : (
+            <div className="flex items-center gap-2">
+              <button onClick={() => setForceShowReception(true)}
+                className="px-4 py-1.5 rounded-full text-[11px] font-mono uppercase tracking-widest bg-white border border-stone-300 text-stone-600
+                  hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 transition-all duration-200">
+                ← Recepção
+              </button>
+              <button onClick={() => setForceShowMeeting(true)}
+                className="px-4 py-1.5 rounded-full text-[11px] font-mono uppercase tracking-widest bg-white border border-stone-300 text-stone-600
+                  hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 transition-all duration-200">
+                Reunião →
+              </button>
+              <button onClick={onCallAll} disabled={isRunning}
+                className="px-4 py-1.5 rounded-full text-[11px] font-mono uppercase tracking-widest bg-stone-900 text-white
+                  hover:-translate-y-0.5 hover:shadow-lg hover:shadow-stone-900/20 active:translate-y-0
+                  transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed">
+                ⚔ Convocar Todos
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -1194,19 +1472,25 @@ export default function OfficeScene({ inMeeting, agentStatus, onToggleAgent, onC
         >
 
           <g>
-            <RoomBackground onDoorClick={() => setForceShowMeeting(true)} />
-            <MeetingRoomBackground />
+            <ReceptionBackground />
+            <RoomBackground onDoorClick={() => setForceShowMeeting(true)} whiteBoardFill={whiteBoardFill} whiteBoardColor={activeSpeakingAgent?.color} />
+            <MeetingRoomBackground theme={meetingTheme} />
 
             {AGENTS.map(agent => {
               const isIn = inMeeting.has(agent.id)
               const ms = moveStates[agent.id]
               const status = agentStatus[agent.id]
 
+              const isRecepAgent = !!agent.reuniaoOnly && !isIn
               const cx = isIn
                 ? charMeetX(MEET_CHAR_POS[agent.id].gx, MEET_CHAR_POS[agent.id].gy)
+                : isRecepAgent
+                ? charRecepX(ms.gx, ms.gy)
                 : charX(ms.gx, ms.gy)
               const cy = isIn
                 ? charMeetY(MEET_CHAR_POS[agent.id].gx, MEET_CHAR_POS[agent.id].gy)
+                : isRecepAgent
+                ? charRecepY(ms.gx, ms.gy)
                 : charY(ms.gx, ms.gy)
 
               const desk = DESK_POS[agent.id]
@@ -1238,6 +1522,24 @@ export default function OfficeScene({ inMeeting, agentStatus, onToggleAgent, onC
                     </motion.g>
                   )}
 
+                  {/* T33 — Mic ring for speaking in meeting mode */}
+                  {isIn && status === 'speaking' && (
+                    <g>
+                      <circle cx={22} cy={38} r={32} fill="none" stroke={agent.color} strokeWidth="2"
+                        opacity="0.5" className="animate-mic-ring" />
+                      <circle cx={22} cy={38} r={32} fill="none" stroke={agent.color} strokeWidth="1.5"
+                        opacity="0.3" className="animate-mic-ring" style={{ animationDelay: '0.4s' }} />
+                      {/* Mic icon above head */}
+                      <g transform="translate(22,-20)">
+                        <circle cx={0} cy={0} r={8} fill={agent.color} opacity="0.9" />
+                        <rect x={-2.5} y={-5} width={5} height={8} rx={2.5} fill="white" />
+                        <path d="M-4,3 Q0,7 4,3" stroke="white" strokeWidth="1.2" fill="none" strokeLinecap="round" />
+                        <line x1="0" y1="7" x2="0" y2="9" stroke="white" strokeWidth="1.2" />
+                        <line x1="-3" y1="9" x2="3" y2="9" stroke="white" strokeWidth="1.2" />
+                      </g>
+                    </g>
+                  )}
+
                   {/* Thinking balloon */}
                   {status === 'thinking' && (
                     <g transform="translate(36,-14)">
@@ -1246,10 +1548,26 @@ export default function OfficeScene({ inMeeting, agentStatus, onToggleAgent, onC
                     </g>
                   )}
 
-                  {/* Status dot */}
-                  {status !== 'idle' && (
+                  {/* T32 — Done badge ✓ */}
+                  {status === 'done' && (
+                    <g transform="translate(34,-2)">
+                      <circle cx={7} cy={7} r={7} fill="#10b981" stroke="white" strokeWidth="1.5" />
+                      <text x={7} y={11} textAnchor="middle" fontSize={8} fill="white" fontWeight="bold">✓</text>
+                    </g>
+                  )}
+
+                  {/* T32 — Error badge ✗ */}
+                  {status === 'error' && (
+                    <g transform="translate(34,-2)">
+                      <circle cx={7} cy={7} r={7} fill="#ef4444" stroke="white" strokeWidth="1.5" />
+                      <text x={7} y={11} textAnchor="middle" fontSize={8} fill="white" fontWeight="bold">✕</text>
+                    </g>
+                  )}
+
+                  {/* Status dot — only for thinking/speaking (done/error now have badges) */}
+                  {(status === 'speaking' || status === 'thinking') && (
                     <circle cx={38} cy={2} r={5.5}
-                      fill={status === 'speaking' ? '#f59e0b' : status === 'thinking' ? '#8b5cf6' : status === 'done' ? '#10b981' : '#ef4444'}
+                      fill={status === 'speaking' ? '#f59e0b' : '#8b5cf6'}
                       stroke="white" strokeWidth="1.5" />
                   )}
 
@@ -1267,6 +1585,8 @@ export default function OfficeScene({ inMeeting, agentStatus, onToggleAgent, onC
                         thinking={status === 'thinking'}
                         walking={ms.walking && !isIn}
                         sitting={isSitting}
+                        done={status === 'done'}
+                        error={status === 'error'}
                       />
                     </div>
                   </foreignObject>
@@ -1291,7 +1611,7 @@ export default function OfficeScene({ inMeeting, agentStatus, onToggleAgent, onC
         </svg>
 
         {/* Overlay hint */}
-        {!showMeeting && (
+        {!showMeeting && !forceShowReception && (
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.5 }}
             className="absolute bottom-5 left-1/2 -translate-x-1/2 glass px-4 py-2 rounded-full pointer-events-none"

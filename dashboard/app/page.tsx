@@ -18,6 +18,7 @@ import { AGENTS, type AgentId } from '@/lib/agents'
 import { useChat, type ImageData } from '@/lib/useChat'
 import { useHistory, type HistoryDetail } from '@/lib/useHistory'
 import { useReuniao } from '@/lib/useReuniao'
+import Link from 'next/link'
 import OfficeScene from '@/components/office/OfficeScene'
 import ChatPanel from '@/components/chat/ChatPanel'
 import HistoryPanel from '@/components/history/HistoryPanel'
@@ -28,8 +29,8 @@ export default function Home() {
   const [chatMode, setChatMode] = useState<'pipeline' | 'reuniao'>('pipeline')
   const [historyOpen, setHistoryOpen] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
-  const { messages, agentStatus, isRunning, sessionId, avaliado, resumedFrom, manualMode, awaitingApproval, agentConfig, send, approve, abort, toggleManualMode, updateConfig, avaliar, reset, loadSession } = useChat()
-  const { messages: reunMessages, agentStatus: reunAgentStatus, isRunning: reunIsRunning, send: reunSend, reset: reunReset, abort: reunAbort } = useReuniao()
+  const { messages, agentStatus, isRunning, sessionId, avaliado, resumedFrom, manualMode, fastTrack, sandbox, custoCap, custoCapAtingido, custoAviso, awaitingApproval, agentConfig, tagsSugeridas, send, approve, abort, toggleManualMode, toggleFastTrack, toggleSandbox, setCustoCap, autorizarCusto, recusarCustoExtra, updateConfig, avaliar, exportar, reset, loadSession } = useChat()
+  const { messages: reunMessages, agentStatus: reunAgentStatus, isRunning: reunIsRunning, send: reunSend, reset: reunReset, abort: reunAbort, mesaRedonda: reunMesaRedonda } = useReuniao()
   const { sessions, selected, loading, loadingDetail, fetchSessions, fetchDetail, clearSelected } = useHistory()
 
   const dragControls = useDragControls()
@@ -41,8 +42,9 @@ export default function Home() {
   const historyPanelY = useMotionValue(0)
 
   useEffect(() => {
-    panelX.set(Math.max(0, window.innerWidth - 640))
-  }, [panelX])
+    panelX.set(Math.max(0, window.innerWidth - 480))
+    panelY.set(56)
+  }, [panelX, panelY])
 
   useEffect(() => {
     historyPanelX.set(Math.max(0, (window.innerWidth - 760) / 2))
@@ -70,10 +72,22 @@ export default function Home() {
 
   const callAll = () => setInMeeting(new Set(AGENTS.map(a => a.id)))
   const exitMeeting = () => setInMeeting(new Set())
-  const handleSend = (msg: string, image?: ImageData) => send(Array.from(inMeeting), msg, image)
+  const handleSend = (msg: string, image?: ImageData) => send(
+    Array.from(inMeeting).filter(id => !AGENTS.find(a => a.id === id)?.reuniaoOnly),
+    msg,
+    image,
+  )
 
   const handleResume = (detail: HistoryDetail) => {
     loadSession(detail)
+    setHistoryOpen(false)
+    setChatOpen(true)
+    setChatMode('pipeline')
+  }
+
+  const handleRemix = (detail: HistoryDetail) => {
+    loadSession(detail)
+    setInMeeting(new Set(['salles', 'sonia', 'aya'] as AgentId[]))
     setHistoryOpen(false)
     setChatOpen(true)
     setChatMode('pipeline')
@@ -98,15 +112,18 @@ export default function Home() {
             {AGENTS.map(agent => {
               const status = agentStatus[agent.id]
               const isIn = inMeeting.has(agent.id)
+              const isGuest = !!agent.reuniaoOnly
               return (
                 <motion.button
                   key={agent.id}
                   onClick={() => !isRunning && toggleAgent(agent.id)}
                   whileHover={{ scale: 1.04 }}
                   whileTap={{ scale: 0.96 }}
+                  title={isGuest ? `${agent.name} — convidado (só reunião)` : agent.name}
                   className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-mono uppercase tracking-widest
                     transition-all duration-200 border
-                    ${isIn ? 'text-white border-transparent shadow-sm' : 'bg-white text-stone-500 border-stone-200 hover:border-stone-400'}`}
+                    ${isIn ? 'text-white border-transparent shadow-sm' : 'bg-white text-stone-500 border-stone-200 hover:border-stone-400'}
+                    ${isGuest && !isIn ? 'border-dashed' : ''}`}
                   style={isIn ? { background: agent.color, borderColor: agent.color } : {}}
                 >
                   <div className={`w-1.5 h-1.5 rounded-full ${
@@ -117,11 +134,34 @@ export default function Home() {
                     isIn ? 'bg-white/60' : 'bg-stone-300'
                   }`}/>
                   {agent.name}
+                  {isGuest && !isIn && <span className="text-[7px] opacity-50 ml-0.5">cliente</span>}
                 </motion.button>
               )
             })}
           </div>
           <Clock />
+          <Link href="/saude" title="Dashboard de Saúde"
+            className="w-8 h-8 rounded-lg border border-stone-200 bg-white flex items-center justify-center hover:bg-stone-50 hover:border-stone-400 transition-all text-stone-500">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+            </svg>
+          </Link>
+          <Link href="/hall-of-fame" title="Hall of Fame"
+            className="w-8 h-8 rounded-lg border border-stone-200 bg-white flex items-center justify-center hover:bg-stone-50 hover:border-stone-400 transition-all text-stone-500 text-sm">
+            🏆
+          </Link>
+          <Link href="/briefing-reverso" title="Briefing Reverso"
+            className="w-8 h-8 rounded-lg border border-stone-200 bg-white flex items-center justify-center hover:bg-stone-50 hover:border-stone-400 transition-all text-stone-500 text-sm">
+            🔍
+          </Link>
+          <Link href="/cortes" title="Cortes-Prontos"
+            className="w-8 h-8 rounded-lg border border-stone-200 bg-white flex items-center justify-center hover:bg-stone-50 hover:border-stone-400 transition-all text-stone-500 text-sm">
+            ✂️
+          </Link>
+          <Link href="/calibragem" title="Calibragem Pedro"
+            className="w-8 h-8 rounded-lg border border-stone-200 bg-white flex items-center justify-center hover:bg-stone-50 hover:border-stone-400 transition-all text-stone-500 text-sm">
+            🎯
+          </Link>
           <button
             onClick={() => setHistoryOpen(v => !v)}
             className={`w-8 h-8 rounded-lg border flex items-center justify-center transition-all
@@ -144,6 +184,7 @@ export default function Home() {
           onCallAll={callAll}
           onExitMeeting={exitMeeting}
           isRunning={isRunning}
+          messages={messages}
         />
       </main>
 
@@ -169,6 +210,11 @@ export default function Home() {
             avaliado={avaliado}
             resumedFrom={resumedFrom}
             manualMode={manualMode}
+            fastTrack={fastTrack}
+            sandbox={sandbox}
+            custoCap={custoCap}
+            custoCapAtingido={custoCapAtingido}
+            custoAviso={custoAviso}
             awaitingApproval={awaitingApproval}
             agentConfig={agentConfig}
             dragControls={dragControls}
@@ -178,6 +224,11 @@ export default function Home() {
             onApprove={approve}
             onAbort={abort}
             onToggleManualMode={toggleManualMode}
+            onToggleFastTrack={toggleFastTrack}
+            onToggleSandbox={toggleSandbox}
+            onSetCustoCap={setCustoCap}
+            onAutorizarCusto={autorizarCusto}
+            onRecusarCustoExtra={recusarCustoExtra}
             onUpdateConfig={updateConfig}
             reunMessages={reunMessages}
             reunAgentStatus={reunAgentStatus}
@@ -185,6 +236,10 @@ export default function Home() {
             onReunSend={handleReunSend}
             onReunReset={reunReset}
             onReunAbort={reunAbort}
+            onMesaRedonda={reunMesaRedonda}
+            onExportar={exportar}
+            tagsSugeridas={tagsSugeridas}
+            onSetInMeeting={ids => setInMeeting(new Set(ids))}
             onClose={() => setChatOpen(false)}
           />
         </motion.div>
@@ -212,6 +267,7 @@ export default function Home() {
             onClearSelected={clearSelected}
             onClose={() => setHistoryOpen(false)}
             onResume={handleResume}
+            onRemix={handleRemix}
           />
         </motion.div>
       )}

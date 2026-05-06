@@ -1,10 +1,10 @@
 'use client'
 import type { AgentId } from '@/lib/agents'
 
-interface Props { id: AgentId; size?: number; speaking?: boolean; thinking?: boolean; walking?: boolean; sitting?: boolean }
+interface Props { id: AgentId; size?: number; speaking?: boolean; thinking?: boolean; walking?: boolean; sitting?: boolean; done?: boolean; error?: boolean }
 
-export default function CharacterSprite({ id, size = 1, speaking, walking, sitting }: Props) {
-  const cls = speaking ? 'animate-talk-bob' : walking ? 'animate-walk' : sitting ? 'animate-seated' : 'animate-float'
+export default function CharacterSprite({ id, size = 1, speaking, walking, sitting, done, error }: Props) {
+  const cls = speaking ? 'animate-talk-bob' : error ? 'animate-error' : done ? 'animate-celebrate' : walking ? 'animate-walk' : sitting ? 'animate-seated' : 'animate-float'
   const W = 40, H = 72
 
   const sprites: Record<AgentId, React.ReactNode> = {
@@ -245,6 +245,67 @@ export default function CharacterSprite({ id, size = 1, speaking, walking, sitti
         <rect x="20" y="61" width="13" height="9" rx="3" fill="#f8fafc"/>
         <rect x="7" y="61" width="13" height="3" rx="1.5" fill="#7c3aed"/>
         <rect x="20" y="61" width="13" height="3" rx="1.5" fill="#7c3aed"/>
+      </svg>
+    ),
+
+    // ─── Pedro Abrahão — Médico consultor: jaleco branco, cabelo castanho, estetoscópio
+    pedro_abrahao: (
+      <svg width={W * size} height={H * size} viewBox="0 0 40 72" fill="none" className={cls}>
+        {/* Cabelo castanho curto */}
+        <rect x="10" y="4" width="20" height="9" rx="4" fill="#6b3d1e"/>
+        <rect x="10" y="4" width="20" height="5" rx="3" fill="#7c4a24"/>
+        {/* Ear */}
+        <ellipse cx="9.5" cy="20" rx="2.5" ry="3.5" fill="#dba070"/>
+        {/* Head */}
+        <ellipse cx="20" cy="19" rx="11" ry="10.5" fill="#f5d0a9"/>
+        {/* Eyes */}
+        <rect x="12" y="14" width="5" height="5" rx="1.5" fill="#1c1917"/>
+        <rect x="23" y="14" width="5" height="5" rx="1.5" fill="#1c1917"/>
+        <rect x="12.8" y="14.8" width="1.8" height="1.8" fill="white"/>
+        <rect x="23.8" y="14.8" width="1.8" height="1.8" fill="white"/>
+        {/* Nariz */}
+        <circle cx="20" cy="22" r="1.1" fill="#c4845a"/>
+        {/* Sorriso */}
+        <path d="M15 25 Q20 28 25 25" stroke="#b06040" strokeWidth="1" fill="none" strokeLinecap="round"/>
+        {/* Jaleco branco */}
+        <rect x="7" y="28" width="26" height="23" rx="3" fill="#f8fafc"/>
+        {/* Lapelas jaleco */}
+        <polygon points="20,28 14,38 20,34" fill="#e2e8f0"/>
+        <polygon points="20,28 26,38 20,34" fill="#e2e8f0"/>
+        {/* Camisa teal por baixo */}
+        <rect x="17" y="28" width="6" height="23" fill="#0f766e" opacity="0.9"/>
+        {/* Bolso jaleco */}
+        <rect x="8" y="34" width="7" height="6" rx="1" fill="none" stroke="#cbd5e1" strokeWidth="0.8"/>
+        <rect x="9.5" y="33" width="1" height="3" rx="0.5" fill="#0f766e" opacity="0.7"/>
+        <rect x="11" y="33" width="1" height="3" rx="0.5" fill="#ef4444" opacity="0.7"/>
+        {/* Left arm */}
+        <rect x="1" y="29" width="8" height="15" rx="3" fill="#f8fafc"/>
+        {/* Right arm */}
+        <rect x="31" y="29" width="8" height="15" rx="3" fill="#f8fafc"/>
+        {/* Left hand */}
+        <ellipse cx="5" cy="46" rx="4.5" ry="3.5" fill="#f5d0a9"/>
+        {/* Right hand */}
+        <ellipse cx="35" cy="46" rx="4.5" ry="3.5" fill="#f5d0a9"/>
+        {/* Estetoscópio */}
+        <path d="M12 28 Q8 35 10 42 Q12 48 17 46" stroke="#374151" strokeWidth="1.6" fill="none" strokeLinecap="round"/>
+        <path d="M28 28 Q32 35 30 42 Q28 48 23 46" stroke="#374151" strokeWidth="1.6" fill="none" strokeLinecap="round"/>
+        <circle cx="20" cy="46" r="3.5" fill="#374151"/>
+        <circle cx="20" cy="46" r="2" fill="#6b7280"/>
+        {/* Prancheta */}
+        <rect x="29" y="41" width="11" height="13" rx="2" fill="#e2e8f0"/>
+        <rect x="30" y="42" width="9" height="11" rx="1" fill="#f8fafc"/>
+        <rect x="33" y="40" width="5" height="3" rx="1" fill="#94a3b8"/>
+        <line x1="31" y1="45" x2="38" y2="45" stroke="#94a3b8" strokeWidth="0.8"/>
+        <line x1="31" y1="47" x2="38" y2="47" stroke="#94a3b8" strokeWidth="0.8"/>
+        <line x1="31" y1="49" x2="36" y2="49" stroke="#94a3b8" strokeWidth="0.8"/>
+        {/* Calça cinza */}
+        <rect x="9" y="50" width="9" height="13" rx="2" fill="#475569"/>
+        <rect x="22" y="50" width="9" height="13" rx="2" fill="#475569"/>
+        {/* Sapatos pretos */}
+        <rect x="7" y="61" width="13" height="9" rx="3" fill="#1c1917"/>
+        <rect x="20" y="61" width="13" height="9" rx="3" fill="#1c1917"/>
+        <rect x="7" y="61" width="13" height="2.5" rx="1" fill="#374151"/>
+        <rect x="20" y="61" width="13" height="2.5" rx="1" fill="#374151"/>
       </svg>
     ),
 

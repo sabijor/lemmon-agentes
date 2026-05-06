@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { motion, type DragControls } from 'framer-motion'
 import { AGENT_MAP } from '@/lib/agents'
 import { type HistoryItem, type HistoryDetail } from '@/lib/useHistory'
+import { API_URL } from '@/lib/api'
 import CharacterSprite from '../office/CharacterSprite'
 
 const HEADER_H = 52
@@ -18,6 +19,7 @@ interface Props {
   onClearSelected: () => void
   onClose: () => void
   onResume: (detail: HistoryDetail) => void
+  onRemix?: (detail: HistoryDetail) => void
 }
 
 function fmt(ts: string) {
@@ -117,15 +119,35 @@ function SessionList({ sessions, loading, selectedId, onSelect }: {
   )
 }
 
-function SessionDetail({ detail, loadingDetail, bodyH, onBack, onResume }: {
+function SessionDetail({ detail, loadingDetail, bodyH, onBack, onResume, onRemix }: {
   detail: HistoryDetail | null
   loadingDetail: boolean
   bodyH: number
   onBack: () => void
   onResume: (detail: HistoryDetail) => void
+  onRemix?: (detail: HistoryDetail) => void
 }) {
   const bottomRef = useRef<HTMLDivElement>(null)
   const [briefingExpanded, setBriefingExpanded] = useState(false)
+  const [exemplaresMarked, setExemplaresMarked] = useState<Record<string, boolean>>({})
+
+  const marcarExemplar = async (agentId: string, trecho: string) => {
+    if (!detail) return
+    const key = `${detail.session_id}-${agentId}`
+    try {
+      await fetch(`${API_URL}/exemplares`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          agente: agentId,
+          trecho,
+          contexto: detail.briefing?.slice(0, 200) ?? '',
+          session_id: detail.session_id,
+        }),
+      })
+      setExemplaresMarked(prev => ({ ...prev, [key]: true }))
+    } catch {}
+  }
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -191,15 +213,26 @@ function SessionDetail({ detail, loadingDetail, bodyH, onBack, onResume }: {
         </div>
         <div className="flex items-center gap-1.5 flex-shrink-0">
           {!isReuniao && (
-            <button
-              onClick={() => onResume(detail)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-stone-900 text-white text-[9px] font-mono uppercase tracking-widest hover:bg-stone-700 transition-colors"
-            >
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <polygon points="5 3 19 12 5 21 5 3"/>
-              </svg>
-              Retomar
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => onResume(detail)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-stone-900 text-white text-[9px] font-mono uppercase tracking-widest hover:bg-stone-700 transition-colors"
+              >
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <polygon points="5 3 19 12 5 21 5 3"/>
+                </svg>
+                Retomar
+              </button>
+              {onRemix && (
+                <button
+                  onClick={() => onRemix(detail)}
+                  title="Remix: carrega sessão com Salles+Sônia+Aya pré-selecionados — ideal para reutilizar tese com novo formato/cliente"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-100 border border-violet-200 text-violet-700 text-[9px] font-mono uppercase tracking-widest hover:bg-violet-200 transition-colors"
+                >
+                  🔀 Remix
+                </button>
+              )}
+            </div>
           )}
           <button onClick={onBack}
             className="w-7 h-7 rounded-lg border border-stone-200 bg-white flex items-center justify-center hover:bg-stone-50 hover:border-stone-400 transition-all">
@@ -277,7 +310,30 @@ function SessionDetail({ detail, loadingDetail, bodyH, onBack, onResume }: {
                     </span>
                     <span className="text-[8px] font-mono text-stone-400">{agent.title}</span>
                     {cost !== undefined && cost > 0 && (
-                      <span className="text-[8px] font-mono text-stone-300 ml-auto">${cost.toFixed(5)}</span>
+                      <span className="text-[8px] font-mono text-stone-300">${cost.toFixed(5)}</span>
+                    )}
+                    {(() => {
+                      const dur = (detail.duracoes_segundos ?? {})[agentId]
+                      if (!dur) return null
+                      const slow = dur > 120
+                      return (
+                        <span className={`text-[8px] font-mono ${slow ? 'text-amber-500' : 'text-stone-300'}`}>
+                          ⏱ {dur}s
+                        </span>
+                      )
+                    })()}
+                    {detail.avaliacao === 5 && (
+                      <button
+                        onClick={() => marcarExemplar(agentId, text)}
+                        className={`ml-auto text-[8px] font-mono px-2 py-0.5 rounded-full border transition-all ${
+                          exemplaresMarked[`${detail.session_id}-${agentId}`]
+                            ? 'bg-amber-100 border-amber-300 text-amber-700 cursor-default'
+                            : 'bg-white border-stone-200 text-stone-400 hover:border-amber-300 hover:text-amber-600'
+                        }`}
+                        disabled={!!exemplaresMarked[`${detail.session_id}-${agentId}`]}
+                      >
+                        {exemplaresMarked[`${detail.session_id}-${agentId}`] ? '⭐ marcado' : '☆ exemplar'}
+                      </button>
                     )}
                   </div>
                   <div className="rounded-2xl rounded-tl-sm px-4 py-3 border"
@@ -313,14 +369,105 @@ function SessionDetail({ detail, loadingDetail, bodyH, onBack, onResume }: {
   )
 }
 
+interface FilterState {
+  periodo: '' | '7d' | '30d' | '90d'
+  agente: string
+  avaliacaoMin: '' | '1' | '2' | '3' | '4' | '5'
+  origem: string
+  semAvaliacao: boolean
+}
+
+const DEFAULT_FILTER: FilterState = { periodo: '', agente: '', avaliacaoMin: '', origem: '', semAvaliacao: false }
+
+function applyFilter(sessions: HistoryItem[], f: FilterState): HistoryItem[] {
+  return sessions.filter(s => {
+    if (f.semAvaliacao && s.avaliacao !== null) return false
+    if (!f.semAvaliacao && f.avaliacaoMin && (s.avaliacao === null || s.avaliacao < Number(f.avaliacaoMin))) return false
+    if (f.agente && !s.agentes_usados.includes(f.agente)) return false
+    if (f.origem && s.origem !== f.origem) return false
+    if (f.periodo) {
+      const ts = new Date(s.timestamp)
+      const cutoff = new Date()
+      if (f.periodo === '7d') cutoff.setDate(cutoff.getDate() - 7)
+      else if (f.periodo === '30d') cutoff.setDate(cutoff.getDate() - 30)
+      else if (f.periodo === '90d') cutoff.setDate(cutoff.getDate() - 90)
+      if (ts < cutoff) return false
+    }
+    return true
+  })
+}
+
+function FilterBar({ filter, onChange, sessions }: {
+  filter: FilterState
+  onChange: (patch: Partial<FilterState>) => void
+  sessions: HistoryItem[]
+}) {
+  const origens = Array.from(new Set(sessions.map(s => s.origem).filter(Boolean)))
+  const activeCount = Object.values(filter).filter(v => v !== '' && v !== false).length
+
+  return (
+    <div className="px-3 py-2 border-b border-stone-100 space-y-1.5">
+      <div className="flex items-center justify-between">
+        <span className="text-[8px] font-mono text-stone-400 uppercase tracking-widest">Filtros</span>
+        {activeCount > 0 && (
+          <button onClick={() => onChange(DEFAULT_FILTER)}
+            className="text-[8px] font-mono text-stone-400 hover:text-stone-700 transition-colors">
+            limpar ({activeCount})
+          </button>
+        )}
+      </div>
+      <div className="flex flex-wrap gap-1">
+        {/* Período */}
+        <select value={filter.periodo} onChange={e => onChange({ periodo: e.target.value as FilterState['periodo'] })}
+          className="px-1.5 py-0.5 rounded-md bg-stone-100 border border-stone-200 text-[8px] font-mono text-stone-600 focus:outline-none">
+          <option value="">todo período</option>
+          <option value="7d">7 dias</option>
+          <option value="30d">30 dias</option>
+          <option value="90d">90 dias</option>
+        </select>
+        {/* Origem */}
+        {origens.length > 1 && (
+          <select value={filter.origem} onChange={e => onChange({ origem: e.target.value })}
+            className="px-1.5 py-0.5 rounded-md bg-stone-100 border border-stone-200 text-[8px] font-mono text-stone-600 focus:outline-none">
+            <option value="">toda origem</option>
+            {origens.map(o => <option key={o} value={o}>{o}</option>)}
+          </select>
+        )}
+        {/* Agente */}
+        <select value={filter.agente} onChange={e => onChange({ agente: e.target.value })}
+          className="px-1.5 py-0.5 rounded-md bg-stone-100 border border-stone-200 text-[8px] font-mono text-stone-600 focus:outline-none">
+          <option value="">todo agente</option>
+          {Object.values(AGENT_MAP).map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+        </select>
+        {/* Avaliação mínima */}
+        <select
+          value={filter.semAvaliacao ? 'sem' : filter.avaliacaoMin}
+          onChange={e => {
+            if (e.target.value === 'sem') onChange({ semAvaliacao: true, avaliacaoMin: '' })
+            else onChange({ semAvaliacao: false, avaliacaoMin: e.target.value as FilterState['avaliacaoMin'] })
+          }}
+          className="px-1.5 py-0.5 rounded-md bg-stone-100 border border-stone-200 text-[8px] font-mono text-stone-600 focus:outline-none">
+          <option value="">qualquer nota</option>
+          <option value="sem">sem avaliação</option>
+          <option value="5">★★★★★ (5)</option>
+          <option value="4">★★★★+ (4+)</option>
+          <option value="3">★★★+ (3+)</option>
+        </select>
+      </div>
+    </div>
+  )
+}
+
 export default function HistoryPanel({
   sessions, selected, loading, loadingDetail,
-  dragControls, onOpen, onSelectSession, onClearSelected, onClose, onResume,
+  dragControls, onOpen, onSelectSession, onClearSelected, onClose, onResume, onRemix,
 }: Props) {
   const [panelSize, setPanelSize] = useState(() => ({
     w: 760,
     h: typeof window !== 'undefined' ? Math.min(window.innerHeight - 120, 600) : 560,
   }))
+  const [filter, setFilter] = useState<FilterState>(DEFAULT_FILTER)
+  const filteredSessions = applyFilter(sessions, filter)
   const [minimized, setMinimized] = useState(false)
   const panelSizeRef = useRef(panelSize)
   useEffect(() => { panelSizeRef.current = panelSize }, [panelSize])
@@ -385,7 +532,9 @@ export default function HistoryPanel({
             <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
           </svg>
           <span className="font-display font-semibold text-sm tracking-tight">Histórico</span>
-          <span className="text-[9px] font-mono text-stone-400 bg-stone-100 px-1.5 py-0.5 rounded-full">{sessions.length}</span>
+          <span className="text-[9px] font-mono text-stone-400 bg-stone-100 px-1.5 py-0.5 rounded-full">
+            {filteredSessions.length}{filteredSessions.length !== sessions.length ? `/${sessions.length}` : ''}
+          </span>
         </div>
         <div className="flex items-center gap-1.5">
           <button onClick={() => setMinimized(v => !v)}
@@ -406,8 +555,9 @@ export default function HistoryPanel({
         <div style={{ height: bodyH, display: 'flex', flexDirection: 'row', overflow: 'hidden' }}>
           {/* Session list */}
           <div style={{ width: 256, height: bodyH, overflowY: 'auto', flexShrink: 0, borderRight: '1px solid #e7e5e480' }}>
+            <FilterBar filter={filter} onChange={patch => setFilter(f => ({ ...f, ...patch }))} sessions={sessions} />
             <SessionList
-              sessions={sessions}
+              sessions={filteredSessions}
               loading={loading}
               selectedId={selected?.session_id ?? null}
               onSelect={onSelectSession}
@@ -422,6 +572,7 @@ export default function HistoryPanel({
               bodyH={bodyH}
               onBack={onClearSelected}
               onResume={onResume}
+              onRemix={onRemix}
             />
           </div>
         </div>

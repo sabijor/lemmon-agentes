@@ -1,5 +1,60 @@
 """Protocolo de discussão estruturada entre agentes."""
-from typing import Dict, Optional
+from typing import Dict, List, Optional
+
+
+# ── Mesa Redonda ─────────────────────────────────────────────────────────────
+
+PERFIS_MESA_REDONDA: Dict[str, str] = {
+    "otto":          "Estrategista — questiona se a tese central é a mais forte possível e se o ângulo está diferenciado.",
+    "heitor":        "Compliance — aponta riscos regulatórios, termos proibidos ou afirmações que podem gerar problema.",
+    "salles":        "Roteirista — desafia a estrutura narrativa, a abertura e o gancho emocional.",
+    "sonia":         "Performance — questiona potencial de conversão, CTA e adaptação para diferentes formatos.",
+    "aya":           "Compiladora — identifica lacunas entre os outputs e sugere o que está faltando para o dossiê fechar.",
+    "pedro_abrahao": "Cliente Espelho — avalia se a proposta está fiel à voz e ao posicionamento do cliente.",
+}
+
+
+def construir_prompt_questionamento_mesa(
+    agente_id: str,
+    tese: str,
+    briefing: str,
+    agentes_presentes: List[str],
+) -> str:
+    perfil = PERFIS_MESA_REDONDA.get(agente_id, "Agente especializado")
+    outros = [PERFIS_MESA_REDONDA.get(a, a) for a in agentes_presentes if a != agente_id]
+    outros_str = "\n".join(f"- {o}" for o in outros) if outros else "— nenhum outro"
+    return (
+        f"MESA REDONDA — SESSÃO DE STRESS TEST\n\n"
+        f"Você é: {perfil}\n\n"
+        f"Outros presentes:\n{outros_str}\n\n"
+        f"BRIEFING:\n{briefing}\n\n"
+        f"TESE CENTRAL EM DEBATE:\n{tese}\n\n"
+        f"SUA TAREFA: Faça UM questionamento cirúrgico sobre a tese central, "
+        f"na sua área de especialidade. Seja direto, máximo 3 parágrafos. "
+        f"Não repita o que outros poderiam dizer — foque no SEU ângulo único. "
+        f"Ao final, proponha UMA sugestão de melhoria concreta."
+    )
+
+
+def construir_prompt_ata_mesa(
+    tese: str,
+    briefing: str,
+    questionamentos: Dict[str, str],
+) -> str:
+    blocos = "\n\n".join(
+        f"### {agente_id.upper()}\n{texto}"
+        for agente_id, texto in questionamentos.items()
+    )
+    return (
+        f"COMPILAÇÃO — ATA DA MESA REDONDA\n\n"
+        f"BRIEFING:\n{briefing}\n\n"
+        f"TESE DEBATIDA:\n{tese}\n\n"
+        f"QUESTIONAMENTOS DOS AGENTES:\n\n{blocos}\n\n"
+        f"SUA TAREFA: Compile uma ATA executiva da mesa redonda. "
+        f"Inclua: (1) síntese dos pontos de consenso, (2) principais tensões identificadas, "
+        f"(3) recomendações para fortalecer a tese, (4) próximos passos sugeridos. "
+        f"Formato markdown, objetivo, máximo 400 palavras."
+    )
 
 DIMENSOES_DISCUSSAO = [
     "concordancia_tese",

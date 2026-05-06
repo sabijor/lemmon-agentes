@@ -13,7 +13,8 @@ interface ISpeechRecognition extends EventTarget {
 declare const SpeechRecognition: { new(): ISpeechRecognition } | undefined
 declare const webkitSpeechRecognition: { new(): ISpeechRecognition } | undefined
 import { AGENT_MAP, AGENTS as AGENTS_LIST, type AgentId } from '@/lib/agents'
-import { type Message, type AgentStatus, type ImageData, type ApprovalRequest, type AgentConfig } from '@/lib/useChat'
+import { type Message, type AgentStatus, type ImageData, type ApprovalRequest, type AgentConfig, type ExportResult } from '@/lib/useChat'
+import { API_URL } from '@/lib/api'
 import CharacterSprite from '../office/CharacterSprite'
 
 interface AttachedImage extends ImageData {
@@ -31,15 +32,25 @@ interface Props {
   sessionId: string | null
   avaliado: boolean
   manualMode: boolean
+  fastTrack: boolean
+  sandbox: boolean
+  custoCap: number | null
+  custoCapAtingido: { total: number; cap: number } | null
+  custoAviso: { total: number; cap: number; pct: number } | null
   awaitingApproval: ApprovalRequest | null
   agentConfig: AgentConfig
   onSend: (msg: string, image?: ImageData) => void
   resumedFrom?: string | null
   onReset: () => void
-  onAvaliar: (nota: number, obs?: string) => void
+  onAvaliar: (nota: number, obs?: string, tags?: string[]) => void
   onApprove: (action: 'approve' | 'retry' | 'skip' | 'cancel' | 'confirmar_sim' | 'confirmar_nao') => void
   onAbort: () => void
   onToggleManualMode: () => void
+  onToggleFastTrack: () => void
+  onToggleSandbox: () => void
+  onSetCustoCap: (v: number | null) => void
+  onAutorizarCusto: (valor: number) => void
+  onRecusarCustoExtra: () => void
   onUpdateConfig: <K extends keyof AgentConfig>(agent: K, patch: Partial<AgentConfig[K]>) => void
   reunMessages: Message[]
   reunAgentStatus: Record<AgentId, AgentStatus>
@@ -47,8 +58,12 @@ interface Props {
   onReunSend: (agents: AgentId[], msg: string, manual?: boolean) => void
   onReunReset: () => void
   onReunAbort: () => void
+  onMesaRedonda?: (agents: AgentId[], tese: string, briefing: string) => void
+  onExportar?: (sessionId: string) => Promise<ExportResult>
   onClose?: () => void
+  onSetInMeeting?: (agents: AgentId[]) => void
   dragControls?: DragControls
+  tagsSugeridas?: string[]
 }
 
 // ─── Export ──────────────────────────────────────────────────────────
@@ -58,7 +73,7 @@ function exportTxt(messages: Message[]) {
     if (msg.role === 'user') {
       lines.push('VOCÊ:', msg.content, '')
     } else {
-      const agent = AGENT_MAP[msg.role as AgentId]
+      const agent = AGENT_MAP[msg.role as AgentId] ?? AGENT_MAP[msg.role.replace(/_v\d+$/, '') as AgentId]
       if (agent) {
         lines.push(`${agent.name.toUpperCase()} | ${agent.title}:`)
         lines.push(msg.content)
@@ -103,7 +118,7 @@ function UserMessage({ msg }: { msg: Message }) {
 }
 
 function AgentMessage({ msg }: { msg: Message }) {
-  const agent = AGENT_MAP[msg.role as AgentId]
+  const agent = AGENT_MAP[msg.role as AgentId] ?? AGENT_MAP[msg.role.replace(/_v\d+$/, '') as AgentId]
   if (!agent) return null
   return (
     <motion.div
@@ -143,10 +158,12 @@ function AgentMessage({ msg }: { msg: Message }) {
 }
 
 // ─── Config sidebar ───────────────────────────────────────────────────
-function ConfigSidebar({ agentConfig, onUpdateConfig, isRunning }: {
+function ConfigSidebar({ agentConfig, onUpdateConfig, isRunning, custoCap, onSetCustoCap }: {
   agentConfig: AgentConfig
   onUpdateConfig: Props['onUpdateConfig']
   isRunning: boolean
+  custoCap: number | null
+  onSetCustoCap: (v: number | null) => void
 }) {
   return (
     <div className="w-44 flex-shrink-0 border-r border-stone-200/50 flex flex-col bg-stone-50/70">
@@ -198,7 +215,7 @@ function ConfigSidebar({ agentConfig, onUpdateConfig, isRunning }: {
             <span className="text-[9px] font-mono uppercase tracking-widest text-stone-500 font-bold">Salles</span>
           </div>
           <p className="text-[8px] font-mono text-stone-400 mb-1.5">formato</p>
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1 mb-3">
             {(['auto', 'reels', 'documental', 'mini-doc', 'tese', 'aftermovie'] as const).map(v => (
               <button key={v} disabled={isRunning} onClick={() => onUpdateConfig('salles', { formato: v })}
                 className={`px-2 py-1 rounded-md text-[9px] font-mono border transition-all text-left disabled:opacity-50 ${
@@ -208,6 +225,31 @@ function ConfigSidebar({ agentConfig, onUpdateConfig, isRunning }: {
                 }`}>{v}</button>
             ))}
           </div>
+          <p className="text-[8px] font-mono text-stone-400 mb-1.5">gate espelho pedro</p>
+          <div className="flex flex-col gap-1 mb-3">
+            {(['off', 'auto', 'manual'] as const).map(v => (
+              <button key={v} disabled={isRunning} onClick={() => onUpdateConfig('salles', { gate_espelho: v })}
+                className={`px-2 py-1 rounded-md text-[9px] font-mono border transition-all text-left disabled:opacity-50 ${
+                  agentConfig.salles.gate_espelho === v
+                    ? 'bg-stone-900 text-white border-stone-900'
+                    : 'bg-white text-stone-500 border-stone-200 hover:border-stone-400'
+                }`}>
+                {v === 'off' ? 'off — sem gate' : v === 'auto' ? 'auto — bloqueia se 🔴' : 'manual — sempre pede OK'}
+              </button>
+            ))}
+          </div>
+          <button disabled={isRunning}
+            onClick={() => onUpdateConfig('salles', { alternativas: agentConfig.salles.alternativas === 3 ? 0 : 3 })}
+            className="flex items-center gap-2 disabled:opacity-50">
+            <div className={`w-7 h-4 rounded-full transition-colors relative flex-shrink-0 ${
+              agentConfig.salles.alternativas === 3 ? 'bg-stone-900' : 'bg-stone-200'
+            }`}>
+              <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-transform ${
+                agentConfig.salles.alternativas === 3 ? 'translate-x-3.5' : 'translate-x-0.5'
+              }`} />
+            </div>
+            <span className="text-[9px] font-mono text-stone-500">3 variantes A/B</span>
+          </button>
         </div>
 
         {/* Sônia */}
@@ -235,6 +277,38 @@ function ConfigSidebar({ agentConfig, onUpdateConfig, isRunning }: {
             ))}
           </div>
         </div>
+
+        {/* Custo-cap */}
+        <div>
+          <div className="flex items-center gap-1.5 mb-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            <span className="text-[9px] font-mono uppercase tracking-widest text-stone-500 font-bold">Custo-cap</span>
+          </div>
+          <p className="text-[8px] font-mono text-stone-400 mb-1.5">limite USD por sessão</p>
+          <div className="flex gap-1 items-center">
+            <input
+              type="number"
+              min="0"
+              step="0.10"
+              placeholder="sem limite"
+              value={custoCap ?? ''}
+              disabled={isRunning}
+              onChange={e => {
+                const v = parseFloat(e.target.value)
+                onSetCustoCap(isNaN(v) || v <= 0 ? null : v)
+              }}
+              className="flex-1 rounded-md border border-stone-200 bg-white px-2 py-1 text-[9px] font-mono text-stone-700
+                placeholder:text-stone-300 focus:outline-none focus:border-stone-400 disabled:opacity-50 min-w-0"
+            />
+            {custoCap !== null && (
+              <button onClick={() => onSetCustoCap(null)} disabled={isRunning}
+                className="text-stone-400 hover:text-stone-700 transition-colors text-[10px] flex-shrink-0 disabled:opacity-50">×</button>
+            )}
+          </div>
+          {custoCap !== null && (
+            <p className="text-[8px] font-mono text-emerald-600 mt-1">cap: ${custoCap.toFixed(2)}</p>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -244,28 +318,63 @@ function ConfigSidebar({ agentConfig, onUpdateConfig, isRunning }: {
 export default function ChatPanel({
   mode, onToggleMode,
   messages, agentStatus, inMeeting, isRunning, sessionId, avaliado, resumedFrom,
-  manualMode, awaitingApproval, agentConfig, dragControls,
-  onSend, onReset, onAvaliar, onApprove, onAbort, onToggleManualMode, onUpdateConfig,
+  manualMode, fastTrack, sandbox, custoCap, custoCapAtingido, custoAviso, awaitingApproval, agentConfig, dragControls,
+  onSend, onReset, onAvaliar, onApprove, onAbort, onToggleManualMode, onToggleFastTrack, onToggleSandbox,
+  onSetCustoCap, onAutorizarCusto, onRecusarCustoExtra, onUpdateConfig,
   reunMessages, reunAgentStatus, reunIsRunning, onReunSend, onReunReset, onReunAbort,
-  onClose,
+  onMesaRedonda,
+  onExportar, onClose, onSetInMeeting,
+  tagsSugeridas = [],
 }: Props) {
   // Mode-aware aliases
   const activeMessages    = mode === 'reuniao' ? reunMessages    : messages
   const activeAgentStatus = mode === 'reuniao' ? reunAgentStatus : agentStatus
   const activeIsRunning   = mode === 'reuniao' ? reunIsRunning   : isRunning
-  const activeReset       = mode === 'reuniao' ? onReunReset     : onReset
   const activeAbort       = mode === 'reuniao' ? onReunAbort     : onAbort
 
   const [input, setInput] = useState('')
   const [minimized, setMinimized] = useState(false)
+  const [configOpen, setConfigOpen] = useState(false)
   const [reuniaoManual, setReuniaoManual] = useState(false)
+  const [reuniaoRating, setReuniaoRating] = useState(0)
+  const [tagsAceitas, setTagsAceitas] = useState<string[]>([])
+  const [sugestao, setSugestao] = useState<{ agentes: AgentId[]; razoes: Record<string, string> } | null>(null)
+  const [loadingSugestao, setLoadingSugestao] = useState(false)
+  const [sugestaoError, setSugestaoError] = useState('')
+
+  useEffect(() => { setTagsAceitas(tagsSugeridas) }, [tagsSugeridas])
+
+  const sugerirPipeline = async () => {
+    const q = input.trim()
+    if (!q || loadingSugestao) return
+    setLoadingSugestao(true)
+    setSugestao(null)
+    setSugestaoError('')
+    try {
+      const res = await fetch(`${API_URL}/sugerir_pipeline?briefing=${encodeURIComponent(q)}`)
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.detail ?? 'Falha ao sugerir pipeline')
+      }
+      const data = await res.json()
+      setSugestao(data)
+    } catch (e) {
+      setSugestaoError((e as Error).message)
+    } finally {
+      setLoadingSugestao(false)
+    }
+  }
+
+  const activeReset = mode === 'reuniao' ? () => { onReunReset(); setReuniaoRating(0) } : onReset
   // @mention autocomplete
   const [mentionQuery, setMentionQuery] = useState<string | null>(null)
   const [mentionCursor, setMentionCursor] = useState(0)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const [referencias, setReferencias] = useState<null | Array<{ session_id: string; briefing: string; avaliacao: number | null; score: number }>>(null)
+  const [loadingRefs, setLoadingRefs] = useState(false)
   const [panelSize, setPanelSize] = useState(() => ({
-    w: 620,
-    h: typeof window !== 'undefined' ? Math.max(400, window.innerHeight - 80) : 640,
+    w: 460,
+    h: typeof window !== 'undefined' ? Math.min(Math.max(480, window.innerHeight - 160), 640) : 560,
   }))
   const panelSizeRef = useRef(panelSize)
   useEffect(() => { panelSizeRef.current = panelSize }, [panelSize])
@@ -296,14 +405,72 @@ export default function ChatPanel({
     window.addEventListener('pointermove', resizeHandlers.current.move)
     window.addEventListener('pointerup', resizeHandlers.current.end)
   }
+  const [exportState, setExportState] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
+  const [exportResult, setExportResult] = useState<ExportResult | null>(null)
+
+  useEffect(() => {
+    setExportState('idle')
+    setExportResult(null)
+    setSharingState('idle')
+    setShareToken(null)
+  }, [sessionId])
+
+  const handleExportar = async () => {
+    if (!sessionId || !onExportar) return
+    setExportState('loading')
+    try {
+      const r = await onExportar(sessionId)
+      setExportResult(r)
+      setExportState(r.erros.length > 0 && !r.html_gerado && !r.pdf_gerado ? 'error' : 'done')
+    } catch {
+      setExportState('error')
+      setExportResult(null)
+    }
+  }
+
+  const handleDownload = async (tipo: 'html' | 'pdf', filename: string) => {
+    if (!sessionId) return
+    const url = `${API_URL}/download/${sessionId}/${tipo}`
+    const w = window as Window & typeof globalThis & { showSaveFilePicker?: (opts: unknown) => Promise<FileSystemFileHandle> }
+    if (w.showSaveFilePicker) {
+      try {
+        const res = await fetch(url)
+        const blob = await res.blob()
+        const handle = await w.showSaveFilePicker({
+          suggestedName: filename,
+          types: tipo === 'html'
+            ? [{ description: 'HTML', accept: { 'text/html': ['.html'] } }]
+            : [{ description: 'PDF', accept: { 'application/pdf': ['.pdf'] } }],
+        })
+        const writable = await handle.createWritable()
+        await writable.write(blob)
+        await writable.close()
+        return
+      } catch (e) {
+        if ((e as { name?: string }).name === 'AbortError') return
+      }
+    }
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+  }
+
   const [hoveredStar, setHoveredStar] = useState(0)
   const [attachedImage, setAttachedImage] = useState<AttachedImage | null>(null)
   const [imageError, setImageError] = useState('')
   const [isRecording, setIsRecording] = useState(false)
   const [noSpeechSupport, setNoSpeechSupport] = useState(false)
+  const [audioTranscribing, setAudioTranscribing] = useState(false)
+  const [audioError, setAudioError] = useState('')
+  const [shareToken, setShareToken] = useState<string | null>(null)
+  const [sharingState, setSharingState] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
+  const [ttsSpeaking, setTtsSpeaking] = useState(false)
+  const [ttsError, setTtsError] = useState('')
   const recognitionRef = useRef<ISpeechRecognition | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const audioInputRef = useRef<HTMLInputElement>(null)
 
   const toggleRecording = () => {
     if (isRecording) {
@@ -334,6 +501,51 @@ export default function ChatPanel({
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [activeMessages])
+
+  const handleAudioSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    const allowed = ['audio/mpeg', 'audio/mp4', 'audio/wav', 'audio/ogg', 'audio/webm', 'audio/m4a', 'audio/x-m4a']
+    if (!allowed.includes(file.type) && !file.name.match(/\.(mp3|m4a|wav|ogg|webm)$/i)) {
+      setAudioError('Formatos suportados: mp3, m4a, wav, ogg.')
+      return
+    }
+    if (file.size > 25 * 1024 * 1024) { setAudioError('Máximo 25MB por arquivo de áudio.'); return }
+    setAudioError('')
+    setAudioTranscribing(true)
+    try {
+      const fd = new FormData()
+      fd.append('audio', file)
+      const res = await fetch(`${API_URL}/transcrever`, { method: 'POST', body: fd })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.detail ?? 'Erro ao transcrever')
+      setInput(prev => prev ? `${prev}\n\n${data.transcricao}` : data.transcricao)
+    } catch (err) {
+      setAudioError(err instanceof Error ? err.message : 'Erro ao transcrever áudio')
+    } finally {
+      setAudioTranscribing(false)
+    }
+  }
+
+  const compartilharAprovacao = async () => {
+    if (!sessionId) return
+    setSharingState('loading')
+    setShareToken(null)
+    try {
+      const res = await fetch(`${API_URL}/share`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: sessionId }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.detail ?? 'Erro ao gerar link')
+      setShareToken(data.token)
+      setSharingState('done')
+    } catch {
+      setSharingState('error')
+    }
+  }
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -382,8 +594,39 @@ export default function ChatPanel({
     }
   }
 
+  const buscarReferencias = async () => {
+    const q = input.trim()
+    if (!q || loadingRefs) return
+    setLoadingRefs(true)
+    setReferencias(null)
+    try {
+      const res = await fetch(`${API_URL}/historico/similar?briefing=${encodeURIComponent(q)}&n=3`)
+      const data = await res.json()
+      setReferencias(data)
+    } catch {
+      setReferencias([])
+    } finally {
+      setLoadingRefs(false)
+    }
+  }
+
+  const dispensarTag = async (tag: string) => {
+    const next = tagsAceitas.filter(t => t !== tag)
+    setTagsAceitas(next)
+    if (sessionId) {
+      try {
+        await fetch(`${API_URL}/tags`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session_id: sessionId, tags: next }),
+        })
+      } catch { /* silencia */ }
+    }
+  }
+
   const handleSend = () => {
     const msg = input.trim()
+    setReferencias(null)
     if (!msg || activeIsRunning || inMeeting.size === 0) return
     if (mode === 'reuniao') {
       onReunSend(Array.from(inMeeting) as AgentId[], msg, reuniaoManual)
@@ -402,6 +645,43 @@ export default function ChatPanel({
       transition={{ type: 'spring', stiffness: 200, damping: 30 }}
       className="flex flex-row glass border border-stone-200/60 overflow-hidden flex-shrink-0 rounded-2xl relative"
     >
+      {/* Custo-cap atingido — blocking overlay */}
+      {custoCapAtingido && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm rounded-2xl">
+          <div className="bg-white rounded-2xl p-6 mx-6 shadow-2xl border border-stone-200 flex flex-col gap-4 max-w-xs w-full">
+            <div className="text-center">
+              <div className="text-3xl mb-2">💸</div>
+              <p className="text-sm font-display font-semibold text-stone-900 mb-1">Limite de custo atingido</p>
+              <p className="text-[10px] font-mono text-stone-500 leading-relaxed">
+                O pipeline foi pausado ao atingir o cap de{' '}
+                <span className="text-stone-700 font-bold tabular-nums">${custoCapAtingido.cap.toFixed(2)}</span>.
+                <br />
+                Custo acumulado: <span className="text-stone-700 tabular-nums">${custoCapAtingido.total.toFixed(3)}</span>
+              </p>
+            </div>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => onAutorizarCusto(custoCapAtingido.cap + 0.50)}
+                className="w-full py-2.5 rounded-xl bg-stone-900 text-white text-[10px] font-mono font-bold uppercase tracking-widest
+                  hover:bg-stone-700 active:scale-[0.98] transition-all">
+                Autorizar +$0.50 e continuar
+              </button>
+              <button
+                onClick={() => onAutorizarCusto(custoCapAtingido.cap + 2.00)}
+                className="w-full py-2.5 rounded-xl border border-stone-200 bg-white text-stone-600 text-[10px] font-mono uppercase tracking-widest
+                  hover:border-stone-400 hover:bg-stone-50 active:scale-[0.98] transition-all">
+                Autorizar +$2.00 e continuar
+              </button>
+              <button
+                onClick={onRecusarCustoExtra}
+                className="w-full py-2 rounded-xl text-[10px] font-mono text-red-500 hover:text-red-700 transition-colors uppercase tracking-widest">
+                Encerrar pipeline
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Resize handles */}
       {!minimized && <>
         <div className="absolute left-0 top-6 bottom-6 w-1.5 cursor-ew-resize z-50 hover:bg-stone-300/40 rounded-full transition-colors" onPointerDown={e => startResize(e, 'w')} />
@@ -415,8 +695,21 @@ export default function ChatPanel({
           </svg>
         </div>
       </>}
-      {/* Config sidebar — pipeline only */}
-      {!minimized && mode === 'pipeline' && <ConfigSidebar agentConfig={agentConfig} onUpdateConfig={onUpdateConfig} isRunning={isRunning} />}
+      {/* Config sidebar — pipeline only, collapsible */}
+      <AnimatePresence initial={false}>
+        {!minimized && mode === 'pipeline' && configOpen && (
+          <motion.div
+            key="config"
+            initial={{ width: 0, opacity: 0 }}
+            animate={{ width: 176, opacity: 1 }}
+            exit={{ width: 0, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 260, damping: 28 }}
+            className="overflow-hidden flex-shrink-0"
+          >
+            <ConfigSidebar agentConfig={agentConfig} onUpdateConfig={onUpdateConfig} isRunning={isRunning} custoCap={custoCap} onSetCustoCap={onSetCustoCap} />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Main chat */}
       <div className="flex-1 flex flex-col min-w-0">
@@ -475,6 +768,22 @@ export default function ChatPanel({
               </button>
             )}
 
+            {/* Mesa Redonda button — reunião only */}
+            {mode === 'reuniao' && onMesaRedonda && !reunIsRunning && inMeeting.size > 0 && (
+              <button
+                title="Mesa Redonda: escreva a tese no campo abaixo e clique aqui para que cada agente a questione"
+                onClick={() => {
+                  const tese = input.trim()
+                  if (!tese) return
+                  const briefing = reunMessages.find(m => m.role === 'user')?.content ?? ''
+                  onMesaRedonda(Array.from(inMeeting) as AgentId[], tese, briefing)
+                  setInput('')
+                }}
+                className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-mono uppercase tracking-widest border border-stone-300 bg-white text-stone-600 hover:bg-stone-50 hover:border-stone-500 transition-all">
+                ⊞ mesa
+              </button>
+            )}
+
             {/* Manual mode toggle — pipeline only */}
             {mode === 'pipeline' && <button onClick={onToggleManualMode}
               title={manualMode ? 'Modo manual ativo' : 'Modo automático'}
@@ -487,11 +796,48 @@ export default function ChatPanel({
               <span>{manualMode ? 'manual' : 'auto'}</span>
             </button>}
 
+            {/* Fast-track — pipeline only */}
+            {mode === 'pipeline' && <button onClick={onToggleFastTrack} disabled={isRunning}
+              title="Fast-track: Otto resumido, Heitor pulado — resultado em <3 min"
+              className={`flex items-center gap-1 px-2 py-1 rounded-md text-[9px] font-mono uppercase tracking-widest border transition-all disabled:opacity-30 ${
+                fastTrack
+                  ? 'bg-red-50 border-red-300 text-red-700'
+                  : 'bg-white border-stone-200 text-stone-400 hover:border-stone-400'
+              }`}>
+              ⚡{fastTrack ? ' fast' : ''}
+            </button>}
+
+            {/* Sandbox — pipeline only */}
+            {mode === 'pipeline' && <button onClick={onToggleSandbox} disabled={isRunning}
+              title="Sandbox: sessão não salva no histórico"
+              className={`flex items-center gap-1 px-2 py-1 rounded-md text-[9px] font-mono uppercase tracking-widest border transition-all disabled:opacity-30 ${
+                sandbox
+                  ? 'bg-violet-50 border-violet-300 text-violet-700'
+                  : 'bg-white border-stone-200 text-stone-400 hover:border-stone-400'
+              }`}>
+              🧪{sandbox ? ' lab' : ''}
+            </button>}
+
             {/* Clear */}
             {activeMessages.length > 0 && !activeIsRunning && (
               <button onClick={activeReset}
                 className="text-[10px] font-mono text-stone-400 hover:text-stone-700 transition-colors uppercase tracking-wider">
                 limpar
+              </button>
+            )}
+
+            {/* Config toggle — pipeline only */}
+            {mode === 'pipeline' && (
+              <button onClick={() => setConfigOpen(v => !v)} title="Configurações"
+                className={`w-7 h-7 rounded-lg border flex items-center justify-center transition-all ${
+                  configOpen
+                    ? 'bg-stone-900 border-stone-900 text-white'
+                    : 'border-stone-200 bg-white text-stone-500 hover:bg-stone-50 hover:border-stone-400'
+                }`}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="3"/>
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
               </button>
             )}
 
@@ -587,6 +933,27 @@ export default function ChatPanel({
           <div ref={bottomRef} />
         </div>}
 
+        {/* Custo-aviso banner — pipeline only */}
+        {!minimized && mode === 'pipeline' && custoAviso && (
+          <motion.div
+            initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
+            className="mx-4 mb-0 mt-1 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 flex items-center justify-between gap-3 flex-shrink-0"
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-amber-500 text-sm flex-shrink-0">⚠</span>
+              <p className="text-[9px] font-mono text-amber-700 leading-relaxed">
+                Custo em <strong>{custoAviso.pct}%</strong> do limite —{' '}
+                <span className="tabular-nums">${custoAviso.total.toFixed(3)}</span> de{' '}
+                <span className="tabular-nums">${custoAviso.cap.toFixed(2)}</span>
+              </p>
+            </div>
+            <button onClick={() => onAutorizarCusto(custoAviso.cap)}
+              className="text-[8px] font-mono text-amber-600 hover:text-amber-800 uppercase tracking-widest flex-shrink-0 transition-colors">
+              ok
+            </button>
+          </motion.div>
+        )}
+
         {/* Approval bar — pipeline only */}
         {!minimized && mode === 'pipeline' && <AnimatePresence>
           {awaitingApproval && (
@@ -657,6 +1024,234 @@ export default function ChatPanel({
           )}
         </AnimatePresence>}
 
+        {/* Avaliação + Export — pipeline only, fora do input para nunca ser cortado */}
+        <AnimatePresence>
+          {!minimized && mode === 'pipeline' && sessionId && !isRunning && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+              className="mx-4 mb-1 flex flex-col gap-3 px-4 py-3 rounded-xl border border-stone-200/60 bg-stone-50/80 flex-shrink-0"
+            >
+              {/* Tags sugeridas */}
+              {tagsAceitas.length > 0 && (
+                <div className="border-b border-stone-200/60 pb-3 mb-3">
+                  <p className="text-[8px] font-mono text-stone-400 uppercase tracking-widest mb-2">tags sugeridas</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {tagsAceitas.map(tag => (
+                      <span key={tag} className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-stone-100 border border-stone-200 text-[9px] font-mono text-stone-600">
+                        {tag}
+                        <button onClick={() => dispensarTag(tag)}
+                          className="ml-0.5 text-stone-400 hover:text-stone-700 transition-colors leading-none">×</button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Estrelas */}
+              {avaliado ? (
+                <p className="text-[10px] font-mono text-green-600 uppercase tracking-widest text-center">
+                  ✓ Avaliação salva no histórico
+                </p>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-mono text-stone-400 uppercase tracking-widest">Como foi essa sessão?</span>
+                  <div className="flex gap-1">
+                    {[1, 2, 3, 4, 5].map(n => (
+                      <button key={n} onClick={() => onAvaliar(n, '', tagsAceitas)}
+                        onMouseEnter={() => setHoveredStar(n)} onMouseLeave={() => setHoveredStar(0)}
+                        className="text-lg transition-transform hover:scale-125 active:scale-110">
+                        <span style={{ color: n <= hoveredStar ? '#f59e0b' : '#d6d3d1' }}>★</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Export Dossiê — só aparece se Aya rodou */}
+              {onExportar && messages.some(m => m.role === 'aya' && m.done) && (
+                <div className="border-t border-stone-200/60 pt-2">
+                  {exportState === 'idle' && (
+                    <button onClick={handleExportar}
+                      className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl
+                        bg-stone-900 text-white text-[10px] font-mono uppercase tracking-widest
+                        hover:bg-stone-700 active:scale-[0.98] transition-all">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                        <line x1="12" y1="18" x2="12" y2="12"/>
+                        <line x1="9" y1="15" x2="15" y2="15"/>
+                      </svg>
+                      Exportar Dossiê (HTML + PDF)
+                    </button>
+                  )}
+                  {exportState === 'loading' && (
+                    <div className="flex items-center justify-center gap-2 py-2">
+                      <div className="flex gap-0.5">
+                        {[0, 1, 2].map(i => (
+                          <div key={i} className="w-1 h-1 rounded-full bg-stone-400 animate-bounce"
+                            style={{ animationDelay: `${i * 0.15}s` }} />
+                        ))}
+                      </div>
+                      <span className="text-[9px] font-mono text-stone-400 uppercase tracking-widest">Gerando HTML + PDF...</span>
+                    </div>
+                  )}
+                  {exportState === 'done' && exportResult && (
+                    <div className="flex flex-col gap-1.5">
+                      {exportResult.html_gerado && (
+                        <button
+                          onClick={() => handleDownload('html', exportResult.caminho_html?.split('/').pop() ?? 'dossie.html')}
+                          className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-green-50 border border-green-200 hover:bg-green-100 active:scale-[0.98] transition-all w-full text-left">
+                          <span className="text-green-600 text-[10px]">🌐</span>
+                          <span className="text-[9px] font-mono text-green-700 truncate flex-1">
+                            {exportResult.caminho_html?.split('/').pop()}
+                          </span>
+                          <span className="text-[8px] font-mono text-green-500 uppercase tracking-widest flex-shrink-0">HTML ↓</span>
+                        </button>
+                      )}
+                      {exportResult.pdf_gerado && (
+                        <button
+                          onClick={() => handleDownload('pdf', exportResult.caminho_pdf?.split('/').pop() ?? 'dossie.pdf')}
+                          className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-green-50 border border-green-200 hover:bg-green-100 active:scale-[0.98] transition-all w-full text-left">
+                          <span className="text-green-600 text-[10px]">📕</span>
+                          <span className="text-[9px] font-mono text-green-700 truncate flex-1">
+                            {exportResult.caminho_pdf?.split('/').pop()}
+                          </span>
+                          <span className="text-[8px] font-mono text-green-500 uppercase tracking-widest flex-shrink-0">PDF ↓</span>
+                        </button>
+                      )}
+                      {exportResult.erros.length > 0 && (
+                        <div className="px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200">
+                          {exportResult.erros.map((e, i) => (
+                            <p key={i} className="text-[9px] font-mono text-amber-700">{e}</p>
+                          ))}
+                        </div>
+                      )}
+                      <button onClick={() => setExportState('idle')}
+                        className="text-[8px] font-mono text-stone-400 hover:text-stone-600 transition-colors text-center uppercase tracking-widest mt-0.5">
+                        exportar novamente
+                      </button>
+                    </div>
+                  )}
+                  {exportState === 'error' && (
+                    <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-red-50 border border-red-200">
+                      <span className="text-[9px] font-mono text-red-600">Falha ao exportar</span>
+                      <button onClick={() => setExportState('idle')}
+                        className="text-[9px] font-mono text-stone-500 hover:text-stone-700 transition-colors uppercase tracking-widest">
+                        tentar novamente
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* T35 — TTS: narrar Aya */}
+              {messages.some(m => m.role === 'aya' && m.done && m.content) && (
+                <div className="border-t border-stone-200/60 pt-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[8px] font-mono text-stone-400 uppercase tracking-widest">Narração (TTS)</span>
+                    <button
+                      onClick={() => {
+                        setTtsError('')
+                        if (ttsSpeaking) { window.speechSynthesis.cancel(); setTtsSpeaking(false); return }
+                        const ayaMsg = messages.find(m => m.role === 'aya' && m.done && m.content)
+                        if (!ayaMsg) return
+                        const voices = window.speechSynthesis.getVoices()
+                        console.log('[TTS] vozes disponíveis:', voices.map(v => `${v.name} (${v.lang})`))
+                        const ptVoice = voices.find(v => v.lang.startsWith('pt'))
+                        if (!ptVoice && voices.length > 0) {
+                          setTtsError('Nenhuma voz pt-BR disponível. Tente Chrome ou instale uma voz no sistema.')
+                          return
+                        }
+                        const utt = new SpeechSynthesisUtterance(ayaMsg.content)
+                        utt.lang = 'pt-BR'
+                        utt.rate = 0.92
+                        if (ptVoice) utt.voice = ptVoice
+                        utt.onstart = () => setTtsSpeaking(true)
+                        utt.onend = () => setTtsSpeaking(false)
+                        utt.onerror = (e) => { setTtsSpeaking(false); setTtsError(`Erro TTS: ${e.error}`) }
+                        window.speechSynthesis.speak(utt)
+                      }}
+                      className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-[9px] font-mono transition-all
+                        ${ttsSpeaking
+                          ? 'bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100'
+                          : 'border-stone-200 bg-white text-stone-500 hover:border-stone-400 hover:text-stone-700'}`}>
+                      {ttsSpeaking ? (
+                        <><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg> pausar</>
+                      ) : (
+                        <><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="5 3 19 12 5 21 5 3"/></svg> ouvir dossiê</>
+                      )}
+                    </button>
+                  </div>
+                  {ttsError && <p className="text-[9px] font-mono text-red-500 mt-1">{ttsError}</p>}
+                </div>
+              )}
+
+              {/* T36 — Compartilhar aprovação */}
+              <div className="border-t border-stone-200/60 pt-2">
+                {sharingState === 'idle' && (
+                  <button onClick={compartilharAprovacao}
+                    className="w-full flex items-center justify-center gap-2 py-1.5 rounded-lg border border-stone-200 bg-white
+                      text-[9px] font-mono text-stone-500 hover:border-stone-400 hover:text-stone-700 hover:bg-stone-50 transition-all">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+                      <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+                    </svg>
+                    Gerar link de aprovação
+                  </button>
+                )}
+                {sharingState === 'loading' && (
+                  <p className="text-[9px] font-mono text-stone-400 uppercase tracking-widest text-center">gerando link...</p>
+                )}
+                {sharingState === 'done' && shareToken && (
+                  <div className="flex items-center gap-2">
+                    <input readOnly value={`${window.location.origin}/share/${shareToken}`}
+                      className="flex-1 text-[9px] font-mono text-stone-600 border border-stone-200 rounded-lg px-2 py-1.5 bg-stone-50 min-w-0" />
+                    <button onClick={() => navigator.clipboard.writeText(`${window.location.origin}/share/${shareToken}`)}
+                      className="flex-shrink-0 px-2 py-1.5 rounded-lg border border-stone-200 bg-white text-[8px] font-mono text-stone-500 hover:border-stone-400 transition-all">
+                      copiar
+                    </button>
+                  </div>
+                )}
+                {sharingState === 'error' && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9px] font-mono text-red-500">Falha ao gerar link</span>
+                    <button onClick={() => setSharingState('idle')} className="text-[9px] font-mono text-stone-400 hover:text-stone-600 transition-colors uppercase tracking-widest">tentar novamente</button>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Avaliação — reunião */}
+        <AnimatePresence>
+          {!minimized && mode === 'reuniao' && reunMessages.length > 0 && !reunIsRunning && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+              className="mx-4 mb-1 px-4 py-3 rounded-xl border border-stone-200/60 bg-stone-50/80 flex-shrink-0"
+            >
+              {reuniaoRating > 0 ? (
+                <p className="text-[10px] font-mono text-green-600 uppercase tracking-widest text-center">
+                  ✓ Obrigado pelo feedback!
+                </p>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-mono text-stone-400 uppercase tracking-widest">Como foi a reunião?</span>
+                  <div className="flex gap-1">
+                    {[1, 2, 3, 4, 5].map(n => (
+                      <button key={n} onClick={() => setReuniaoRating(n)}
+                        onMouseEnter={() => setHoveredStar(n)} onMouseLeave={() => setHoveredStar(0)}
+                        className="text-lg transition-transform hover:scale-125 active:scale-110">
+                        <span style={{ color: n <= (hoveredStar || reuniaoRating) ? '#f59e0b' : '#d6d3d1' }}>★</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Input */}
         {!minimized && <div className="p-4 border-t border-stone-200/50 flex-shrink-0">
           {inMeeting.size === 0 ? (
@@ -689,7 +1284,9 @@ export default function ChatPanel({
               </AnimatePresence>
 
               {imageError && <p className="text-[10px] font-mono text-red-500 mb-1.5 px-1">{imageError}</p>}
+              {audioError && <p className="text-[10px] font-mono text-red-500 mb-1.5 px-1">{audioError}</p>}
               {noSpeechSupport && <p className="text-[10px] font-mono text-amber-500 mb-1.5 px-1">Microfone não suportado neste browser.</p>}
+              {audioTranscribing && <p className="text-[10px] font-mono text-violet-500 mb-1.5 px-1">⟳ Transcrevendo áudio...</p>}
 
               <div className="relative">
                 {/* @mention autocomplete */}
@@ -706,6 +1303,7 @@ export default function ChatPanel({
                   </div>
                 )}
                 <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
+                <input ref={audioInputRef} type="file" accept=".mp3,.m4a,.wav,.ogg,.webm,audio/*" className="hidden" onChange={handleAudioSelect} />
                 <textarea
                   ref={textareaRef}
                   value={input}
@@ -730,11 +1328,11 @@ export default function ChatPanel({
                   }
                   rows={3}
                   className={`w-full resize-none rounded-xl border bg-white/90
-                    px-4 py-3 pl-12 pr-24 text-sm font-mono text-stone-800 placeholder:text-stone-400
+                    px-4 py-3 pl-20 pr-24 text-sm font-mono text-stone-800 placeholder:text-stone-400
                     focus:outline-none transition-all duration-200 leading-relaxed
                     ${isRecording ? 'border-red-300 focus:border-red-400' : 'border-stone-200 focus:border-stone-400'}`}
                 />
-                {/* Clipe */}
+                {/* Clipe (imagem) */}
                 <button type="button" onClick={() => fileInputRef.current?.click()} disabled={isRunning}
                   title="Anexar imagem"
                   className={`absolute left-3 bottom-3 w-8 h-8 rounded-lg border flex items-center justify-center transition-all
@@ -745,6 +1343,17 @@ export default function ChatPanel({
                     <rect x="3" y="3" width="18" height="18" rx="2"/>
                     <circle cx="8.5" cy="8.5" r="1.5"/>
                     <polyline points="21 15 16 10 5 21"/>
+                  </svg>
+                </button>
+                {/* Upload de áudio (T34) */}
+                <button type="button" onClick={() => audioInputRef.current?.click()} disabled={isRunning || audioTranscribing}
+                  title="Upload de áudio — transcrição automática"
+                  className={`absolute left-13 bottom-3 w-8 h-8 rounded-lg border flex items-center justify-center transition-all
+                    disabled:opacity-30 disabled:cursor-not-allowed
+                    ${audioTranscribing ? 'border-violet-400 bg-violet-100 animate-pulse' : 'border-stone-200 bg-white/90 hover:bg-stone-50 hover:border-stone-400'}`}
+                  style={{ left: '3.25rem' }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={audioTranscribing ? '#7c3aed' : '#78716c'} strokeWidth="2">
+                    <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
                   </svg>
                 </button>
                 {/* Microfone */}
@@ -790,6 +1399,75 @@ export default function ChatPanel({
             </div>
           )}
 
+          {/* Ver referências + sugerir pipeline — pipeline mode only */}
+          {mode === 'pipeline' && !activeIsRunning && input.trim().length > 20 && (
+            <div className="mt-1.5 space-y-1.5">
+              <div className="flex items-center gap-3">
+                <button onClick={buscarReferencias} disabled={loadingRefs}
+                  className="text-[8px] font-mono text-stone-400 hover:text-stone-600 transition-colors disabled:opacity-50 flex items-center gap-1">
+                  {loadingRefs ? '⟳ buscando...' : '🔍 ver referências similares'}
+                </button>
+                {input.trim().length > 30 && (
+                  <button onClick={sugerirPipeline} disabled={loadingSugestao}
+                    className="text-[8px] font-mono text-violet-500 hover:text-violet-700 transition-colors disabled:opacity-50 flex items-center gap-1">
+                    {loadingSugestao ? '⟳ analisando...' : '✦ sugerir agentes'}
+                  </button>
+                )}
+                {sugestaoError && (
+                  <span className="text-[8px] font-mono text-red-500">{sugestaoError}</span>
+                )}
+              </div>
+              {referencias && referencias.length > 0 && (
+                <div className="space-y-1">
+                  {referencias.map(r => (
+                    <div key={r.session_id} className="px-2 py-1.5 rounded-lg bg-stone-50 border border-stone-200">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-[9px] font-mono text-stone-600 line-clamp-1 flex-1">{r.briefing}</p>
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          {r.avaliacao && <span className="text-[8px] text-amber-500">{'★'.repeat(r.avaliacao)}</span>}
+                          <span className="text-[8px] font-mono text-stone-400">{Math.round(r.score * 100)}%</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {referencias && referencias.length === 0 && (
+                <p className="text-[8px] font-mono text-stone-400">Nenhuma referência encontrada.</p>
+              )}
+              {sugestao && (
+                <div className="px-3 py-2.5 rounded-xl bg-violet-50 border border-violet-200">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-[8px] font-mono text-violet-600 uppercase tracking-widest font-bold">sugestão de agentes</p>
+                    <button onClick={() => setSugestao(null)} className="text-violet-400 hover:text-violet-700 text-[10px] leading-none transition-colors">×</button>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {sugestao.agentes.map(a => {
+                      const ag = AGENT_MAP[a]
+                      return ag ? (
+                        <span key={a} className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-mono border"
+                          style={{ background: ag.colorDim, borderColor: `${ag.color}40`, color: ag.color }}>
+                          <span>{ag.name}</span>
+                          {sugestao.razoes[a] && (
+                            <span className="text-[7px] opacity-70">· {sugestao.razoes[a]}</span>
+                          )}
+                        </span>
+                      ) : null
+                    })}
+                  </div>
+                  {onSetInMeeting && (
+                    <button
+                      onClick={() => { onSetInMeeting(sugestao.agentes); setSugestao(null) }}
+                      className="w-full py-1.5 rounded-lg bg-violet-700 text-white text-[9px] font-mono font-bold uppercase tracking-widest
+                        hover:bg-violet-800 active:scale-[0.98] transition-all">
+                      Usar sugestão
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Status de execução */}
           <AnimatePresence>
             {activeIsRunning && (
@@ -808,32 +1486,6 @@ export default function ChatPanel({
             )}
           </AnimatePresence>
 
-          {/* Avaliação — pipeline only */}
-          <AnimatePresence>
-            {mode === 'pipeline' && sessionId && !isRunning && (
-              <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                className="mt-3 pt-3 border-t border-stone-200/60">
-                {avaliado ? (
-                  <p className="text-[10px] font-mono text-green-600 uppercase tracking-widest text-center">
-                    ✓ Avaliação salva no histórico
-                  </p>
-                ) : (
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-mono text-stone-400 uppercase tracking-widest">Como foi essa sessão?</span>
-                    <div className="flex gap-1">
-                      {[1, 2, 3, 4, 5].map(n => (
-                        <button key={n} onClick={() => onAvaliar(n)}
-                          onMouseEnter={() => setHoveredStar(n)} onMouseLeave={() => setHoveredStar(0)}
-                          className="text-lg transition-transform hover:scale-125 active:scale-110">
-                          <span style={{ color: n <= hoveredStar ? '#f59e0b' : '#d6d3d1' }}>★</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
         </div>}
       </div>
     </motion.div>

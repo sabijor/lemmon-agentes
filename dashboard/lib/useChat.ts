@@ -22,6 +22,14 @@ export interface ImageData {
 
 export type AgentStatus = 'idle' | 'thinking' | 'speaking' | 'done' | 'error'
 
+export interface ExportResult {
+  html_gerado: boolean
+  pdf_gerado: boolean
+  caminho_html: string | null
+  caminho_pdf: string | null
+  erros: string[]
+}
+
 export interface ApprovalRequest {
   agent: string
   mode: 'approval' | 'retry' | 'confirmar'
@@ -32,21 +40,21 @@ export interface ApprovalRequest {
 export interface AgentConfig {
   otto: { modo_visual: 'completo' | 'resumido' | 'minimo' }
   heitor: { max_buscas: number }
-  salles: { formato: 'auto' | 'reels' | 'documental' | 'mini-doc' | 'tese' | 'aftermovie' }
+  salles: { formato: 'auto' | 'reels' | 'documental' | 'mini-doc' | 'tese' | 'aftermovie'; gate_espelho: 'off' | 'auto' | 'manual'; alternativas: 0 | 3 }
   sonia: { com_busca: boolean; usar_tendencias: boolean }
 }
 
 const DEFAULT_CONFIG: AgentConfig = {
   otto: { modo_visual: 'completo' },
   heitor: { max_buscas: 3 },
-  salles: { formato: 'auto' },
+  salles: { formato: 'auto', gate_espelho: 'off', alternativas: 0 },
   sonia: { com_busca: false, usar_tendencias: true },
 }
 
 export function useChat() {
   const [messages, setMessages] = useState<Message[]>([])
   const [agentStatus, setAgentStatus] = useState<Record<AgentId, AgentStatus>>({
-    otto: 'idle', heitor: 'idle', salles: 'idle', sonia: 'idle', aya: 'idle',
+    otto: 'idle', heitor: 'idle', salles: 'idle', sonia: 'idle', aya: 'idle', pedro_abrahao: 'idle',
   })
   const [isRunning, setIsRunning] = useState(false)
   const [sessionId, setSessionId] = useState<string | null>(null)
@@ -55,6 +63,12 @@ export function useChat() {
   const [awaitingApproval, setAwaitingApproval] = useState<ApprovalRequest | null>(null)
   const [agentConfig, setAgentConfig] = useState<AgentConfig>(DEFAULT_CONFIG)
   const [resumedFrom, setResumedFrom] = useState<string | null>(null)
+  const [tagsSugeridas, setTagsSugeridas] = useState<string[]>([])
+  const [fastTrack, setFastTrack] = useState(false)
+  const [sandbox, setSandbox] = useState(false)
+  const [custoCap, setCustoCap] = useState<number | null>(null)
+  const [custoCapAtingido, setCustoCapAtingido] = useState<{ total: number; cap: number } | null>(null)
+  const [custoAviso, setCustoAviso] = useState<{ total: number; cap: number; pct: number } | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
   const currentMsgId = useRef<Record<string, string>>({})
   const resumeContextRef = useRef<Record<string, unknown> | null>(null)
@@ -85,7 +99,7 @@ export function useChat() {
     setAvaliado(detail.avaliacao !== null)
     setIsRunning(false)
     setAwaitingApproval(null)
-    setAgentStatus({ otto: 'idle', heitor: 'idle', salles: 'idle', sonia: 'idle', aya: 'idle' })
+    setAgentStatus({ otto: 'idle', heitor: 'idle', salles: 'idle', sonia: 'idle', aya: 'idle', pedro_abrahao: 'idle' })
     setResumedFrom(detail.session_id)
     currentMsgId.current = {}
     resumeContextRef.current = (detail as HistoryDetail & { contexto_tecnico?: Record<string, unknown> }).contexto_tecnico ?? {
@@ -102,6 +116,9 @@ export function useChat() {
     setSessionId(null)
     setAvaliado(false)
     setAwaitingApproval(null)
+    setTagsSugeridas([])
+    setCustoCapAtingido(null)
+    setCustoAviso(null)
 
     const userId = crypto.randomUUID()
     setMessages(prev => [...prev, { id: userId, role: 'user', content: userMessage, done: true, hasImage: !!image }])
@@ -122,6 +139,9 @@ export function useChat() {
       agents,
       message: userMessage,
       manual_mode: manualMode,
+      fast_track: fastTrack,
+      sandbox,
+      custo_cap_usd: custoCap ?? undefined,
       config: agentConfig,
       ...(resumeCtx && { resume_context: resumeCtx }),
       ...(image && { image_base64: image.base64, image_media_type: image.mediaType }),
@@ -162,8 +182,40 @@ export function useChat() {
         }
       }
 
+      if (data.type === 'gate_espelho_result') {
+        // Prepend veredicto badge to the gate message content
+        const badge = data.veredicto === 'vermelho' ? '🔴 VETO' : data.veredicto === 'amarelo' ? '🟡 ALERTA' : '🟢 OK'
+        const msgId = currentMsgId.current['gate_espelho']
+        if (msgId) {
+          setMessages(prev => prev.map(m => m.id === msgId
+            ? { ...m, content: `**Gate Espelho — ${badge}**\n\n` + m.content }
+            : m
+          ))
+        }
+      }
+
       if (data.type === 'confirmar') {
         setAwaitingApproval({ agent: data.agent, mode: 'confirmar', mensagem: data.mensagem })
+      }
+
+      if (data.type === 'routing_condicional') {
+        // T29: show as system message
+        const msgId = crypto.randomUUID()
+        setMessages(prev => [...prev, { id: msgId, role: 'aya' as AgentId, content: data.mensagem, done: true }])
+      }
+
+      if (data.type === 'custo_aviso') {
+        // T30: low warning
+        setCustoAviso({ total: data.total_atual, cap: data.cap, pct: data.pct })
+      }
+
+      if (data.type === 'custo_cap_atingido') {
+        // T30: cap hit — show block dialog
+        setCustoCapAtingido({ total: data.total_atual, cap: data.cap })
+      }
+
+      if (data.type === 'tags_sugeridas') {
+        setTagsSugeridas(data.tags ?? [])
       }
 
       if (data.type === 'pipeline_done') {
@@ -200,20 +252,45 @@ export function useChat() {
   }, [])
 
   const toggleManualMode = useCallback(() => setManualMode(v => !v), [])
+  const toggleFastTrack = useCallback(() => setFastTrack(v => !v), [])
+  const toggleSandbox = useCallback(() => setSandbox(v => !v), [])
+  const autorizarCusto = useCallback((valor: number) => {
+    wsRef.current?.send(JSON.stringify({ type: 'autorizar_custo', valor }))
+    setCustoCapAtingido(null)
+    setCustoAviso(null)
+  }, [])
+  const recusarCustoExtra = useCallback(() => {
+    wsRef.current?.send(JSON.stringify({ type: 'cancel' }))
+    setCustoCapAtingido(null)
+    setIsRunning(false)
+  }, [])
 
-  const avaliar = useCallback(async (nota: number, observacoes = '') => {
+  const avaliar = useCallback(async (nota: number, observacoes = '', tags?: string[]) => {
     if (!sessionId || avaliado) return
     try {
       await fetch(`${API_URL}/avaliar`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ session_id: sessionId, nota, observacoes }),
+        body: JSON.stringify({ session_id: sessionId, nota, observacoes, tags: tags ?? [] }),
       })
       setAvaliado(true)
     } catch {
       // silencia — não bloqueia o usuário
     }
   }, [sessionId, avaliado])
+
+  const exportar = useCallback(async (sid: string): Promise<ExportResult> => {
+    const res = await fetch(`${API_URL}/exportar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: sid }),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: 'Erro desconhecido' }))
+      throw new Error((err as { detail?: string }).detail ?? 'Erro ao exportar')
+    }
+    return res.json() as Promise<ExportResult>
+  }, [])
 
   const abort = useCallback(() => {
     wsRef.current?.close()
@@ -231,19 +308,25 @@ export function useChat() {
   const reset = useCallback(() => {
     wsRef.current?.close()
     setMessages([])
-    setAgentStatus({ otto: 'idle', heitor: 'idle', salles: 'idle', sonia: 'idle', aya: 'idle' })
+    setAgentStatus({ otto: 'idle', heitor: 'idle', salles: 'idle', sonia: 'idle', aya: 'idle', pedro_abrahao: 'idle' })
     setIsRunning(false)
     setSessionId(null)
     setAvaliado(false)
     setAwaitingApproval(null)
     setResumedFrom(null)
+    setTagsSugeridas([])
+    setCustoCapAtingido(null)
+    setCustoAviso(null)
     resumeContextRef.current = null
     currentMsgId.current = {}
   }, [])
 
   return {
     messages, agentStatus, isRunning, sessionId, avaliado, resumedFrom,
-    manualMode, awaitingApproval, agentConfig,
-    send, approve, abort, toggleManualMode, updateConfig, avaliar, reset, loadSession,
+    manualMode, fastTrack, sandbox, custoCap, custoCapAtingido, custoAviso,
+    awaitingApproval, agentConfig, tagsSugeridas,
+    send, approve, abort, toggleManualMode, toggleFastTrack, toggleSandbox,
+    setCustoCap, autorizarCusto, recusarCustoExtra,
+    updateConfig, avaliar, exportar, reset, loadSession,
   }
 }

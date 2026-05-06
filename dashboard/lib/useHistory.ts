@@ -16,6 +16,7 @@ export interface HistoryDetail extends HistoryItem {
   origem?: 'dashboard' | 'reuniao'
   respostas: Record<string, string>
   custos_usd: Record<string, number>
+  duracoes_segundos?: Record<string, number>
   observacoes_operador: string
   tags: string[]
   historico?: Array<{ role: string; content: string }>
