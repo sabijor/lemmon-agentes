@@ -1,6 +1,7 @@
 .env
 __pycache__/
 *.pyc
+*.pyo
 outputs/
 historico/
 .DS_Store
@@ -13,3 +14,7 @@ dashboard/tsconfig.tsbuildinfo
 shares/
 backups/
 *.log
+
+# Claude Code settings (contêm permissões e info pessoal)
+.claude/settings.json
+.claude/settings.local.json
