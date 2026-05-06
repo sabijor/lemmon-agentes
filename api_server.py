@@ -9,6 +9,7 @@ from pathlib import Path
 import base64
 import os
 import secrets
+from html import escape as html_escape
 
 import anthropic as _anthropic
 from fastapi import FastAPI, File, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
@@ -16,7 +17,7 @@ from fastapi.responses import FileResponse, HTMLResponse
 
 _anthropic_client = _anthropic.Anthropic()
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -427,8 +428,8 @@ async def transcrever_audio(audio: UploadFile = File(...)):
 # ── T36 — Links de aprovação ─────────────────────────────────────────────
 
 class ComentarioPayload(BaseModel):
-    autor: str = "Cliente"
-    texto: str
+    autor: str = Field(default="Cliente", max_length=80)
+    texto: str = Field(..., max_length=2000)
 
 
 class SharePayload(BaseModel):
@@ -445,16 +446,8 @@ def _load_share(token: str) -> dict:
 @app.post("/share")
 async def criar_share(payload: SharePayload):
     """T36: Gera link de aprovação limpo para uma sessão."""
-    sessao_path = None
-    for f in sorted(HISTORICO_DIR.glob("*.json"), reverse=True):
-        try:
-            data = json.loads(f.read_text(encoding="utf-8"))
-            if data.get("session_id") == payload.session_id:
-                sessao_path = f
-                break
-        except Exception:
-            continue
-    if not sessao_path:
+    sessao_path = HISTORICO_DIR / "dashboard" / f"{payload.session_id}.json"
+    if not sessao_path.exists():
         raise HTTPException(status_code=404, detail="Sessão não encontrada")
     sessao = json.loads(sessao_path.read_text(encoding="utf-8"))
     token = secrets.token_urlsafe(16)
@@ -486,12 +479,12 @@ async def ver_share(token: str):
             continue
         blocos_html += f"""
         <section class="agent-block">
-          <h2 class="agent-name">{ag.capitalize()}</h2>
-          <pre class="agent-content">{txt}</pre>
+          <h2 class="agent-name">{html_escape(ag.capitalize())}</h2>
+          <pre class="agent-content">{html_escape(txt)}</pre>
         </section>"""
     comentarios_html = ""
     for c in share.get("comentarios", []):
-        comentarios_html += f"""<div class="comment"><strong>{c["autor"]}</strong>: {c["texto"]}</div>"""
+        comentarios_html += f"""<div class="comment"><strong>{html_escape(c["autor"])}</strong>: {html_escape(c["texto"])}</div>"""
     briefing = share.get("briefing", "")
     return HTMLResponse(f"""<!DOCTYPE html>
 <html lang="pt-BR"><head>
@@ -513,7 +506,7 @@ async def ver_share(token: str):
 </style>
 </head><body>
 <h1>Lemmon Produções — Aprovação de Conteúdo</h1>
-<div class="briefing"><strong>Briefing:</strong> {briefing[:500]}</div>
+<div class="briefing"><strong>Briefing:</strong> {html_escape(briefing[:500])}</div>
 {blocos_html}
 <div class="comment-section">
   <h2>Comentários</h2>
@@ -538,8 +531,13 @@ async function sendComment(e){{
 @app.post("/share/{token}/comentar")
 async def comentar_share(token: str, payload: ComentarioPayload):
     """T36: Adiciona comentário inline à sessão compartilhada."""
+    if not payload.texto.strip():
+        raise HTTPException(status_code=400, detail="Comentário não pode ser vazio")
     share = _load_share(token)
-    share.setdefault("comentarios", []).append({
+    comentarios = share.setdefault("comentarios", [])
+    if len(comentarios) >= 20:
+        raise HTTPException(status_code=400, detail="Limite de comentários atingido")
+    comentarios.append({
         "autor": payload.autor,
         "texto": payload.texto,
         "created_at": datetime.now().isoformat(),
