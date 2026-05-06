@@ -82,9 +82,10 @@ function SpeechBubble({ text }: { text: string }) {
   if (cur) lines.push(cur.trim())
   const PH = 13, PAD = 7, bW = 116, bH = lines.length * PH + PAD * 2
   return (
-    <g>
+    <g style={{ cursor: 'pointer' }} className="speech-bubble-group">
       <rect x={-bW / 2} y={-bH - 10} width={bW} height={bH} rx={7}
-        fill="white" stroke="#d6d3d1" strokeWidth="1" opacity="0.97" />
+        fill="white" stroke="#d6d3d1" strokeWidth="1" opacity="0.97"
+        className="speech-bubble-rect" />
       <polygon points={`-5,-10 5,-10 0,-3`} fill="white" stroke="#d6d3d1" strokeWidth="1" />
       {lines.map((line, i) => (
         <text key={i} x={0} y={-bH - 10 + PAD + (i + 1) * PH - 2}

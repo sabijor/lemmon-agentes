@@ -312,6 +312,16 @@ function SessionDetail({ detail, loadingDetail, bodyH, onBack, onResume, onRemix
                     {cost !== undefined && cost > 0 && (
                       <span className="text-[8px] font-mono text-stone-300">${cost.toFixed(5)}</span>
                     )}
+                    {(() => {
+                      const dur = (detail.duracoes_segundos ?? {})[agentId]
+                      if (!dur) return null
+                      const slow = dur > 120
+                      return (
+                        <span className={`text-[8px] font-mono ${slow ? 'text-amber-500' : 'text-stone-300'}`}>
+                          ⏱ {dur}s
+                        </span>
+                      )
+                    })()}
                     {detail.avaliacao === 5 && (
                       <button
                         onClick={() => marcarExemplar(agentId, text)}

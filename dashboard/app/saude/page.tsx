@@ -178,9 +178,12 @@ export default function Saude() {
               <div className="space-y-3">
                 {stats.agentRanking.map(({ id, count, agent }) => (
                   <div key={id} className="flex items-center gap-3">
-                    <span className="text-[9px] font-mono w-28 flex-shrink-0" style={{ color: agent?.color ?? '#a8a29e' }}>
-                      {agent?.name ?? id}
-                    </span>
+                    <div className="flex items-center gap-1.5 w-28 flex-shrink-0 min-w-0">
+                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: agent?.color ?? '#a8a29e' }} />
+                      <span className="text-[9px] font-mono text-stone-300 truncate">
+                        {agent?.name ?? id}
+                      </span>
+                    </div>
                     <div className="flex-1 h-4 bg-stone-800 rounded-full overflow-hidden">
                       <div
                         className="h-full rounded-full transition-all duration-700"

@@ -101,6 +101,7 @@ def _salvar_sessao(
     respostas: dict[str, str],
     custos: dict[str, float],
     contexto_tecnico: dict | None = None,
+    duracoes: dict[str, float] | None = None,
 ) -> Path:
     """Salva sessão completa da dashboard no histórico."""
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -115,6 +116,7 @@ def _salvar_sessao(
         "respostas": respostas,
         "custos_usd": custos,
         "custo_total_usd": sum(custos.values()),
+        "duracoes_segundos": duracoes or {},
         "contexto_tecnico": contexto_tecnico or {},
         "avaliacao": None,
         "observacoes_operador": "",
@@ -724,6 +726,7 @@ async def chat(ws: WebSocket):
             # Herda respostas anteriores para que a sessão salva fique completa
             respostas: dict[str, str] = dict(resume_context.get("respostas", {}))
             custos: dict[str, float] = dict(resume_context.get("custos_usd", {}))
+            duracoes: dict[str, float] = {}
             pipeline_cancelled = False
             heitor_risco_vermelho = False  # T29: roteamento condicional
 
@@ -873,10 +876,12 @@ async def chat(ws: WebSocket):
                 while True:
                     await ws.send_json({"type": "agent_start", "agent": name})
                     try:
+                        _t0 = asyncio.get_event_loop().time()
                         result = await _run_agent_step(name)
                         if result is None:
                             return True
                         text, cost = result
+                        duracoes[name] = round(asyncio.get_event_loop().time() - _t0, 1)
                         respostas[name] = text
                         custos[name] = cost
                         await _stream(ws, name, text)
@@ -1083,7 +1088,7 @@ async def chat(ws: WebSocket):
             }
             # T27: sandbox — não salva no histórico
             if not sandbox:
-                session_path = _salvar_sessao(briefing, all_agents, respostas, custos, contexto_tecnico)
+                session_path = _salvar_sessao(briefing, all_agents, respostas, custos, contexto_tecnico, duracoes=duracoes)
                 session_id = session_path.stem
             else:
                 session_id = None
