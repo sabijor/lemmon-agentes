@@ -5,7 +5,7 @@ import { type Message, type AgentStatus } from './useChat'
 import { WS_URL } from './api'
 
 const DEFAULT_STATUS = (): Record<AgentId, AgentStatus> => ({
-  otto: 'idle', heitor: 'idle', salles: 'idle', sonia: 'idle', aya: 'idle',
+  otto: 'idle', heitor: 'idle', salles: 'idle', sonia: 'idle', aya: 'idle', pedro_abrahao: 'idle',
 })
 
 export function useReuniao() {
@@ -155,5 +155,55 @@ export function useReuniao() {
     })
   }, [])
 
-  return { messages, agentStatus, isRunning, send, reset, abort }
+  const mesaRedonda = useCallback(async (agents: AgentId[], tese: string, briefing: string) => {
+    setIsRunning(true)
+    setMessages(prev => [...prev, {
+      id: `user-mesa-${Date.now()}`,
+      role: 'user',
+      content: `🔴 Mesa Redonda — tese em debate: "${tese}"`,
+      done: true,
+    }])
+
+    const ws = new WebSocket(`${WS_URL}/ws/mesa_redonda`)
+    await new Promise<void>(resolve => { ws.onopen = () => resolve() })
+
+    ws.onmessage = (e) => {
+      const msg = JSON.parse(e.data)
+      if (msg.type === 'agent_start') {
+        streamBufRef.current[msg.agent] = ''
+        setAgentStatus(s => ({ ...s, [msg.agent]: 'thinking' }))
+        setMessages(prev => [...prev, { id: `mr-${msg.agent}`, role: msg.agent as AgentId, content: '', done: false }])
+      } else if (msg.type === 'token') {
+        const buf = (streamBufRef.current[msg.agent] ?? '') + msg.content
+        streamBufRef.current[msg.agent] = buf
+        setAgentStatus(s => ({ ...s, [msg.agent]: 'speaking' }))
+        setMessages(prev => prev.map(m => m.id === `mr-${msg.agent}` ? { ...m, content: buf } : m))
+      } else if (msg.type === 'agent_done') {
+        setAgentStatus(s => ({ ...s, [msg.agent]: 'done' }))
+        setMessages(prev => prev.map(m => m.id === `mr-${msg.agent}` ? { ...m, done: true, cost: msg.cost } : m))
+        delete streamBufRef.current[msg.agent]
+      } else if (msg.type === 'agent_error') {
+        setAgentStatus(s => ({ ...s, [msg.agent]: 'error' }))
+        setMessages(prev => prev.filter(m => m.id !== `mr-${msg.agent}`).concat([{
+          id: `mr-err-${msg.agent}`, role: msg.agent as AgentId, content: '', done: true, error: msg.error,
+        }]))
+      } else if (msg.type === 'mesa_redonda_done') {
+        setIsRunning(false)
+        ws.close()
+        setTimeout(() => {
+          setAgentStatus(s => {
+            const next = { ...s }
+            for (const k of Object.keys(next) as AgentId[]) {
+              if (next[k] === 'done') next[k] = 'idle'
+            }
+            return next
+          })
+        }, 1500)
+      }
+    }
+    ws.onclose = () => setIsRunning(false)
+    ws.send(JSON.stringify({ tese, briefing, agents }))
+  }, [])
+
+  return { messages, agentStatus, isRunning, send, reset, abort, mesaRedonda }
 }

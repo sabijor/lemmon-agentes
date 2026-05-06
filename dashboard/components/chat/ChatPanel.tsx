@@ -48,6 +48,7 @@ interface Props {
   onReunSend: (agents: AgentId[], msg: string, manual?: boolean) => void
   onReunReset: () => void
   onReunAbort: () => void
+  onMesaRedonda?: (agents: AgentId[], tese: string, briefing: string) => void
   onExportar?: (sessionId: string) => Promise<ExportResult>
   onClose?: () => void
   dragControls?: DragControls
@@ -262,6 +263,7 @@ export default function ChatPanel({
   manualMode, awaitingApproval, agentConfig, dragControls,
   onSend, onReset, onAvaliar, onApprove, onAbort, onToggleManualMode, onUpdateConfig,
   reunMessages, reunAgentStatus, reunIsRunning, onReunSend, onReunReset, onReunAbort,
+  onMesaRedonda,
   onExportar, onClose,
 }: Props) {
   // Mode-aware aliases
@@ -552,6 +554,22 @@ export default function ChatPanel({
                     : 'bg-white border-stone-200 text-stone-400 hover:border-stone-400'
                 }`}>
                 <span>{reuniaoManual ? '⏸ manual' : '▶▶ auto'}</span>
+              </button>
+            )}
+
+            {/* Mesa Redonda button — reunião only */}
+            {mode === 'reuniao' && onMesaRedonda && !reunIsRunning && inMeeting.size > 0 && (
+              <button
+                title="Mesa Redonda: escreva a tese no campo abaixo e clique aqui para que cada agente a questione"
+                onClick={() => {
+                  const tese = input.trim()
+                  if (!tese) return
+                  const briefing = reunMessages.find(m => m.role === 'user')?.content ?? ''
+                  onMesaRedonda(Array.from(inMeeting) as AgentId[], tese, briefing)
+                  setInput('')
+                }}
+                className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-mono uppercase tracking-widest border border-stone-300 bg-white text-stone-600 hover:bg-stone-50 hover:border-stone-500 transition-all">
+                ⊞ mesa
               </button>
             )}
 

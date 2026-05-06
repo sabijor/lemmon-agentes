@@ -28,8 +28,8 @@ export default function Home() {
   const [chatMode, setChatMode] = useState<'pipeline' | 'reuniao'>('pipeline')
   const [historyOpen, setHistoryOpen] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
-  const { messages, agentStatus, isRunning, sessionId, avaliado, resumedFrom, manualMode, awaitingApproval, agentConfig, send, approve, abort, toggleManualMode, updateConfig, avaliar, reset, loadSession } = useChat()
-  const { messages: reunMessages, agentStatus: reunAgentStatus, isRunning: reunIsRunning, send: reunSend, reset: reunReset, abort: reunAbort } = useReuniao()
+  const { messages, agentStatus, isRunning, sessionId, avaliado, resumedFrom, manualMode, awaitingApproval, agentConfig, send, approve, abort, toggleManualMode, updateConfig, avaliar, exportar, reset, loadSession } = useChat()
+  const { messages: reunMessages, agentStatus: reunAgentStatus, isRunning: reunIsRunning, send: reunSend, reset: reunReset, abort: reunAbort, mesaRedonda: reunMesaRedonda } = useReuniao()
   const { sessions, selected, loading, loadingDetail, fetchSessions, fetchDetail, clearSelected } = useHistory()
 
   const dragControls = useDragControls()
@@ -41,8 +41,9 @@ export default function Home() {
   const historyPanelY = useMotionValue(0)
 
   useEffect(() => {
-    panelX.set(Math.max(0, window.innerWidth - 640))
-  }, [panelX])
+    panelX.set(Math.max(0, window.innerWidth - 480))
+    panelY.set(56)
+  }, [panelX, panelY])
 
   useEffect(() => {
     historyPanelX.set(Math.max(0, (window.innerWidth - 760) / 2))
@@ -70,7 +71,11 @@ export default function Home() {
 
   const callAll = () => setInMeeting(new Set(AGENTS.map(a => a.id)))
   const exitMeeting = () => setInMeeting(new Set())
-  const handleSend = (msg: string, image?: ImageData) => send(Array.from(inMeeting), msg, image)
+  const handleSend = (msg: string, image?: ImageData) => send(
+    Array.from(inMeeting).filter(id => !AGENTS.find(a => a.id === id)?.reuniaoOnly),
+    msg,
+    image,
+  )
 
   const handleResume = (detail: HistoryDetail) => {
     loadSession(detail)
@@ -98,15 +103,18 @@ export default function Home() {
             {AGENTS.map(agent => {
               const status = agentStatus[agent.id]
               const isIn = inMeeting.has(agent.id)
+              const isGuest = !!agent.reuniaoOnly
               return (
                 <motion.button
                   key={agent.id}
                   onClick={() => !isRunning && toggleAgent(agent.id)}
                   whileHover={{ scale: 1.04 }}
                   whileTap={{ scale: 0.96 }}
+                  title={isGuest ? `${agent.name} — convidado (só reunião)` : agent.name}
                   className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-mono uppercase tracking-widest
                     transition-all duration-200 border
-                    ${isIn ? 'text-white border-transparent shadow-sm' : 'bg-white text-stone-500 border-stone-200 hover:border-stone-400'}`}
+                    ${isIn ? 'text-white border-transparent shadow-sm' : 'bg-white text-stone-500 border-stone-200 hover:border-stone-400'}
+                    ${isGuest && !isIn ? 'border-dashed' : ''}`}
                   style={isIn ? { background: agent.color, borderColor: agent.color } : {}}
                 >
                   <div className={`w-1.5 h-1.5 rounded-full ${
@@ -117,6 +125,7 @@ export default function Home() {
                     isIn ? 'bg-white/60' : 'bg-stone-300'
                   }`}/>
                   {agent.name}
+                  {isGuest && !isIn && <span className="text-[7px] opacity-50 ml-0.5">cliente</span>}
                 </motion.button>
               )
             })}
@@ -185,6 +194,8 @@ export default function Home() {
             onReunSend={handleReunSend}
             onReunReset={reunReset}
             onReunAbort={reunAbort}
+            onMesaRedonda={reunMesaRedonda}
+            onExportar={exportar}
             onClose={() => setChatOpen(false)}
           />
         </motion.div>
