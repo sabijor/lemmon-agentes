@@ -1,9 +1,10 @@
 """Teste interativo do Otto."""
 import json
 from datetime import datetime
-from pathlib import Path
+
 from agentes.otto import Otto
 from core.config import INPUTS_DIR, OUTPUTS_DIR
+
 
 def main():
     print("=" * 60)

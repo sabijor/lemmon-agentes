@@ -1,9 +1,9 @@
 """Sistema de avisos do Heitor — 3 camadas (pré, durante, pós)."""
 from core.config import (
-    HEITOR_PREVISAO_RANGE_USD,
     HEITOR_AVISO_AMARELO_USD,
-    HEITOR_PEDIR_CONFIRMACAO_ACIMA_USD,
     HEITOR_AVISO_VERMELHO_USD,
+    HEITOR_PEDIR_CONFIRMACAO_ACIMA_USD,
+    HEITOR_PREVISAO_RANGE_USD,
 )
 
 

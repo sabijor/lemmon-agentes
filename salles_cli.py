@@ -10,8 +10,10 @@ import json
 import sys
 from datetime import datetime
 from pathlib import Path
-from agentes.salles import Salles, FORMATOS_VALIDOS
+
+from agentes.salles import FORMATOS_VALIDOS, Salles
 from core.config import OUTPUTS_DIR
+
 
 def main():
     parser = argparse.ArgumentParser(description="Salles | Roteirista Lemmon")

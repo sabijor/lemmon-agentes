@@ -9,21 +9,21 @@ Sistema de avisos em 3 camadas (pré, durante, pós-execução).
 """
 import json as _json
 from typing import Optional
+
 from core.agente_base import AgenteBase
-from core.web_search_helper import (
-    construir_tool_web_search_oficial,
-    construir_tool_web_search_amplo,
-    extrair_fontes_consultadas,
-    extrair_texto_raciocinio,
-    contar_buscas_realizadas,
-)
+from core.config import HEITOR_MAX_BUSCAS_DEFAULT
 from core.limites_heitor import (
-    aviso_pre_execucao,
     aviso_amarelo,
     aviso_pos_execucao,
+    aviso_pre_execucao,
 )
-from core.config import HEITOR_MAX_BUSCAS_DEFAULT
-
+from core.web_search_helper import (
+    construir_tool_web_search_amplo,
+    construir_tool_web_search_oficial,
+    contar_buscas_realizadas,
+    extrair_fontes_consultadas,
+    extrair_texto_raciocinio,
+)
 
 MODOS_VALIDOS = ["solo", "cadeia", "auditor"]
 MODOS_SAIDA = ["log", "analise", "auto"]

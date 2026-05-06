@@ -1,6 +1,8 @@
 """Cálculo de custo por execução."""
 from dataclasses import dataclass
+
 from .config import CUSTO_INPUT_USD_POR_MILHAO, CUSTO_OUTPUT_USD_POR_MILHAO
+
 
 @dataclass
 class Custo:

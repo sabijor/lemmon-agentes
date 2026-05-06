@@ -1,8 +1,7 @@
 """Sistema de avisos da Aya — versão simplificada (1 chamada)."""
 from core.config import (
-    AYA_PREVISAO_RANGE_USD,
-    AYA_AVISO_AMARELO_USD,
     AYA_AVISO_VERMELHO_USD,
+    AYA_PREVISAO_RANGE_USD,
 )
 
 

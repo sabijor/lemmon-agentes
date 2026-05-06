@@ -17,7 +17,7 @@ from pathlib import Path
 
 try:
     import markdown
-    from weasyprint import HTML, CSS
+    from weasyprint import CSS, HTML
 except ImportError as e:
     print(f"ERRO: dependência faltando — {e}")
     print("Rode: pip install weasyprint markdown")

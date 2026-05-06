@@ -12,8 +12,8 @@ CSS construído a partir do design system real:
 """
 import logging
 import re
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 logger = logging.getLogger("lemmon.aya.exportador")
 

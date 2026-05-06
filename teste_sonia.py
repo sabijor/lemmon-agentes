@@ -1,12 +1,13 @@
 """Teste interativo da Sonia."""
 import json
 from datetime import datetime
-from pathlib import Path
 
-from agentes.sonia import Sonia, MODOS_VALIDOS
+from agentes.sonia import Sonia
 from core.config import (
-    INPUTS_DIR, OUTPUTS_DIR,
-    SONIA_MAX_BUSCAS_DEFAULT, SONIA_MAX_BUSCAS_PROFUNDO,
+    INPUTS_DIR,
+    OUTPUTS_DIR,
+    SONIA_MAX_BUSCAS_DEFAULT,
+    SONIA_MAX_BUSCAS_PROFUNDO,
 )
 
 
@@ -80,7 +81,7 @@ def main():
     arquivo_tend = INPUTS_DIR / "tendencias_atuais.md"
     usar_tendencias = True
     if arquivo_tend.exists():
-        resp = input(f"\nUsar arquivo de tendências? (S/n): ").strip().lower()
+        resp = input("\nUsar arquivo de tendências? (S/n): ").strip().lower()
         usar_tendencias = resp != "n"
 
     print(f"\n⏳ Rodando Sonia em modo '{modo}'...")
@@ -131,7 +132,7 @@ def main():
     print(f"Buscas realizadas:   {resultado['buscas_realizadas']}")
     print(f"Cortes gerados:      {len(resultado['output_tecnico'].get('cortes_autonomos', []))}")
     print(f"Custo total:         ${resultado['custo_total_usd']:.6f} (~R${resultado['custo_total_brl_estimado']:.4f})")
-    print(f"Breakdown:")
+    print("Breakdown:")
     for chave, valor in resultado["breakdown_custo"].items():
         print(f"  {chave}: ${valor:.6f}")
     print(f"Arquivos: outputs/sonia/{ts}_*")

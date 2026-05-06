@@ -5,7 +5,7 @@ import json
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 
-from api.deps import HISTORICO_DIR, OUTPUTS_DIR, AYA_GERAR_HTML, AYA_GERAR_PDF, AYA_PDF_ENGINE
+from api.deps import AYA_GERAR_HTML, AYA_GERAR_PDF, AYA_PDF_ENGINE, HISTORICO_DIR, OUTPUTS_DIR
 from api.schemas import ExportarPayload
 from core.exportador_aya import exportar_dossie
 

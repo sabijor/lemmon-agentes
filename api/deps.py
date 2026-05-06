@@ -17,8 +17,10 @@ from core.config import (
     AYA_GERAR_PDF,
     AYA_PDF_ENGINE,
     HISTORICO_DIR,
-    MODELO_PADRAO as LEMMON_MODELO_PADRAO,
     OUTPUTS_DIR,
+)
+from core.config import (
+    MODELO_PADRAO as LEMMON_MODELO_PADRAO,
 )
 
 _log = logging.getLogger("lemmon.api")

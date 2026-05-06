@@ -1,13 +1,13 @@
 """Teste interativo do Heitor."""
 import json
 from datetime import datetime
-from pathlib import Path
 
-from agentes.heitor import Heitor, MODOS_VALIDOS, MODOS_SAIDA
+from agentes.heitor import Heitor
 from core.config import (
-    INPUTS_DIR, OUTPUTS_DIR,
     HEITOR_MAX_BUSCAS_DEFAULT,
     HEITOR_MAX_BUSCAS_PROFUNDO,
+    INPUTS_DIR,
+    OUTPUTS_DIR,
 )
 
 
@@ -97,7 +97,7 @@ def main():
     modo_saida = {"1": "log", "2": "analise", "3": "auto"}.get(saida_escolha, "auto")
 
     # 3. Executar
-    print(f"\n⏳ Rodando Heitor...")
+    print("\n⏳ Rodando Heitor...")
     print("⚠️  Pode demorar 1-3 minutos (web_search).\n")
 
     heitor = Heitor()

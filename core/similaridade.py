@@ -3,7 +3,7 @@ import json
 import math
 import re
 from pathlib import Path
-from typing import List, Dict
+from typing import Dict, List
 
 # ── Busca semântica leve por TF-IDF/Jaccard no histórico ─────────────────────
 

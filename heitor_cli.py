@@ -12,11 +12,11 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from agentes.heitor import Heitor, MODOS_VALIDOS, MODOS_SAIDA
+from agentes.heitor import MODOS_SAIDA, MODOS_VALIDOS, Heitor
 from core.config import (
-    OUTPUTS_DIR,
     HEITOR_MAX_BUSCAS_DEFAULT,
     HEITOR_MAX_BUSCAS_PROFUNDO,
+    OUTPUTS_DIR,
 )
 
 

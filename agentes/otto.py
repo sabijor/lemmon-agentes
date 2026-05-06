@@ -1,7 +1,6 @@
 """Otto | Estrategista — Agente 1 do sistema Lemmon."""
 from core.agente_base import AgenteBase
 from core.validador import validar_briefing, validar_modo_visual
-from core.custo import Custo
 
 # Schema da ferramenta forçada (structured output via tool use)
 FERRAMENTA_ANALISE = {

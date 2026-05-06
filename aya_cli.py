@@ -3,7 +3,6 @@ import argparse
 import json
 import sys
 from datetime import datetime
-from pathlib import Path
 
 from agentes.aya import Aya
 from core.config import OUTPUTS_DIR
@@ -58,8 +57,8 @@ def main():
     )
 
     # ===== EXPORT v1.1: HTML + PDF =====
-    from core.exportador_aya import exportar_dossie
     from core.config import AYA_GERAR_HTML, AYA_GERAR_PDF, AYA_PDF_ENGINE
+    from core.exportador_aya import exportar_dossie
 
     export_resultado = exportar_dossie(
         markdown_original=resultado["output_humano"],

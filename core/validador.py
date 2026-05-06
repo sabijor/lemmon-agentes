@@ -1,5 +1,6 @@
 """Validação de inputs antes de chamar a API."""
-from .config import BRIEFING_MIN_CARACTERES, BRIEFING_MAX_CARACTERES
+from .config import BRIEFING_MAX_CARACTERES, BRIEFING_MIN_CARACTERES
+
 
 class BriefingInvalido(Exception):
     pass

@@ -2,16 +2,17 @@
 import json as _json
 import time
 from typing import Optional
+
+from agentes.otto import Otto
 from core.agente_base import AgenteBase
-from core.validador import validar_briefing
 from core.custo import Custo
-from core.similaridade import buscar_casos_similares
 from core.discussao import (
     construir_prompt_questionamento,
     construir_prompt_resposta_otto,
-    construir_prompt_rodada_extra
+    construir_prompt_rodada_extra,
 )
-from agentes.otto import Otto
+from core.similaridade import buscar_casos_similares
+from core.validador import validar_briefing
 
 FORMATOS_VALIDOS = {
     "documental_institucional",

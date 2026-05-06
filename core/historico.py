@@ -2,7 +2,9 @@
 import json
 from datetime import datetime
 from pathlib import Path
+
 from .config import HISTORICO_DIR
+
 
 class Historico:
     def __init__(self, agente_nome: str):

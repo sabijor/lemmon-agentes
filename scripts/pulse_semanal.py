@@ -17,8 +17,7 @@ from pathlib import Path
 BASE_DIR = Path(__file__).parent.parent
 sys.path.insert(0, str(BASE_DIR))
 
-from core.config import HISTORICO_DIR, OUTPUTS_DIR, MODELO_PADRAO
-from core.agente_base import AgenteBase
+from core.config import HISTORICO_DIR, MODELO_PADRAO, OUTPUTS_DIR
 
 
 def _carregar_sessoes_periodo(inicio: datetime, fim: datetime) -> list[dict]:

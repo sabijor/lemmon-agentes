@@ -3,15 +3,15 @@
 Função: CONSULTOR ESPELHO do cliente Dr. Pedro Abrahão (Hator Clinic).
 Invocado sob demanda. Não entra no pipeline padrão.
 """
-from core.espelho import EspelhoCliente
 from core.config import (
-    PEDRO_MATERIAL_DIR,
-    PEDRO_INPUT_MAX_CHARS,
-    PEDRO_CONTEXTO_OPCIONAL_MAX_CHARS,
-    PEDRO_RESPOSTA_MAX_TOKENS,
-    PEDRO_PREVISAO_RANGE_USD,
     PEDRO_AVISO_VERMELHO_USD,
+    PEDRO_CONTEXTO_OPCIONAL_MAX_CHARS,
+    PEDRO_INPUT_MAX_CHARS,
+    PEDRO_MATERIAL_DIR,
+    PEDRO_PREVISAO_RANGE_USD,
+    PEDRO_RESPOSTA_MAX_TOKENS,
 )
+from core.espelho import EspelhoCliente
 
 
 def PedroAbrahao() -> EspelhoCliente:

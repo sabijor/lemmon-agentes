@@ -13,7 +13,7 @@ from agentes.salles import Salles
 from agentes.sonia import Sonia
 from api.deps import _anthropic_client, _log
 from api.storage import _salvar_sessao
-from api.ws_helpers import _make_confirmacao_callback, _make_on_token, _stream
+from api.ws_helpers import _make_confirmacao_callback, _stream
 
 
 async def chat(ws: WebSocket):

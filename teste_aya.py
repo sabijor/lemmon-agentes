@@ -1,7 +1,6 @@
 """Teste interativo da Aya."""
 import json
 from datetime import datetime
-from pathlib import Path
 
 from agentes.aya import Aya
 from core.config import OUTPUTS_DIR
@@ -48,8 +47,8 @@ def main():
     )
 
     # ===== EXPORT v1.1: HTML + PDF =====
-    from core.exportador_aya import exportar_dossie
     from core.config import AYA_GERAR_HTML, AYA_GERAR_PDF, AYA_PDF_ENGINE
+    from core.exportador_aya import exportar_dossie
 
     print("\n📤 Exportando HTML + PDF (design system AURA)...")
 
@@ -67,7 +66,7 @@ def main():
     if export_resultado["pdf_gerado"]:
         print(f"📕 PDF:      {export_resultado['caminho_pdf']}")
     if export_resultado["erros"]:
-        print(f"\n⚠️  Avisos de export:")
+        print("\n⚠️  Avisos de export:")
         for erro in export_resultado["erros"]:
             print(f"   - {erro}")
 

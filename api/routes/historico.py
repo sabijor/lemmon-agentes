@@ -3,8 +3,9 @@ import json
 
 from fastapi import APIRouter, HTTPException
 
-from api.deps import HISTORICO_DIR, _anthropic_client, _log, formatar_erro_anthropic
-from api.deps import APIError, APIConnectionError, AuthenticationError, RateLimitError
+from api.deps import (
+    HISTORICO_DIR,
+)
 from api.schemas import AvaliacaoPayload, TagsPayload
 from core.similaridade import buscar_historico_similar
 

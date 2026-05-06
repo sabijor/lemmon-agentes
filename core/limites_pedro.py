@@ -1,8 +1,7 @@
 """Sistema de avisos do Pedro — agente consultor cliente."""
 from core.config import (
-    PEDRO_PREVISAO_RANGE_USD,
-    PEDRO_AVISO_AMARELO_USD,
     PEDRO_AVISO_VERMELHO_USD,
+    PEDRO_PREVISAO_RANGE_USD,
 )
 
 

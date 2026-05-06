@@ -1,9 +1,10 @@
 """Teste interativo do Salles."""
 import json
 from datetime import datetime
-from pathlib import Path
-from agentes.salles import Salles, FORMATOS_VALIDOS
+
+from agentes.salles import FORMATOS_VALIDOS, Salles
 from core.config import INPUTS_DIR, OUTPUTS_DIR
+
 
 def main():
     print("=" * 60)
@@ -89,12 +90,12 @@ def main():
     print(f"Formato aplicado:      {resultado['formato_aplicado']}")
     print(f"Tags:                  {resultado['tags']}")
     print(f"Custo total:           ${resultado['custo_total_usd']:.6f} (~R${resultado['custo_total_brl_estimado']:.4f})")
-    print(f"Breakdown de custo:")
+    print("Breakdown de custo:")
     for etapa, valor in resultado.get("breakdown_custo", {}).items():
         print(f"  {etapa}: ${valor:.6f}")
     print(f"Casos similares usados: {len(resultado.get('casos_similares_usados', []))}")
     print(f"Arquivos: outputs/salles/{ts}_*")
-    print(f"\n💡 Lembrete: rode 'python avaliar.py' depois de usar o roteiro pra calibrar.")
+    print("\n💡 Lembrete: rode 'python avaliar.py' depois de usar o roteiro pra calibrar.")
 
 if __name__ == "__main__":
     main()

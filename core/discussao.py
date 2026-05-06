@@ -1,6 +1,5 @@
 """Protocolo de discussão estruturada entre agentes."""
-from typing import Dict, List, Optional
-
+from typing import Dict, List
 
 # ── Mesa Redonda ─────────────────────────────────────────────────────────────
 

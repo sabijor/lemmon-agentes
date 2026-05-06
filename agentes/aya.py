@@ -5,28 +5,26 @@ NÃO interpreta, NÃO opina, NÃO sintetiza. Só organiza.
 
 Arquitetura: 1 chamada API (cards) + montagem Python pura do markdown final.
 """
-import time
 import json as _json
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Dict
+from typing import Dict, Optional
+
 from anthropic import APIError, AuthenticationError, RateLimitError
 
 from core.agente_base import AgenteBase
+from core.config import (
+    AYA_AGENTES_PADRAO,
+    AYA_DOSSIE_MAX_CHARS_TOTAL,
+    AYA_OUTPUT_AGENTE_MAX_CHARS,
+    AYA_RESUMO_AGENTE_MAX_CHARS,
+)
 from core.custo import Custo
 from core.historico import Historico
 from core.limites_aya import (
-    aviso_pre_execucao_aya,
     aviso_pos_execucao_aya,
+    aviso_pre_execucao_aya,
 )
-from core.config import (
-    AYA_AGENTES_PADRAO,
-    AYA_OUTPUT_AGENTE_MAX_CHARS,
-    AYA_DOSSIE_MAX_CHARS_TOTAL,
-    AYA_RESUMO_AGENTE_MAX_CHARS,
-    OUTPUTS_DIR,
-)
-
 
 # Schema da chamada única — apenas cards de resumo, sem síntese narrativa
 FERRAMENTA_DOSSIE_AYA = {
@@ -258,11 +256,11 @@ class Aya(AgenteBase):
             if len(output_humano) > AYA_OUTPUT_AGENTE_MAX_CHARS:
                 output_humano = (
                     output_humano[:AYA_OUTPUT_AGENTE_MAX_CHARS]
-                    + f"\n\n[TRUNCADO]"
+                    + "\n\n[TRUNCADO]"
                 )
 
             prompt_partes.append(f"\n## {agente.upper()}\n")
-            prompt_partes.append(f"\n### Output técnico (resumido):\n")
+            prompt_partes.append("\n### Output técnico (resumido):\n")
             prompt_partes.append(_json.dumps(
                 self._resumir_output_tecnico(agente, output_tecnico),
                 ensure_ascii=False, indent=2

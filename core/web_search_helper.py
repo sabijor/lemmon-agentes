@@ -5,7 +5,8 @@ IMPORTANTE:
 - Funciona com Sonnet 4.6 (testado em teste_websearch.py)
 - Custo: $10/1000 buscas + tokens normais de processamento
 """
-from typing import List, Dict
+from typing import Dict, List
+
 from core.config import HEITOR_DOMINIOS_OFICIAIS
 
 

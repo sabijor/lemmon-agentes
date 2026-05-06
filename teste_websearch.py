@@ -1,7 +1,8 @@
 """Teste mínimo: web_search funciona com Sonnet 4.6 na minha conta?"""
 import os
-from dotenv import load_dotenv
+
 from anthropic import Anthropic
+from dotenv import load_dotenv
 
 load_dotenv()
 
@@ -34,7 +35,7 @@ try:
         elif bloco.type == "tool_use":
             print(f"\n🔍 BUSCA INICIADA: {bloco.input}")
         elif bloco.type == "web_search_tool_result":
-            print(f"\n📄 RESULTADOS DA BUSCA:")
+            print("\n📄 RESULTADOS DA BUSCA:")
             if hasattr(bloco, 'content'):
                 for resultado in bloco.content:
                     if hasattr(resultado, 'url'):
@@ -43,7 +44,7 @@ try:
             print(f"\n🔸 OUTRO BLOCO: tipo={bloco.type}")
     
     print("\n" + "-" * 50)
-    print(f"📊 USAGE:")
+    print("📊 USAGE:")
     print(f"   Input tokens:  {response.usage.input_tokens}")
     print(f"   Output tokens: {response.usage.output_tokens}")
     
@@ -75,5 +76,5 @@ except Exception as e:
     elif "authentication" in erro_str or "api key" in erro_str:
         print("⚠️  Problema com a API key.")
     else:
-        print(f"⚠️  Erro não mapeado. Cola a mensagem inteira pro assistente.")
+        print("⚠️  Erro não mapeado. Cola a mensagem inteira pro assistente.")
 

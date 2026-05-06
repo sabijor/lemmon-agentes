@@ -1,7 +1,6 @@
 """Teste interativo do Pedro."""
 import json
 from datetime import datetime
-from pathlib import Path
 
 from agentes.pedro_abrahao import PedroAbrahao
 from core.config import OUTPUTS_DIR

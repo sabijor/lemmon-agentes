@@ -1,10 +1,7 @@
 """CLI de avaliação de execuções dos agentes."""
-from core.avaliacao import (
-    listar_agentes_com_pendencias,
-    formatar_resumo_caso,
-    extrair_output_humano
-)
+from core.avaliacao import extrair_output_humano, formatar_resumo_caso, listar_agentes_com_pendencias
 from core.historico import Historico
+
 
 def main():
     print("=" * 60)

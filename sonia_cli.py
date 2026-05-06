@@ -12,10 +12,11 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from agentes.sonia import Sonia, MODOS_VALIDOS
+from agentes.sonia import MODOS_VALIDOS, Sonia
 from core.config import (
     OUTPUTS_DIR,
-    SONIA_MAX_BUSCAS_DEFAULT, SONIA_MAX_BUSCAS_PROFUNDO,
+    SONIA_MAX_BUSCAS_DEFAULT,
+    SONIA_MAX_BUSCAS_PROFUNDO,
 )
 
 

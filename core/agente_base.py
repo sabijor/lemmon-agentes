@@ -2,7 +2,9 @@
 import time
 from abc import ABC, abstractmethod
 from typing import Callable
-from anthropic import Anthropic, APIError, APIConnectionError, AuthenticationError, RateLimitError
+
+from anthropic import Anthropic, APIConnectionError, APIError, AuthenticationError, RateLimitError
+
 from .config import ANTHROPIC_API_KEY, MODELO_PADRAO, PROMPTS_DIR
 from .custo import Custo
 from .exemplares import formatar_exemplares_para_prompt

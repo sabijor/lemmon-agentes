@@ -7,35 +7,34 @@ Arquitetura: 3 chamadas separadas.
 
 Sistema de avisos em 3 camadas.
 """
-import time
 import json as _json
-from pathlib import Path
+import time
 from typing import Optional
+
 from anthropic import APIError, AuthenticationError, RateLimitError
 
 from core.agente_base import AgenteBase
-from core.custo import Custo
-from core.web_search_helper import (
-    extrair_fontes_consultadas,
-    extrair_texto_raciocinio,
-    contar_buscas_realizadas,
+from core.config import (
+    INPUTS_DIR,
+    SONIA_CORTES_MAX,
+    SONIA_CORTES_MIN,
+    SONIA_DOMINIOS_OFICIAIS,
+    SONIA_HEITOR_CONTEXTO_MAX_TERMOS,
+    SONIA_MAX_BUSCAS_DEFAULT,
+    SONIA_ROTEIRO_MAX_CHARS,
+    SONIA_TENDENCIAS_MAX_CHARS,
 )
+from core.custo import Custo
 from core.limites_sonia import (
-    aviso_pre_execucao_sonia,
     aviso_amarelo_sonia,
     aviso_pos_execucao_sonia,
+    aviso_pre_execucao_sonia,
 )
-from core.config import (
-    SONIA_MAX_BUSCAS_DEFAULT,
-    SONIA_DOMINIOS_OFICIAIS,
-    SONIA_TENDENCIAS_MAX_CHARS,
-    SONIA_ROTEIRO_MAX_CHARS,
-    SONIA_HEITOR_CONTEXTO_MAX_TERMOS,
-    SONIA_CORTES_MIN,
-    SONIA_CORTES_MAX,
-    INPUTS_DIR,
+from core.web_search_helper import (
+    contar_buscas_realizadas,
+    extrair_fontes_consultadas,
+    extrair_texto_raciocinio,
 )
-
 
 MODOS_VALIDOS = ["cadeia", "solo", "cortes_apenas"]
 
@@ -393,17 +392,17 @@ class Sonia(AgenteBase):
         if contexto_otto and isinstance(contexto_otto, dict):
             tese = contexto_otto.get("tese_criativa", {}) if isinstance(contexto_otto.get("tese_criativa"), dict) else {}
             conceito = contexto_otto.get("conceito", {}) if isinstance(contexto_otto.get("conceito"), dict) else {}
-            contexto_extra += f"\n\nCONTEXTO OTTO:\n"
+            contexto_extra += "\n\nCONTEXTO OTTO:\n"
             contexto_extra += f"- Tese: {tese.get('frase_tese', '?')}\n"
             contexto_extra += f"- Conceito: {conceito.get('titulo', '?')}\n"
 
         if contexto_salles and isinstance(contexto_salles, dict):
-            contexto_extra += f"\n\nCONTEXTO SALLES:\n"
+            contexto_extra += "\n\nCONTEXTO SALLES:\n"
             contexto_extra += f"- Formato: {contexto_salles.get('formato_aplicado', '?')}\n"
             contexto_extra += f"- Título: {contexto_salles.get('titulo_roteiro', '?')}\n"
 
         if heitor_safe:
-            contexto_extra += f"\n\nCONTEXTO HEITOR (compliance):\n"
+            contexto_extra += "\n\nCONTEXTO HEITOR (compliance):\n"
             contexto_extra += f"- Risco geral: {heitor_safe['risco_geral']}\n"
             contexto_extra += f"- Termos a evitar: {heitor_safe['termos_evitar']}\n"
             termos_ctx = heitor_safe['termos_permitidos_com_contexto']
@@ -415,7 +414,7 @@ class Sonia(AgenteBase):
 
         if contexto_salles_ressalvas and isinstance(contexto_salles_ressalvas, list):
             if contexto_salles_ressalvas:
-                contexto_extra += f"\n\nRESSALVAS QUE SALLES JÁ APLICOU vs HEITOR:\n"
+                contexto_extra += "\n\nRESSALVAS QUE SALLES JÁ APLICOU vs HEITOR:\n"
                 for r in contexto_salles_ressalvas[:5]:
                     if isinstance(r, dict):
                         contexto_extra += f"- Salles manteve: {r.get('item', '?')}\n"

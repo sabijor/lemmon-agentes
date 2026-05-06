@@ -1,8 +1,9 @@
 """Logger unificado para todos os agentes."""
 import logging
 import sys
-from pathlib import Path
+
 from .config import BASE_DIR, LOG_LEVEL
+
 
 def get_logger(nome: str) -> logging.Logger:
     logger = logging.getLogger(nome)

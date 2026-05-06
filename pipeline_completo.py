@@ -14,18 +14,18 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from agentes.otto import Otto
-from agentes.heitor import Heitor, MODOS_VALIDOS
-from agentes.salles import Salles, FORMATOS_VALIDOS
-from agentes.sonia import Sonia
 from agentes.aya import Aya
+from agentes.heitor import Heitor
+from agentes.otto import Otto
+from agentes.salles import FORMATOS_VALIDOS, Salles
+from agentes.sonia import Sonia
 from core.config import (
-    OUTPUTS_DIR,
     HEITOR_MAX_BUSCAS_DEFAULT,
     HEITOR_MAX_BUSCAS_PROFUNDO,
+    OUTPUTS_DIR,
+    PIPELINE_AVISO_CUSTO_TOTAL_USD,
     SONIA_MAX_BUSCAS_DEFAULT,
     SONIA_MAX_BUSCAS_PROFUNDO,
-    PIPELINE_AVISO_CUSTO_TOTAL_USD,
 )
 
 

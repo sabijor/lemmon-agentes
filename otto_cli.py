@@ -9,8 +9,10 @@ import json
 import sys
 from datetime import datetime
 from pathlib import Path
+
 from agentes.otto import Otto
 from core.config import OUTPUTS_DIR
+
 
 def main():
     parser = argparse.ArgumentParser(description="Otto | Estrategista Lemmon")

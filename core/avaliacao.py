@@ -1,8 +1,7 @@
 """Sistema de avaliação manual de execuções."""
-from pathlib import Path
-from typing import Optional
-from .historico import Historico
 from .config import HISTORICO_DIR
+from .historico import Historico
+
 
 def listar_agentes_com_pendencias() -> dict:
     resultado = {}
