@@ -40,14 +40,14 @@ export interface ApprovalRequest {
 export interface AgentConfig {
   otto: { modo_visual: 'completo' | 'resumido' | 'minimo' }
   heitor: { max_buscas: number }
-  salles: { formato: 'auto' | 'reels' | 'documental' | 'mini-doc' | 'tese' | 'aftermovie'; gate_espelho: 'off' | 'auto' | 'manual' }
+  salles: { formato: 'auto' | 'reels' | 'documental' | 'mini-doc' | 'tese' | 'aftermovie'; gate_espelho: 'off' | 'auto' | 'manual'; alternativas: 0 | 3 }
   sonia: { com_busca: boolean; usar_tendencias: boolean }
 }
 
 const DEFAULT_CONFIG: AgentConfig = {
   otto: { modo_visual: 'completo' },
   heitor: { max_buscas: 3 },
-  salles: { formato: 'auto', gate_espelho: 'off' },
+  salles: { formato: 'auto', gate_espelho: 'off', alternativas: 0 },
   sonia: { com_busca: false, usar_tendencias: true },
 }
 
@@ -64,6 +64,8 @@ export function useChat() {
   const [agentConfig, setAgentConfig] = useState<AgentConfig>(DEFAULT_CONFIG)
   const [resumedFrom, setResumedFrom] = useState<string | null>(null)
   const [tagsSugeridas, setTagsSugeridas] = useState<string[]>([])
+  const [fastTrack, setFastTrack] = useState(false)
+  const [sandbox, setSandbox] = useState(false)
   const wsRef = useRef<WebSocket | null>(null)
   const currentMsgId = useRef<Record<string, string>>({})
   const resumeContextRef = useRef<Record<string, unknown> | null>(null)
@@ -132,6 +134,8 @@ export function useChat() {
       agents,
       message: userMessage,
       manual_mode: manualMode,
+      fast_track: fastTrack,
+      sandbox,
       config: agentConfig,
       ...(resumeCtx && { resume_context: resumeCtx }),
       ...(image && { image_base64: image.base64, image_media_type: image.mediaType }),
@@ -226,6 +230,8 @@ export function useChat() {
   }, [])
 
   const toggleManualMode = useCallback(() => setManualMode(v => !v), [])
+  const toggleFastTrack = useCallback(() => setFastTrack(v => !v), [])
+  const toggleSandbox = useCallback(() => setSandbox(v => !v), [])
 
   const avaliar = useCallback(async (nota: number, observacoes = '', tags?: string[]) => {
     if (!sessionId || avaliado) return
@@ -283,7 +289,7 @@ export function useChat() {
 
   return {
     messages, agentStatus, isRunning, sessionId, avaliado, resumedFrom,
-    manualMode, awaitingApproval, agentConfig, tagsSugeridas,
-    send, approve, abort, toggleManualMode, updateConfig, avaliar, exportar, reset, loadSession,
+    manualMode, fastTrack, sandbox, awaitingApproval, agentConfig, tagsSugeridas,
+    send, approve, abort, toggleManualMode, toggleFastTrack, toggleSandbox, updateConfig, avaliar, exportar, reset, loadSession,
   }
 }

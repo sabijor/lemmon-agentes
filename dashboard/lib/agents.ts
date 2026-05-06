@@ -1,4 +1,4 @@
-export type AgentId = 'otto' | 'heitor' | 'salles' | 'sonia' | 'aya'
+export type AgentId = 'otto' | 'heitor' | 'salles' | 'sonia' | 'aya' | 'pedro_abrahao'
 
 export interface AgentConfig {
   id: AgentId
@@ -11,6 +11,7 @@ export interface AgentConfig {
   deskPosition: { x: number; y: number }
   meetingPosition: { x: number; y: number }
   idleQuote: string
+  reuniaoOnly?: boolean
 }
 
 export const AGENTS: AgentConfig[] = [
@@ -73,6 +74,19 @@ export const AGENTS: AgentConfig[] = [
     deskPosition: { x: 340, y: 140 },
     meetingPosition: { x: 500, y: 220 },
     idleQuote: 'Compilando e conectando os fluxos...',
+  },
+  {
+    id: 'pedro_abrahao',
+    name: 'Pedro',
+    title: 'Consultor',
+    rpgClass: 'Cliente',
+    color: '#0f766e',
+    colorDim: '#ccfbf1',
+    colorText: '#fff',
+    deskPosition: { x: 400, y: 140 },
+    meetingPosition: { x: 440, y: 260 },
+    idleQuote: 'Avaliando pela ótica do paciente...',
+    reuniaoOnly: true,
   },
 ]
 

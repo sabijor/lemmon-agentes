@@ -19,6 +19,7 @@ interface Props {
   onClearSelected: () => void
   onClose: () => void
   onResume: (detail: HistoryDetail) => void
+  onRemix?: (detail: HistoryDetail) => void
 }
 
 function fmt(ts: string) {
@@ -118,12 +119,13 @@ function SessionList({ sessions, loading, selectedId, onSelect }: {
   )
 }
 
-function SessionDetail({ detail, loadingDetail, bodyH, onBack, onResume }: {
+function SessionDetail({ detail, loadingDetail, bodyH, onBack, onResume, onRemix }: {
   detail: HistoryDetail | null
   loadingDetail: boolean
   bodyH: number
   onBack: () => void
   onResume: (detail: HistoryDetail) => void
+  onRemix?: (detail: HistoryDetail) => void
 }) {
   const bottomRef = useRef<HTMLDivElement>(null)
   const [briefingExpanded, setBriefingExpanded] = useState(false)
@@ -211,15 +213,26 @@ function SessionDetail({ detail, loadingDetail, bodyH, onBack, onResume }: {
         </div>
         <div className="flex items-center gap-1.5 flex-shrink-0">
           {!isReuniao && (
-            <button
-              onClick={() => onResume(detail)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-stone-900 text-white text-[9px] font-mono uppercase tracking-widest hover:bg-stone-700 transition-colors"
-            >
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <polygon points="5 3 19 12 5 21 5 3"/>
-              </svg>
-              Retomar
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => onResume(detail)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-stone-900 text-white text-[9px] font-mono uppercase tracking-widest hover:bg-stone-700 transition-colors"
+              >
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <polygon points="5 3 19 12 5 21 5 3"/>
+                </svg>
+                Retomar
+              </button>
+              {onRemix && (
+                <button
+                  onClick={() => onRemix(detail)}
+                  title="Remix: carrega sessão com Salles+Sônia+Aya pré-selecionados — ideal para reutilizar tese com novo formato/cliente"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-100 border border-violet-200 text-violet-700 text-[9px] font-mono uppercase tracking-widest hover:bg-violet-200 transition-colors"
+                >
+                  🔀 Remix
+                </button>
+              )}
+            </div>
           )}
           <button onClick={onBack}
             className="w-7 h-7 rounded-lg border border-stone-200 bg-white flex items-center justify-center hover:bg-stone-50 hover:border-stone-400 transition-all">
@@ -437,7 +450,7 @@ function FilterBar({ filter, onChange, sessions }: {
 
 export default function HistoryPanel({
   sessions, selected, loading, loadingDetail,
-  dragControls, onOpen, onSelectSession, onClearSelected, onClose, onResume,
+  dragControls, onOpen, onSelectSession, onClearSelected, onClose, onResume, onRemix,
 }: Props) {
   const [panelSize, setPanelSize] = useState(() => ({
     w: 760,
@@ -549,6 +562,7 @@ export default function HistoryPanel({
               bodyH={bodyH}
               onBack={onClearSelected}
               onResume={onResume}
+              onRemix={onRemix}
             />
           </div>
         </div>

@@ -29,7 +29,7 @@ export default function Home() {
   const [chatMode, setChatMode] = useState<'pipeline' | 'reuniao'>('pipeline')
   const [historyOpen, setHistoryOpen] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
-  const { messages, agentStatus, isRunning, sessionId, avaliado, resumedFrom, manualMode, awaitingApproval, agentConfig, tagsSugeridas, send, approve, abort, toggleManualMode, updateConfig, avaliar, exportar, reset, loadSession } = useChat()
+  const { messages, agentStatus, isRunning, sessionId, avaliado, resumedFrom, manualMode, fastTrack, sandbox, awaitingApproval, agentConfig, tagsSugeridas, send, approve, abort, toggleManualMode, toggleFastTrack, toggleSandbox, updateConfig, avaliar, exportar, reset, loadSession } = useChat()
   const { messages: reunMessages, agentStatus: reunAgentStatus, isRunning: reunIsRunning, send: reunSend, reset: reunReset, abort: reunAbort, mesaRedonda: reunMesaRedonda } = useReuniao()
   const { sessions, selected, loading, loadingDetail, fetchSessions, fetchDetail, clearSelected } = useHistory()
 
@@ -80,6 +80,14 @@ export default function Home() {
 
   const handleResume = (detail: HistoryDetail) => {
     loadSession(detail)
+    setHistoryOpen(false)
+    setChatOpen(true)
+    setChatMode('pipeline')
+  }
+
+  const handleRemix = (detail: HistoryDetail) => {
+    loadSession(detail)
+    setInMeeting(new Set(['salles', 'sonia', 'aya'] as AgentId[]))
     setHistoryOpen(false)
     setChatOpen(true)
     setChatMode('pipeline')
@@ -142,6 +150,14 @@ export default function Home() {
             className="w-8 h-8 rounded-lg border border-stone-200 bg-white flex items-center justify-center hover:bg-stone-50 hover:border-stone-400 transition-all text-stone-500 text-sm">
             🏆
           </Link>
+          <Link href="/briefing-reverso" title="Briefing Reverso"
+            className="w-8 h-8 rounded-lg border border-stone-200 bg-white flex items-center justify-center hover:bg-stone-50 hover:border-stone-400 transition-all text-stone-500 text-sm">
+            🔍
+          </Link>
+          <Link href="/cortes" title="Cortes-Prontos"
+            className="w-8 h-8 rounded-lg border border-stone-200 bg-white flex items-center justify-center hover:bg-stone-50 hover:border-stone-400 transition-all text-stone-500 text-sm">
+            ✂️
+          </Link>
           <button
             onClick={() => setHistoryOpen(v => !v)}
             className={`w-8 h-8 rounded-lg border flex items-center justify-center transition-all
@@ -189,6 +205,8 @@ export default function Home() {
             avaliado={avaliado}
             resumedFrom={resumedFrom}
             manualMode={manualMode}
+            fastTrack={fastTrack}
+            sandbox={sandbox}
             awaitingApproval={awaitingApproval}
             agentConfig={agentConfig}
             dragControls={dragControls}
@@ -198,6 +216,8 @@ export default function Home() {
             onApprove={approve}
             onAbort={abort}
             onToggleManualMode={toggleManualMode}
+            onToggleFastTrack={toggleFastTrack}
+            onToggleSandbox={toggleSandbox}
             onUpdateConfig={updateConfig}
             reunMessages={reunMessages}
             reunAgentStatus={reunAgentStatus}
@@ -235,6 +255,7 @@ export default function Home() {
             onClearSelected={clearSelected}
             onClose={() => setHistoryOpen(false)}
             onResume={handleResume}
+            onRemix={handleRemix}
           />
         </motion.div>
       )}

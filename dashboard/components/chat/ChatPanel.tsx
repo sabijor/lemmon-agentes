@@ -32,6 +32,8 @@ interface Props {
   sessionId: string | null
   avaliado: boolean
   manualMode: boolean
+  fastTrack: boolean
+  sandbox: boolean
   awaitingApproval: ApprovalRequest | null
   agentConfig: AgentConfig
   onSend: (msg: string, image?: ImageData) => void
@@ -41,6 +43,8 @@ interface Props {
   onApprove: (action: 'approve' | 'retry' | 'skip' | 'cancel' | 'confirmar_sim' | 'confirmar_nao') => void
   onAbort: () => void
   onToggleManualMode: () => void
+  onToggleFastTrack: () => void
+  onToggleSandbox: () => void
   onUpdateConfig: <K extends keyof AgentConfig>(agent: K, patch: Partial<AgentConfig[K]>) => void
   reunMessages: Message[]
   reunAgentStatus: Record<AgentId, AgentStatus>
@@ -213,7 +217,7 @@ function ConfigSidebar({ agentConfig, onUpdateConfig, isRunning }: {
             ))}
           </div>
           <p className="text-[8px] font-mono text-stone-400 mb-1.5">gate espelho pedro</p>
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1 mb-3">
             {(['off', 'auto', 'manual'] as const).map(v => (
               <button key={v} disabled={isRunning} onClick={() => onUpdateConfig('salles', { gate_espelho: v })}
                 className={`px-2 py-1 rounded-md text-[9px] font-mono border transition-all text-left disabled:opacity-50 ${
@@ -225,6 +229,18 @@ function ConfigSidebar({ agentConfig, onUpdateConfig, isRunning }: {
               </button>
             ))}
           </div>
+          <button disabled={isRunning}
+            onClick={() => onUpdateConfig('salles', { alternativas: agentConfig.salles.alternativas === 3 ? 0 : 3 })}
+            className="flex items-center gap-2 disabled:opacity-50">
+            <div className={`w-7 h-4 rounded-full transition-colors relative flex-shrink-0 ${
+              agentConfig.salles.alternativas === 3 ? 'bg-stone-900' : 'bg-stone-200'
+            }`}>
+              <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-transform ${
+                agentConfig.salles.alternativas === 3 ? 'translate-x-3.5' : 'translate-x-0.5'
+              }`} />
+            </div>
+            <span className="text-[9px] font-mono text-stone-500">3 variantes A/B</span>
+          </button>
         </div>
 
         {/* Sônia */}
@@ -261,8 +277,8 @@ function ConfigSidebar({ agentConfig, onUpdateConfig, isRunning }: {
 export default function ChatPanel({
   mode, onToggleMode,
   messages, agentStatus, inMeeting, isRunning, sessionId, avaliado, resumedFrom,
-  manualMode, awaitingApproval, agentConfig, dragControls,
-  onSend, onReset, onAvaliar, onApprove, onAbort, onToggleManualMode, onUpdateConfig,
+  manualMode, fastTrack, sandbox, awaitingApproval, agentConfig, dragControls,
+  onSend, onReset, onAvaliar, onApprove, onAbort, onToggleManualMode, onToggleFastTrack, onToggleSandbox, onUpdateConfig,
   reunMessages, reunAgentStatus, reunIsRunning, onReunSend, onReunReset, onReunAbort,
   onMesaRedonda,
   onExportar, onClose,
@@ -621,6 +637,28 @@ export default function ChatPanel({
               }`}>
               <span>{manualMode ? '⏸' : '▶▶'}</span>
               <span>{manualMode ? 'manual' : 'auto'}</span>
+            </button>}
+
+            {/* Fast-track — pipeline only */}
+            {mode === 'pipeline' && <button onClick={onToggleFastTrack} disabled={isRunning}
+              title="Fast-track: Otto resumido, Heitor pulado — resultado em <3 min"
+              className={`flex items-center gap-1 px-2 py-1 rounded-md text-[9px] font-mono uppercase tracking-widest border transition-all disabled:opacity-30 ${
+                fastTrack
+                  ? 'bg-red-50 border-red-300 text-red-700'
+                  : 'bg-white border-stone-200 text-stone-400 hover:border-stone-400'
+              }`}>
+              ⚡{fastTrack ? ' fast' : ''}
+            </button>}
+
+            {/* Sandbox — pipeline only */}
+            {mode === 'pipeline' && <button onClick={onToggleSandbox} disabled={isRunning}
+              title="Sandbox: sessão não salva no histórico"
+              className={`flex items-center gap-1 px-2 py-1 rounded-md text-[9px] font-mono uppercase tracking-widest border transition-all disabled:opacity-30 ${
+                sandbox
+                  ? 'bg-violet-50 border-violet-300 text-violet-700'
+                  : 'bg-white border-stone-200 text-stone-400 hover:border-stone-400'
+              }`}>
+              🧪{sandbox ? ' lab' : ''}
             </button>}
 
             {/* Clear */}
