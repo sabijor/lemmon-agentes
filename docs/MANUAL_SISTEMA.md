@@ -1,6 +1,6 @@
 # LEMMON AGENTES — Manual do Sistema
 
-**Versão atual:** v1.11
+**Versão atual:** v1.13
 **Última atualização:** 2026-05-06
 **Mantido por:** Calebe Alves / Lemmon Produções
 
@@ -11,6 +11,27 @@
 ## Histórico de versões
 
 > **Convenção:** versões mais novas no topo. Cada release lista o que mudou em relação à anterior, mantendo histórico completo.
+
+### v1.13 — 2026-05-06
+
+**FASE 4 — T60: polimento UI (3 fixes).**
+
+- **Barra "Uso de agentes" sem rótulo (T60-1):** Dashboard `/saude` usava `agent.color` como cor do texto — Aya tem `#18181b` (quase preto) invisível sobre fundo escuro. Corrigido: label usa `text-stone-300` consistente, com bolinha colorida à esquerda para manter identidade visual do agente. Todos os labels visíveis em todos os temas.
+- **Speech bubble "Dossiê pronto!" sem affordance de clique (T60-2):** Balão de fala era visualmente idêntico ao decorativo mas aparecia em zona clicável do agente. Adicionado `cursor: pointer` explícito ao balão e hover state via CSS (`.speech-bubble-group:hover .speech-bubble-rect` → stroke mais espesso + drop-shadow). O clique já funcionava (toggleAgent) — agora é visualmente óbvio.
+- **Outros achados visuais (T60-3):** Sem achados adicionais registrados nesta rodada de testes.
+
+---
+
+### v1.12 — 2026-05-06
+
+**FASE 4 — T56+T57+T58+T59: QA, TTS, share e telemetria.**
+
+- **data-testid no Whiteboard (T56):** `<g data-testid="whiteboard">` adicionado ao container do componente SVG. QA pode usar `document.querySelector('[data-testid=whiteboard]')` ao invés de `[class*=whiteboard]` que falha em elementos `<g>`. Confirmação visual de preenchimento das barras depende de rodar pipeline no Chrome.
+- **TTS robusto com detecção de voz pt-BR (T57):** `window.speechSynthesis.speak()` silenciava sem erro quando sem voz pt-BR instalada. Reescrito: enumera vozes via `getVoices()`, detecta pt-BR ou pt por `lang.startsWith`, reporta erro no estado (`ttsError`) se nenhuma encontrada. Ícone alterna ▶/⏸ (amber quando falando). Console.log das vozes disponíveis facilita diagnóstico em novos ambientes.
+- **Página `/share/[token]` lê `err.detail` (T58):** Erros da API agora exibem mensagem legível em vez de "Falha na análise" genérica, consistente com T52.
+- **Telemetria de latência por agente (T59):** Cada execução de agente no WebSocket pipeline agora registra duração em `duracoes[name]`. `_salvar_sessao` persiste `"duracoes_segundos": {...}` no JSON da sessão. `HistoryPanel` exibe `⏱ Xs` ao lado do custo de cada agente (amber quando >120s). Sessões antigas sem `duracoes_segundos` são compatíveis via guard `?? {}`.
+
+---
 
 ### v1.11 — 2026-05-06
 

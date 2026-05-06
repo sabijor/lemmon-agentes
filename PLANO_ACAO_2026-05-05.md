@@ -957,6 +957,799 @@ Polimento final:           T60
 
 ---
 
+# FASE 5 — REFATORAÇÃO E DÍVIDA TÉCNICA
+
+**Adicionado:** 2026-05-06 (sessão 5)
+**Origem:** auditoria sistêmica de visão geral do código pós-FASE 4. Sistema chegou a ~14.4k linhas (8.5k Python + 5.9k TS/TSX) com três arquivos > 1300 linhas. Fase 5 foca em **dívida técnica e qualidade**, não em features.
+
+> **CONVENÇÃO IMPORTANTE DESTA FASE — flag de impacto:** cada tarefa marca explicitamente se afeta o que o operador recebe (output dos agentes, comportamento da UI). A maioria é refatoração interna invisível. Personalidade dos agentes (Otto força tool_use, Heitor faz 3 chamadas, Sônia tem múltiplos modos, Aya monta markdown em Python puro, Pedro carrega material primário, Salles tem duas entradas) **continua exatamente igual** — não estou propondo amassar a função de cada um.
+
+---
+
+## 🔴 BLOCO URGENTE — fazer ANTES de qualquer outra tarefa
+
+### T88 — Conectar repositório ao GitHub (backup remoto crítico)
+
+**Severidade:** 🔴 URGENTE · **Afeta output: NÃO**
+
+**Onde:** raiz do projeto (operação de git)
+
+**Problema constatado em 2026-05-06:**
+- ✅ Repo git local existe com commits.
+- ✅ `.gitignore` correto (`.env`, `.venv`, `outputs/`, `historico/`, `node_modules/` etc.).
+- ❌ **`git remote -v` retorna vazio** — não há remote configurado.
+- ❌ **58 arquivos modificados não comitados** no momento da auditoria, incluindo a FASE 4 inteira (manual v1.13, plano, código novo).
+
+**Risco:** se o Mac morrer ou o disco corromper hoje, **perdemos todos os commits feitos** (último: `2f128a6 fix(t57+t58)`) **mais as 58 mudanças pendentes**. Meses de trabalho num único HD.
+
+**O que fazer (mesmo dia):**
+1. Criar repositório privado no GitHub: `lemmon-produces/lemmon-agentes` ou similar.
+2. No projeto:
+   ```bash
+   cd /Users/calebe/Documents/lemmon-agentes
+   git remote add origin git@github.com:<usuario>/lemmon-agentes.git
+   ```
+3. **Antes do primeiro push**, comitar pendências em commits temáticos pequenos (não num commit gigante "WIP"):
+   - Manual e plano: `docs: atualiza manual v1.13 e plano FASE 4 fechada`
+   - Código FASE 4: aproveitar mensagens dos blocos T51/T54/T55, T52/T53, T56-T59, T60 (já estão claras no CHANGELOG).
+   - REF VISUAL: separar — se forem só referências de design, considerar `git lfs` ou subir como release. Se for pesado, adicionar `REF VISUAL/` no `.gitignore` e manter local.
+4. Push inicial: `git push -u origin main` (ou `master`).
+5. Configurar branch protection na main: pelo menos exigir PR (mesmo trabalhando solo, fica como hábito).
+6. Configurar 2FA na conta GitHub se ainda não tiver.
+
+**Decisões já tomadas (Calebe, 2026-05-06):**
+- **Privado** — código tem prompts proprietários e dossiê do Pedro Abrahão.
+- **Pasta `REF VISUAL/` é mantida no repo** — referência de cenários e personagens, vai junto.
+- **Conta GitHub: a mesma já configurada localmente** (`git config user.email` deve bater).
+- **Histórico preservado** (não nuclear) — log atual vira documentação viva da evolução.
+
+**Critério de aceite:**
+- [ ] `git remote -v` mostra origin apontando pra GitHub
+- [ ] `git status` limpo após o primeiro push
+- [ ] `git log` no GitHub bate com `git log` local
+- [ ] Repo é **privado**
+- [ ] 2FA ativo na conta
+- [ ] Pasta `REF VISUAL/` resolvida (subiu, ignorou, ou foi pra LFS — qualquer escolha consciente)
+- [ ] Documentar no manual §8.6: "Push após cada bloco fechado de tarefa, ou no fim do dia"
+
+**Nota sobre `historico/` e `outputs/`:**
+Esses estão (corretamente) no `.gitignore` e **não vão pro GitHub**. Backup deles é trabalho separado (ver T84 — backup automatizado do histórico). T88 cobre só o código + docs.
+
+---
+
+## BLOCO REFATORAÇÃO (estrutura interna — ROI alto)
+
+### T61 — Quebrar `api_server.py` em módulos
+
+**Severidade:** média/alta · **Afeta output do agente: NÃO**
+
+**Onde:** `api_server.py` (1317 linhas hoje)
+
+**Problema:** 23 endpoints REST + 3 WebSockets num arquivo só. Difícil saber onde adicionar próximo endpoint, alto risco de merge conflict, lento de carregar mentalmente.
+
+**Estrutura proposta:**
+```
+api/
+├── main.py            (FastAPI app + CORS + montagem dos routers)
+├── ws_chat.py         (WebSocket /ws/chat — pipeline)
+├── ws_reuniao.py      (WebSocket /ws/reuniao)
+├── ws_mesa.py         (WebSocket /ws/mesa_redonda)
+├── routes/
+│   ├── historico.py   (listar, similar, detalhe)
+│   ├── exportar.py    (exportar dossiê + download)
+│   ├── exemplares.py
+│   ├── share.py       (share + comentar + share/{token}.json)
+│   ├── auxiliares.py  (sugerir, briefing-reverso, cortes)
+│   ├── transcrever.py
+│   └── calibragem.py
+└── schemas.py         (todos Pydantic models que hoje estão in-line)
+```
+
+**O que fazer:**
+1. Criar pasta `api/` e os arquivos vazios.
+2. Mover endpoints e schemas mantendo lógica intacta (find-and-cut).
+3. `api_server.py` vira `api_server.py = from api.main import app` (compat com uvicorn).
+4. Conferir que todos os imports continuam funcionando.
+
+**Critério de aceite:**
+- [ ] `uvicorn api_server:app --reload` continua funcionando idêntico
+- [ ] Todos os 23 endpoints respondem como antes
+- [ ] Cada arquivo do `api/routes/` tem < 200 linhas
+
+---
+
+### T62 — Trocar `print()` por `logger` em agentes/exportador
+
+**Severidade:** média · **Afeta output do agente: SIM (trade-off documentado)**
+
+**Onde:** `agentes/aya.py`, `agentes/heitor.py`, `agentes/sonia.py`, `core/espelho.py`, `core/exportador_aya.py`
+
+**Problema:** `print()` polui stdout do uvicorn. Não é loggado, não tem nível, não vai pra arquivo. Em produção (uvicorn como serviço), os "🟢 Pedro pronto pra responder" somem ou poluem.
+
+**Trade-off pro operador:** ao rodar `uvicorn` no terminal manualmente, **você para de ver os avisos coloridos rolando ao vivo no terminal**. Vão pro log estruturado em arquivo.
+
+**Mitigação proposta:** manter os `print()` apenas quando o agente é chamado via CLI (`pedro_cli.py`, `heitor_cli.py`, etc.). Quando vem da API, usa `logger`. Detecção pode ser via flag passado ao construtor (`Agente(modo="cli")`) ou via `sys.stdout.isatty()`.
+
+**O que fazer:**
+1. Para cada `print(aviso_*)`, decidir: log ou print-condicional.
+2. Sugestão: criar wrapper `self._aviso(texto, level="info")` em `AgenteBase` que decide.
+3. Em CLIs, ativar print direto (operador quer ver).
+4. Via API/WS, sempre logger.
+
+**Critério de aceite:**
+- [ ] CLI continua mostrando avisos coloridos como hoje
+- [ ] Backend uvicorn não tem mais prints na stdout durante execução de pipeline
+- [ ] Logs estruturados aparecem em `logs/` ou stdout do uvicorn em formato consistente
+
+---
+
+### T63 — Extrair CSS gigante de `core/exportador_aya.py`
+
+**Severidade:** média · **Afeta output do agente: NÃO**
+
+**Onde:** `core/exportador_aya.py` (829 linhas, das quais ~460 são CSS literal)
+
+**Problema:** CSS está embutido como string Python e duplicado em `design_system.html`. Mudar uma cor exige edição em dois lugares — risco de drift visual entre dossiê PDF e dashboard.
+
+**O que fazer:**
+1. Criar `core/templates/aura.css`.
+2. `exportador_aya.py` lê o CSS via `Path.read_text()`.
+3. Se houver placeholders dinâmicos (cores variáveis, nome do projeto), usar simples `.replace()` ou Jinja2.
+4. Documentar no topo do CSS: "Espelho do design_system.html — sincronizar manualmente."
+
+**Critério de aceite:**
+- [ ] PDF gerado pelo `exportar_dossie()` é visualmente idêntico ao atual
+- [ ] `core/exportador_aya.py` cai pra ~370 linhas
+- [ ] CSS único em `core/templates/aura.css`
+
+---
+
+### T64 — Splitar `OfficeScene.tsx` em sub-componentes
+
+**Severidade:** média · **Afeta output da UI: NÃO**
+
+**Onde:** `dashboard/components/office/OfficeScene.tsx` (1627 linhas)
+
+**Problema:** SVG isométrico inteiro num componente. Sprites + sala work + sala meeting + transições + speech bubbles + whiteboard + animações tudo junto. Re-render caro durante streaming.
+
+**Quebra proposta:**
+- `OfficeScene.tsx` (orchestrator, < 300 linhas)
+- `WorkRoom.tsx` (mesa de trabalho)
+- `MeetingRoom.tsx` (sala de reunião)
+- `Whiteboard.tsx` (já marcado com data-testid após T56)
+- `SpeechBubble.tsx`
+- `Sprite.tsx` (já existe como `CharacterSprite.tsx`)
+
+**O que fazer:**
+1. Identificar fronteiras claras (cada sub-componente tem props bem definidas).
+2. Mover blocos pra arquivos separados.
+3. Memoizar com `React.memo` os que não dependem de props que mudam a cada token.
+
+**Critério de aceite:**
+- [ ] Comportamento visual idêntico ao atual
+- [ ] Cada arquivo < 400 linhas
+- [ ] Re-render durante streaming não dispara em sub-componentes não afetados (verificar com React DevTools)
+
+---
+
+### T65 — Splitar `ChatPanel.tsx` em sub-componentes
+
+**Severidade:** média · **Afeta output da UI: NÃO**
+
+**Onde:** `dashboard/components/chat/ChatPanel.tsx` (1493 linhas, > 20 props)
+
+**Quebra proposta:**
+- `ChatPanel.tsx` (orchestrator, < 300 linhas)
+- `ChatHeader.tsx`
+- `ConfigSidebar.tsx` (configs do Otto/Heitor/Salles/Sônia)
+- `MessageList.tsx`
+- `InputBar.tsx`
+- `ApprovalDialog.tsx`
+- `AvaliacaoBar.tsx`
+- `TagChips.tsx`
+- `CustoCapModal.tsx`
+
+**O que fazer:**
+1. Identificar funções internas que já estão segmentadas.
+2. Extrair pra arquivos próprios mantendo props strict.
+3. Reduzir props do `ChatPanel` central usando context provider local se necessário.
+
+**Critério de aceite:**
+- [ ] Comportamento idêntico em todos os modos (pipeline, reunião, manual, fast-track, sandbox)
+- [ ] Props do `ChatPanel` central caem de 20+ pra ≤ 8
+- [ ] Cada sub-componente < 300 linhas
+
+---
+
+## BLOCO DX / QUALIDADE (semana)
+
+### T66 — Configurar `ruff` + `mypy` no Python
+
+**Severidade:** média · **Afeta output do agente: NÃO**
+
+**Onde:** raiz do projeto, novo `pyproject.toml`
+
+**Problema:** Type hints existem mas não são checados. Imports não usados acumulam (já encontrei 2 na auditoria).
+
+**O que fazer:**
+1. Adicionar `pyproject.toml` com:
+   ```toml
+   [tool.ruff]
+   select = ["E", "F", "I", "B"]   # erros básicos + imports + bugs
+   line-length = 100
+
+   [tool.mypy]
+   ignore_missing_imports = true
+   check_untyped_defs = true
+   ```
+2. Rodar `ruff check . --fix` e corrigir o que sobrar manualmente.
+3. Rodar `mypy agentes/ core/` e ajustar tipos onde precisar.
+
+**Critério de aceite:**
+- [ ] `ruff check .` passa sem erros (ou com lista controlada de exceções)
+- [ ] `mypy agentes/ core/` passa em modo conservador
+- [ ] Comportamento runtime inalterado
+
+---
+
+### T67 — Migrar `teste_*.py` interativos para `pytest` mínimo (smoke tests)
+
+**Severidade:** alta para sustentabilidade · **Afeta output do agente: NÃO**
+
+**Onde:** `teste_*.py` (7 arquivos hoje, todos com `input()`)
+
+**Problema:** Sem testes automatizados. Cada deploy depende de QA manual via Chrome. Mudança em `_chamar_api` pode quebrar 6 agentes silenciosamente.
+
+**O que fazer:**
+1. Criar `tests/` com `pytest`.
+2. Smoke tests por agente: instanciar, chamar com input mock, verificar shape do retorno.
+3. Mockar Anthropic com `unittest.mock` ou pytest fixture (não chamar API real em testes).
+4. Manter os `teste_*.py` antigos como "QA interativo" se forem úteis.
+5. CI básico: `.github/workflows/test.yml` (mesmo que GitHub Actions não esteja em uso, deixa configurado).
+
+**Critério de aceite:**
+- [ ] `pytest` na raiz roda em < 10s sem custo Anthropic
+- [ ] Smoke test pra cada um dos 6 agentes
+- [ ] Smoke test pra cada endpoint REST básico
+
+---
+
+### T68 — Script `dev` que sobe backend + frontend juntos
+
+**Severidade:** baixa de DX · **Afeta output: NÃO**
+
+**Onde:** raiz do projeto, novo `Makefile` ou `package.json scripts`
+
+**O que fazer:**
+1. `Makefile` simples:
+   ```makefile
+   dev:
+   	concurrently "uvicorn api_server:app --reload" "cd dashboard && npm run dev"
+   ```
+2. Ou usar `npm run dev:all` no `dashboard/package.json` com `concurrently`.
+
+**Critério de aceite:**
+- [ ] `make dev` (ou equivalente) sobe os dois processos com um comando
+- [ ] Logs separados/coloridos por processo
+
+---
+
+### T69 — Auditar `.gitignore`
+
+**Severidade:** baixa · **Afeta output: NÃO**
+
+**Onde:** `.gitignore` na raiz
+
+**O que fazer:**
+1. Verificar se `.venv/`, `dashboard/node_modules/`, `dashboard/.next/`, `outputs/`, `historico/`, `*.pyc`, `__pycache__/` estão ignorados.
+2. Se algum estiver versionado por engano, remover do tracking (`git rm -r --cached <path>`).
+
+**Critério de aceite:**
+- [ ] `git status` limpo após gerar PDF, rodar pipeline, rodar testes
+- [ ] Repo não tem `.venv` versionada
+
+---
+
+## BLOCO PRODUÇÃO-READY (quando for hospedar)
+
+### T70 — Auth simples no backend
+
+**Severidade:** alta SE hospedar · **Afeta output: SIM (login na primeira vez)**
+
+**Onde:** `api_server.py` middleware + `dashboard/lib/api.ts`
+
+**Problema:** Sem auth. Hoje OK em dev local, perigoso se hospedar fora.
+
+**O que fazer (variantes):**
+- **Mínimo:** API key fixa no `.env`, header `X-Lemmon-Key` em todos os requests. Frontend lê de env public.
+- **Médio:** OAuth via Google ou similar.
+- **Pra agora:** mínimo. Implementar OAuth quando tiver mais usuários.
+
+**Trade-off pro operador:** ao subir fora do localhost, vai precisar configurar a key na primeira vez. Em localhost (sem hospedagem), pode ficar opcional.
+
+**Critério de aceite:**
+- [ ] Endpoint sem header válido retorna 401
+- [ ] Frontend manda header automaticamente
+- [ ] Localhost dev continua funcionando sem header (modo permissivo)
+
+---
+
+### T71 — Rate limit nos endpoints LLM
+
+**Severidade:** média (preventivo) · **Afeta output: indiretamente — só se você passar do cap**
+
+**Onde:** `api_server.py` decorator nos endpoints LLM-based
+
+**Problema:** Sem rate limit, alguém com acesso ao backend pode chamar `/sugerir_pipeline` em loop e estourar a conta Anthropic.
+
+**O que fazer:**
+1. Adicionar `slowapi` ao requirements.
+2. Decorator `@limiter.limit("10/minute")` em `/sugerir_pipeline`, `/briefing_reverso`, `/cortes_prontos`, `/transcrever`.
+3. Resposta 429 com `detail: "Limite de chamadas. Aguarde 1 minuto."`
+
+**Critério de aceite:**
+- [ ] 11ª chamada em < 1min retorna 429 amigável
+- [ ] Frontend mostra a mensagem clara
+
+---
+
+### T72 — CORS restritivo via env var
+
+**Severidade:** baixa (até hospedar) · **Afeta output: NÃO**
+
+**Onde:** `api_server.py` middleware CORS
+
+**O que fazer:**
+1. Trocar `allow_origins=["*"]` por `os.getenv("CORS_ORIGINS", "*").split(",")`.
+2. Em produção: `CORS_ORIGINS=https://lemmon.app,https://dashboard.lemmon.app`.
+
+**Critério de aceite:**
+- [ ] Sem env var, comportamento igual hoje (`*`)
+- [ ] Com env var configurada, requisições de origens não listadas são rejeitadas
+
+---
+
+## BLOCO ARQUITETURA (continua)
+
+### T73 — TypedDict `AgenteResultado` (shape comum, sem amassar personalidade)
+
+**Severidade:** média · **Afeta output do agente: NÃO**
+
+**Onde:** novo `core/tipos.py` ou `core/agente_base.py`
+
+**Problema:** Cada agente retorna dict com chaves diferentes. Otto tem `custo` aninhado E `custo_total_usd`. Heitor tem `web_search_requests`. Aya tem `agentes_detectados`. Pedro tem `modo_execucao`. Sem garantia de shape mínimo, código consumidor (`api_server.py`) acaba com `.get()` defensivo em todo lugar.
+
+> **Importante (refinado):** isso NÃO é forçar todos os agentes a terem mesma assinatura de `executar()` ou mesmo número de chamadas. Cada agente continua com sua personalidade — Otto força tool_use, Heitor faz 3 chamadas com web search, Sônia tem 3 modos, Aya monta markdown em Python, Pedro carrega material primário, Salles tem duas entradas. **Só estou propondo um SHAPE BASE garantido no retorno**, com campos extras livres por agente.
+
+**O que fazer:**
+1. Definir TypedDict mínimo:
+   ```python
+   class AgenteResultado(TypedDict):
+       output_humano: str
+       output_tecnico: dict
+       custo_total_usd: float
+       duracao_segundos: float
+       # qualquer outro campo é permitido (TypedDict total=False)
+   ```
+2. Verificar cada agente: `Otto`, `Heitor`, `Salles`, `Sônia`, `Aya`, `EspelhoCliente`.
+3. Onde algum dos 4 campos base estiver faltando, adicionar (sem remover nada existente).
+4. Tipar retornos com `-> AgenteResultado`.
+5. Mypy (após T66) garante que ninguém retorna sem os 4 campos base.
+
+**Critério de aceite:**
+- [ ] Os 6 agentes retornam pelo menos `output_humano`, `output_tecnico`, `custo_total_usd`, `duracao_segundos`
+- [ ] Campos específicos de cada agente (web_search_requests, agentes_detectados, etc.) **continuam intactos**
+- [ ] Output humano e técnico de cada agente é byte-igual ao atual
+- [ ] mypy passa
+
+---
+
+### T74 — `lib/api-client.ts` no frontend (eliminar fetch duplicado)
+
+**Severidade:** média de DX · **Afeta output: NÃO**
+
+**Onde:** novo `dashboard/lib/api-client.ts` + 8 páginas que chamam `fetch` direto
+
+**Problema:** 8 páginas (`briefing-reverso`, `calibragem`, `cortes`, `hall-of-fame`, `saude`, `share`, etc.) duplicam padrão `fetch + try + catch + setError`.
+
+**O que fazer:**
+1. Criar `dashboard/lib/api-client.ts` com funções tipadas:
+   ```ts
+   export async function fetchHistorico(): Promise<HistoryItem[]> { ... }
+   export async function postBriefingReverso(t: string): Promise<{...}> { ... }
+   export async function postCalibragem(p: ...): Promise<{...}> { ... }
+   ```
+2. Cada função encapsula `fetch + parse + error handling`.
+3. Refatorar as 8 páginas pra usar.
+
+**Critério de aceite:**
+- [ ] Cada página perde código boilerplate
+- [ ] Tipos TS dos retornos ficam centralizados
+- [ ] Comportamento UI idêntico
+
+---
+
+### T75 — Hook `useApiQuery` padronizado
+
+**Severidade:** baixa · **Afeta output: NÃO**
+
+**Onde:** novo `dashboard/lib/use-api-query.ts`
+
+**O que fazer:**
+1. Hook genérico:
+   ```ts
+   function useApiQuery<T>(fn: () => Promise<T>) {
+     const [data, setData] = useState<T | null>(null)
+     const [loading, setLoading] = useState(true)
+     const [error, setError] = useState<string | null>(null)
+     useEffect(() => { ... }, [])
+     return { data, loading, error, reload }
+   }
+   ```
+2. Refatorar páginas para usar.
+
+**Critério de aceite:**
+- [ ] Loading/error padronizado entre páginas
+- [ ] Possibilidade de refresh manual (`reload()`)
+
+---
+
+## BLOCO DOCUMENTAÇÃO
+
+### T76 — Receitas §6 do manual cobrindo features novas
+
+**Severidade:** baixa · **Afeta output: SIM (manual mais completo)**
+
+**Onde:** `docs/MANUAL_SISTEMA.md` §6
+
+**Problema:** Receitas atuais (§6) só cobrem cenários básicos. Modo Remix, Fast-track, Sandbox, A/B Salles, Briefing Reverso, Cortes-prontos não têm receita.
+
+**O que fazer:**
+Adicionar receitas:
+- 6.7 — Variar uma estratégia que funcionou (Modo Remix)
+- 6.8 — Roteiro emergencial sob deadline (Fast-track)
+- 6.9 — Testar ideia maluca sem poluir histórico (Sandbox)
+- 6.10 — Comparar 3 abordagens de roteiro (A/B Salles)
+- 6.11 — Reverse-engineer um vídeo concorrente (Briefing Reverso)
+- 6.12 — Preparar reels a partir de vídeo longo (Cortes-prontos)
+
+**Critério de aceite:**
+- [ ] §6 tem receitas pra todas as features documentadas no manual
+- [ ] Cada receita tem 4-6 linhas com passo-a-passo claro
+
+---
+
+### T77 — Manual ganha seção "Como adicionar cliente espelho novo"
+
+**Severidade:** baixa · **Afeta output: SIM (mais doc)**
+
+**Onde:** `docs/MANUAL_SISTEMA.md` nova §10 ou §2.7
+
+**O que fazer:**
+1. Documentar uso do `onboard_cliente.py` passo a passo.
+2. Mostrar onde editar o snippet TS gerado.
+3. Como adicionar alias de menção (linkar T51).
+4. Como personalizar idleQuote, sprite, sala (futuras features).
+
+**Critério de aceite:**
+- [ ] Operador novo consegue adicionar cliente seguindo só o manual
+- [ ] Inclui snippet copiável e localização exata dos arquivos
+
+---
+
+### T78 — Auditar Heitor para padronizar uso de `_chamar_api`
+
+**Severidade:** média · **Afeta output do agente: NÃO**
+
+**Onde:** `agentes/heitor.py`
+
+**Problema:** Heitor importa `APIError, AuthenticationError, RateLimitError` direto (linha 13), o que sugere que tem try/except espalhado fora do `_chamar_api` da base. Plus: faz 3 chamadas, cada uma com lógica própria — vale conferir se todas usam `_chamar_api` ou se alguma chama `client.messages.create` direto, contornando o helper.
+
+**O que fazer:**
+1. Ler `agentes/heitor.py` e localizar todas as chamadas Anthropic.
+2. As que estão fora do `_chamar_api`, refatorar pra usar (ou criar variação `_chamar_api_com_tools` na base se necessário).
+3. Remover imports desnecessários de erro Anthropic do topo.
+4. Conferir comportamento de erro: deve usar `formatar_erro_anthropic` automaticamente via base.
+
+**Critério de aceite:**
+- [ ] Heitor não importa mais `APIError`, `AuthenticationError`, `RateLimitError` diretamente
+- [ ] Todas as chamadas Anthropic passam por `_chamar_api` ou variação
+- [ ] Comportamento e output do Heitor idêntico ao atual (verificar com pipeline normal)
+
+---
+
+## BLOCO INFRA, ESCALA E DÍVIDA LATENTE
+
+> Tarefas que mencionei no relatório de visão geral mas que não tinham virado tarefa formal — agora documentadas para que **nada precise ser refeito mais tarde por esquecimento**. Maioria são "ainda não dói, mas vai doer".
+
+### T79 — Índice cacheado para `/historico`
+
+**Severidade:** baixa hoje, alta quando passar de ~500 sessões · **Afeta output: NÃO**
+
+**Onde:** `api_server.py:listar_historico` + provavelmente `core/historico.py` (novo helper)
+
+**Problema:** `/historico` faz `glob` + `read JSON` + `sort` em cada chamada. Cap atual de 200 mascara o problema. Em 500-1000 sessões reais, vai começar a ficar lento (~2-3s por chamada). HistoryPanel chama isso ao abrir — risco de UX ruim.
+
+**O que fazer:**
+1. Criar `historico/_index.json` mantido incremental: lista de `{session_id, timestamp, briefing[:120], custo, avaliacao, agentes_usados, origem}`.
+2. Atualizar o índice a cada `_salvar_sessao()` e `_salvar_sessao_reuniao()` (append + dedupe por session_id).
+3. `/historico` lê só o índice. Detalhe (`/historico/{id}`) continua lendo o JSON completo.
+4. Sanity check no startup: se índice estiver dessincronizado vs disco (contagem diferente), reconstrói uma vez.
+
+**Critério de aceite:**
+- [ ] `/historico` responde em < 100ms mesmo com 1000+ sessões
+- [ ] Detalhe segue lendo do JSON (nada perdido)
+- [ ] Reconstrução automática do índice se ficar inconsistente
+
+---
+
+### T80 — Gráfico de latência por agente ao longo do tempo
+
+**Severidade:** baixa, observabilidade · **Afeta output: NÃO** (extensão da T59)
+
+**Onde:** `dashboard/app/saude/page.tsx`
+
+**Problema:** T59 já registra `duracoes_segundos` por sessão. `/saude` mostra custo e contagem mas não latência ao longo do tempo. Sem isso, não dá pra ver se Heitor está demorando mais nas últimas semanas (sinal de degradação).
+
+**O que fazer:**
+1. Endpoint novo `/saude/latencias?agente=heitor&dias=30` que agrega médias por agente por semana.
+2. Gráfico de linha (recharts ou similar) na página `/saude`.
+3. Bonus: marca em vermelho semanas onde mediana > 120s.
+
+**Critério de aceite:**
+- [ ] Gráfico de latência por agente nos últimos 30 dias
+- [ ] Visível tendência se Heitor (ou outro) começar a degradar
+
+---
+
+### T81 — `_chamar_api_chain` para multi-call uniforme (Heitor, Sônia)
+
+**Severidade:** média de arquitetura · **Afeta output: NÃO**
+
+**Onde:** `core/agente_base.py` + `agentes/heitor.py` + `agentes/sonia.py`
+
+**Problema:** Heitor faz 3 chamadas (web_search → tool_use → format) com lógica própria de exception handling. Sônia tem múltiplos modos com chamadas customizadas. T78 (FASE 5) ataca o uso espalhado de `APIError` direto. Mas o padrão "agente que faz N chamadas em sequência somando custos" não tem helper na base — cada agente reinventa.
+
+**O que fazer:**
+1. Adicionar em `AgenteBase`:
+   ```python
+   def _chamar_api_chain(self, chamadas: list[dict]) -> tuple[list, Custo]:
+       """Faz N chamadas, soma custos, retorna lista de responses + custo total."""
+   ```
+2. Refatorar Heitor pra usar (3 chamadas → 1 chain).
+3. Refatorar Sônia pra usar onde fizer sentido.
+4. Pedro continua single-call (não precisa).
+
+**Critério de aceite:**
+- [ ] Heitor com 3 chamadas usa `_chamar_api_chain`
+- [ ] Sônia em modo cadeia idem
+- [ ] Comportamento e output idênticos (testes manuais OK)
+- [ ] Custos somados corretamente
+
+---
+
+### T82 — Splitar `HistoryPanel.tsx` (582 → componentes menores)
+
+**Severidade:** baixa, mas começando a ficar grande · **Afeta output: NÃO**
+
+**Onde:** `dashboard/components/history/HistoryPanel.tsx`
+
+**Quebra proposta:**
+- `HistoryPanel.tsx` (orchestrator + list, < 250 linhas)
+- `SessionDetail.tsx` (detalhe da sessão selecionada)
+- `FilterBar.tsx` (filtros — período, origem, agente, nota)
+- `SessionCard.tsx` (item da lista)
+
+**Critério de aceite:**
+- [ ] Comportamento idêntico
+- [ ] Cada arquivo < 300 linhas
+
+---
+
+### T83 — Permissões 0600 no `.env`
+
+**Severidade:** baixa, segurança em depth · **Afeta output: NÃO**
+
+**Onde:** `.env` na raiz + doc no manual
+
+**Problema:** `.env` contém `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` (futuro). Por padrão no Mac fica 644 (mundo lê). Vale forçar 600.
+
+**O que fazer:**
+1. Comando manual: `chmod 600 .env`.
+2. Documentar no manual §8.5 (variáveis de ambiente).
+3. Bonus: script `scripts/setup_seguro.sh` que ajusta permissões e checa.
+
+**Critério de aceite:**
+- [ ] `.env` com permissão 0600
+- [ ] Manual documenta o passo
+
+---
+
+### T84 — Backup/restore automatizado do histórico
+
+**Severidade:** média latente — alta quando perder o disco · **Afeta output: NÃO**
+
+**Onde:** novo `scripts/backup_historico.py`
+
+**Problema:** `historico/`, `outputs/`, `inputs/clientes/`, `core/exemplares/` são todos JSON em disco local. Se HD morrer ou você mover de máquina, perde tudo (sessões avaliadas, exemplares curados, calibragem do Pedro). Sem backup, dívida silenciosa.
+
+**O que fazer:**
+1. Script `scripts/backup_historico.py` que zipa as pastas críticas com timestamp.
+2. Documentar no manual: rodar manualmente toda semana ou agendar via cron (junto com Pulse).
+3. Opcional: rsync para drive externo / pasta de cloud.
+4. Restore: descompactar de volta.
+
+**Critério de aceite:**
+- [ ] `python scripts/backup_historico.py` cria `backups/lemmon-AAAAMMDD.zip`
+- [ ] Documentação clara de como restaurar
+
+---
+
+### T85 — Versionamento dos materiais primários dos espelhos
+
+**Severidade:** baixa hoje, média quando criar 3+ espelhos · **Afeta output do agente: NÃO**
+
+**Onde:** `inputs/clientes/<id>/dossie.md` e `transcricoes.md`
+
+**Problema:** Material primário do Pedro (e futuros espelhos) muda com o tempo — Pedro real grava vídeo novo, posicionamento evolui. Hoje sobrescrevemos o `dossie.md` e perdemos histórico. Pior: não dá pra saber se o que o Pedro IA respondeu hoje usou o material de janeiro ou o de junho.
+
+**O que fazer:**
+1. Versionar `dossie.md` com sufixo `_v1`, `_v2`. Ou usar git tags. Ou simples pasta `inputs/clientes/pedro/historico/`.
+2. `EspelhoCliente` registra em cada execução qual versão foi usada (hash do material).
+3. Manual ganha receita "como atualizar dossiê de cliente preservando histórico".
+
+**Critério de aceite:**
+- [ ] Cada execução do espelho registra versão/hash do material no JSON
+- [ ] Possível voltar a versão antiga do dossiê se necessário
+- [ ] Manual documenta o processo
+
+---
+
+### T86 — Toast/snackbar global de erros no frontend
+
+**Severidade:** baixa de UX · **Afeta output: NÃO**
+
+**Onde:** novo `dashboard/lib/toast.ts` + integração nas páginas
+
+**Problema:** Cada página/componente mostra erro do seu jeito (alert vermelho inline, p tag, toast custom...). Operador não tem feedback consistente.
+
+**O que fazer:**
+1. Adicionar lib leve (sonner, react-hot-toast) ou implementar custom em ~50 linhas.
+2. Provider no `layout.tsx` global.
+3. Refatorar páginas pra usar `toast.error(detail)` em vez de inline state.
+4. Combina com T74 (api-client.ts) — toast pode ser disparado direto do client em erros padrão.
+
+**Critério de aceite:**
+- [ ] Erros aparecem consistentes em todo o app
+- [ ] Toast some sozinho após X segundos
+- [ ] Botão de "fechar" disponível
+
+---
+
+### T90 — Barra de progresso + ETA durante execução do agente
+
+**Severidade:** média de UX · **Afeta output: SIM (visual durante execução)** · **Depende de:** T59 (telemetria já implementada)
+
+**Onde:** `api_server.py` (novo endpoint), `dashboard/lib/useChat.ts` (estado de progresso), `dashboard/components/chat/ChatPanel.tsx` (UI da barra)
+
+**Problema:**
+Hoje, durante execução de um agente, o operador vê só "processando..." sem ideia de quanto falta. Heitor pode levar 1min ou 4min, Otto pode levar 10s ou 40s, e o operador fica sem âncora temporal — gera ansiedade e leva a abortar pipelines bons.
+
+**Limitação técnica honesta:**
+LLM não retorna progresso. ETA é **estimativa baseada em mediana histórica**, não verdade. Trade-offs documentados.
+
+**O que fazer:**
+
+1. **Backend: endpoint de medianas.**
+   - Novo `GET /sessoes/medianas?agente=otto` que lê todas as sessões com `duracoes_segundos.<agente>` e calcula mediana das últimas 20 execuções.
+   - Bonus: suportar `?config=<hash>` agrupando medianas por configuração (ex: Heitor com `max_buscas=3` tem mediana diferente de `max_buscas=0`). Hash da config gerado client-side a partir do `agentConfig`.
+   - Se < 3 amostras, retornar `null` e frontend usa fallback fixo (Otto 20s, Heitor 40s, Salles 30s, Sônia 30s, Aya 15s, Pedro 25s).
+
+2. **Frontend: estado de progresso por agente.**
+   - Quando chega `agent_start`, capturar timestamp e fetchar mediana.
+   - `setInterval` a cada 200ms calcula `progresso = min(95, decorrido / mediana * 100)`.
+   - Quando chega `agent_done`, snap pra 100% e limpa o interval.
+   - Cap em 95% antes de `agent_done` real — barra **nunca** chega em 100% sem confirmação.
+
+3. **UI da barra.**
+   - Barra fina abaixo da bolha de mensagem em construção, na cor do agente.
+   - Texto à direita: `≈ 12s restantes` (com til indicando aproximação).
+   - Hover mostra tooltip: `Tempo médio: 30s · decorrido: 18s · n=15 amostras`.
+   - Quando passar de 1.5x da mediana sem terminar: muda cor pra âmbar e troca texto pra `Mais lento que o normal — possível overloaded`.
+
+4. **Barra macro do pipeline (opcional, recomendada).**
+   - No topo do chat, durante pipeline ativo: linha com bolinhas dos agentes selecionados.
+   - Cada bolinha em um de quatro estados: `⏱ aguardando`, `▶ ativo (com mini-barra)`, `✓ concluído`, `✕ erro`.
+   - Click em bolinha conclusiva pode rolar até a mensagem dela.
+
+5. **Cuidados especiais:**
+   - **Salles em modo A/B (3 variantes):** detectar `config.salles.alternativas === 3`, multiplicar mediana por 3.
+   - **Heitor sem histórico de uma config específica:** cair no fallback fixo, não no timeout zero.
+   - **Modo manual com aprovação:** barra trava em 100% esperando OK do operador (não fica regredindo).
+   - **Fast-track:** Otto resumido tem mediana diferente — agrupar por config.
+
+**Critério de aceite:**
+- [ ] `GET /sessoes/medianas?agente=otto` retorna `{mediana_segundos: 28.5, amostras: 15}` ou `null`
+- [ ] Pipeline real mostra barra enchendo em tempo real para cada agente
+- [ ] Barra **nunca** atinge 100% antes de `agent_done` chegar
+- [ ] Texto "Mais lento que o normal" aparece em janelas de overloaded
+- [ ] Barra macro mostra estado de cada agente do pipeline em uma linha
+- [ ] Em modo manual, barra trava no final e espera aprovação visualmente
+- [ ] Sem histórico, fallback fixo funciona e não quebra UI
+
+**Variantes de escopo (escolher antes de mandar pro agente):**
+- **V1 mínima:** só barra micro do agente atual + ETA simples. Sem barra macro, sem detecção de overloaded.
+- **V2 completa:** tudo acima.
+- **V3 ambiciosa:** futuro — usar contagem de tokens streamados pra estimativa mais granular (não vale agora, V2 é suficiente).
+
+---
+
+### T89 — Tema claro/escuro no dashboard
+
+**Severidade:** baixa de UX · **Afeta output: SIM (toggle visual)**
+
+**Onde:** `dashboard/app/layout.tsx`, `dashboard/app/globals.css`, componentes que usam Tailwind classes
+
+**Problema:** Hoje o dashboard tem só um tema. Calebe pediu adicionar toggle claro/escuro.
+
+**O que fazer:**
+1. Adicionar `next-themes` (lib leve, padrão de mercado): `npm i next-themes`.
+2. `ThemeProvider` no `layout.tsx` envolvendo `<body>`.
+3. Botão toggle no header (sol/lua) ao lado do relógio e ícone de histórico.
+4. Refatorar uso de cores hardcoded (`bg-stone-50`, `text-stone-900`) pra suportar dark mode com classes `dark:` do Tailwind. Concentrar em `globals.css` ou via tokens Tailwind.
+5. Cuidado especial: sprites do escritório, paleta dos agentes (cores Lemmon — Otto azul, Heitor verde etc.) devem manter identidade em ambos os temas. Provavelmente só ajustar fundo + bordas.
+6. Persistir preferência (localStorage, padrão do `next-themes`).
+7. Padrão inicial: seguir `prefers-color-scheme` do sistema do operador.
+
+**Critério de aceite:**
+- [ ] Toggle no header alterna claro ↔ escuro instantaneamente
+- [ ] Preferência persiste após reload
+- [ ] Nenhuma área visual fica ilegível em algum dos temas (texto preto sobre fundo preto, etc)
+- [ ] Cores dos agentes (sprite, badges, idleQuotes) reconhecíveis nos dois modos
+- [ ] Whiteboard, mic destaque, status físicos continuam visualmente coerentes
+
+---
+
+### T87 — Limpeza periódica de `outputs/`
+
+**Severidade:** baixa latente · **Afeta output: NÃO**
+
+**Onde:** novo `scripts/limpar_outputs.py`
+
+**Problema:** `outputs/otto/`, `outputs/heitor/`, `outputs/salles/`, etc. acumulam markdown e JSON a cada execução. Em 6 meses de uso, fácil ter 1000+ arquivos. Hoje não há limpeza automática.
+
+**O que fazer:**
+1. Script `scripts/limpar_outputs.py --dias 90` que apaga arquivos > N dias.
+2. Default conservador: 90 dias.
+3. Sempre preserva sessões avaliadas com 5⭐ (cruzar com índice T79).
+4. Dry-run obrigatório por padrão; flag `--executar` pra apagar de fato.
+
+**Critério de aceite:**
+- [ ] Script funciona em dry-run
+- [ ] Sessões 5⭐ nunca apagadas
+- [ ] Documentado no manual
+
+---
+
+# ORDEM SUGERIDA DA FASE 5
+
+```
+🔴 URGENTE (mesmo dia):            T88 (GitHub)  ← FAZER PRIMEIRO
+Bloco refatoração (alto valor):    T61 → T62 → T63 → T64 → T65 → T78
+Bloco DX/qualidade:                T66 → T67 → T69 → T68
+Bloco arquitetura:                 T73 → T74 → T75 → T81 → T82
+Bloco doc:                         T76 → T77 → T85
+Bloco infra/escala (latente):      T79 → T80 → T83 → T84 → T86 → T87
+Bloco UX:                          T90 (barra progresso) → T89 (tema claro/escuro)
+Bloco produção (só se hospedar):   T70 → T71 → T72
+```
+
+> **Princípio especial desta fase:** todas as tarefas marcadas "Afeta output do agente: NÃO" podem ser executadas com confiança total — o que cada agente entrega para o operador (Otto continua entregando tese + conceito; Heitor continua com risco verde/amarelo/vermelho + fontes; Salles continua com roteiro bloco-a-bloco; Sônia continua com nota + cortes; Aya continua compilando dossiê; Pedro continua com voz fiel + zonas de recusa) **é byte-igual ao atual**. Personalidade dos agentes é deliberada e está preservada.
+>
+> As exceções marcadas explicitamente são: T62 (CLI vs API: trade-off de visualização do log), T70 (login se hospedar fora), T71 (mensagem 429 se passar do cap), T76/T77 (manual mais completo).
+
+---
+
 ## POLIMENTOS — fazer só se sobrar tempo
 
 Lista curta, sem detalhamento — cada um vira tarefa numerada quando for atacado.
@@ -1022,3 +1815,9 @@ Quando voltar à conversa, eu (o assistente daqui) vou:
 | T51 — @pedro em reunião | ✅ concluído | 2026-05-06 | AGENTE_ALIAS dict; _parse_mentions testa alias curto + id completo |
 | T54 — URL /cortes | ✅ concluído | 2026-05-06 | HTTP 200 confirmado por curl + build; 404 era estado anterior. Verificado em 2026-05-06 |
 | T55 — tags fallback | ✅ concluído | 2026-05-06 | except:pass → warning log + fallback heurístico (Counter + stopwords pt-BR, prefix auto:); evento tags_sugeridas_falhou enviado |
+| T56 — whiteboard testid | ✅ concluído | 2026-05-06 | data-testid="whiteboard" no outer `<g>` do componente Whiteboard; reteste visual no Chrome pendente do operador |
+| T57 — TTS pt-BR robusto | ✅ concluído | 2026-05-06 | Detecção de voz via getVoices(); erro reportado em ttsError state se nenhuma pt-BR; toggle ▶/⏸ com amber; console.log de diagnóstico |
+| T58 — share err.detail | ✅ concluído | 2026-05-06 | Página /share/[token] lê err.detail consistente com T52 |
+| T59 — telemetria latência | ✅ concluído | 2026-05-06 | duracoes_segundos por agente em session JSON; HistoryPanel exibe ⏱ Xs (amber >120s); guard ?? {} para sessões antigas |
+| T60 — polimento UI | ✅ concluído | 2026-05-06 | Saúde: labels visíveis (stone-300 + bolinha colorida, fix Aya #18181b invisível); speech bubble: cursor-pointer + hover CSS; sem outros achados nessa rodada |
+| Manual v1.12+v1.13 | ✅ concluído | 2026-05-06 | v1.12 documenta T56-T59; v1.13 documenta T60; PDF gerado docs/releases/MANUAL_v1.13_2026-05-06.pdf |
