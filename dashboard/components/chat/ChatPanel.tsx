@@ -283,6 +283,8 @@ export default function ChatPanel({
   const [mentionQuery, setMentionQuery] = useState<string | null>(null)
   const [mentionCursor, setMentionCursor] = useState(0)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const [referencias, setReferencias] = useState<null | Array<{ session_id: string; briefing: string; avaliacao: number | null; score: number }>>(null)
+  const [loadingRefs, setLoadingRefs] = useState(false)
   const [panelSize, setPanelSize] = useState(() => ({
     w: 460,
     h: typeof window !== 'undefined' ? Math.min(Math.max(480, window.innerHeight - 160), 640) : 560,
@@ -451,8 +453,25 @@ export default function ChatPanel({
     }
   }
 
+  const buscarReferencias = async () => {
+    const q = input.trim()
+    if (!q || loadingRefs) return
+    setLoadingRefs(true)
+    setReferencias(null)
+    try {
+      const res = await fetch(`${API_URL}/historico/similar?briefing=${encodeURIComponent(q)}&n=3`)
+      const data = await res.json()
+      setReferencias(data)
+    } catch {
+      setReferencias([])
+    } finally {
+      setLoadingRefs(false)
+    }
+  }
+
   const handleSend = () => {
     const msg = input.trim()
+    setReferencias(null)
     if (!msg || activeIsRunning || inMeeting.size === 0) return
     if (mode === 'reuniao') {
       onReunSend(Array.from(inMeeting) as AgentId[], msg, reuniaoManual)
@@ -1036,6 +1055,34 @@ export default function ChatPanel({
                 )}
 
               </div>
+            </div>
+          )}
+
+          {/* Ver referências — pipeline mode only */}
+          {mode === 'pipeline' && !activeIsRunning && input.trim().length > 20 && (
+            <div className="mt-1.5">
+              <button onClick={buscarReferencias} disabled={loadingRefs}
+                className="text-[8px] font-mono text-stone-400 hover:text-stone-600 transition-colors disabled:opacity-50 flex items-center gap-1">
+                {loadingRefs ? '⟳ buscando...' : '🔍 ver referências similares'}
+              </button>
+              {referencias && referencias.length > 0 && (
+                <div className="mt-1.5 space-y-1">
+                  {referencias.map(r => (
+                    <div key={r.session_id} className="px-2 py-1.5 rounded-lg bg-stone-50 border border-stone-200">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-[9px] font-mono text-stone-600 line-clamp-1 flex-1">{r.briefing}</p>
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          {r.avaliacao && <span className="text-[8px] text-amber-500">{'★'.repeat(r.avaliacao)}</span>}
+                          <span className="text-[8px] font-mono text-stone-400">{Math.round(r.score * 100)}%</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {referencias && referencias.length === 0 && (
+                <p className="text-[8px] font-mono text-stone-400 mt-1">Nenhuma referência encontrada.</p>
+              )}
             </div>
           )}
 

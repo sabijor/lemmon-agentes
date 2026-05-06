@@ -26,6 +26,7 @@ from core.config import HISTORICO_DIR, OUTPUTS_DIR, AYA_GERAR_HTML, AYA_GERAR_PD
 from core.exportador_aya import exportar_dossie
 from core.discussao import construir_prompt_questionamento_mesa, construir_prompt_ata_mesa
 from core.exemplares import salvar_exemplar, carregar_exemplares, remover_exemplar
+from core.similaridade import buscar_historico_similar
 
 app = FastAPI(title="Lemmon Dashboard API")
 app.add_middleware(
@@ -142,6 +143,13 @@ async def listar_historico():
         except Exception:
             pass
     return sessions
+
+
+@app.get("/historico/similar")
+async def historico_similar(briefing: str, n: int = 3):
+    """Retorna as N sessões mais similares ao briefing."""
+    resultados = buscar_historico_similar(briefing, HISTORICO_DIR, limite=max(1, min(n, 10)))
+    return resultados
 
 
 @app.get("/historico/{session_id}")
