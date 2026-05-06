@@ -758,7 +758,8 @@ async def chat(ws: WebSocket):
                         diretrizes_heitor = res.get("output_tecnico")
                         output_humano = res.get("output_humano", "")
                         # T29: detectar risco vermelho para routing condicional
-                        if "🔴" in output_humano or "risco_geral: vermelho" in str(diretrizes_heitor or ""):
+                        _risco = (diretrizes_heitor or {}).get("risco_geral", "") if isinstance(diretrizes_heitor, dict) else ""
+                        if _risco.lower() in ("vermelho", "red", "high") or "🔴" in output_humano:
                             heitor_risco_vermelho = True
                             await ws.send_json({"type": "routing_condicional", "motivo": "heitor_risco_vermelho",
                                                 "mensagem": "🔴 Risco vermelho detectado — Salles será instruído a adotar modo seguro automaticamente."})
