@@ -29,7 +29,7 @@ export default function Home() {
   const [chatMode, setChatMode] = useState<'pipeline' | 'reuniao'>('pipeline')
   const [historyOpen, setHistoryOpen] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
-  const { messages, agentStatus, isRunning, sessionId, avaliado, resumedFrom, manualMode, fastTrack, sandbox, awaitingApproval, agentConfig, tagsSugeridas, send, approve, abort, toggleManualMode, toggleFastTrack, toggleSandbox, updateConfig, avaliar, exportar, reset, loadSession } = useChat()
+  const { messages, agentStatus, isRunning, sessionId, avaliado, resumedFrom, manualMode, fastTrack, sandbox, custoCap, custoCapAtingido, custoAviso, awaitingApproval, agentConfig, tagsSugeridas, send, approve, abort, toggleManualMode, toggleFastTrack, toggleSandbox, setCustoCap, autorizarCusto, recusarCustoExtra, updateConfig, avaliar, exportar, reset, loadSession } = useChat()
   const { messages: reunMessages, agentStatus: reunAgentStatus, isRunning: reunIsRunning, send: reunSend, reset: reunReset, abort: reunAbort, mesaRedonda: reunMesaRedonda } = useReuniao()
   const { sessions, selected, loading, loadingDetail, fetchSessions, fetchDetail, clearSelected } = useHistory()
 
@@ -207,6 +207,9 @@ export default function Home() {
             manualMode={manualMode}
             fastTrack={fastTrack}
             sandbox={sandbox}
+            custoCap={custoCap}
+            custoCapAtingido={custoCapAtingido}
+            custoAviso={custoAviso}
             awaitingApproval={awaitingApproval}
             agentConfig={agentConfig}
             dragControls={dragControls}
@@ -218,6 +221,9 @@ export default function Home() {
             onToggleManualMode={toggleManualMode}
             onToggleFastTrack={toggleFastTrack}
             onToggleSandbox={toggleSandbox}
+            onSetCustoCap={setCustoCap}
+            onAutorizarCusto={autorizarCusto}
+            onRecusarCustoExtra={recusarCustoExtra}
             onUpdateConfig={updateConfig}
             reunMessages={reunMessages}
             reunAgentStatus={reunAgentStatus}
@@ -228,6 +234,7 @@ export default function Home() {
             onMesaRedonda={reunMesaRedonda}
             onExportar={exportar}
             tagsSugeridas={tagsSugeridas}
+            onSetInMeeting={ids => setInMeeting(new Set(ids))}
             onClose={() => setChatOpen(false)}
           />
         </motion.div>

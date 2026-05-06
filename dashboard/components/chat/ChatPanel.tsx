@@ -34,6 +34,9 @@ interface Props {
   manualMode: boolean
   fastTrack: boolean
   sandbox: boolean
+  custoCap: number | null
+  custoCapAtingido: { total: number; cap: number } | null
+  custoAviso: { total: number; cap: number; pct: number } | null
   awaitingApproval: ApprovalRequest | null
   agentConfig: AgentConfig
   onSend: (msg: string, image?: ImageData) => void
@@ -45,6 +48,9 @@ interface Props {
   onToggleManualMode: () => void
   onToggleFastTrack: () => void
   onToggleSandbox: () => void
+  onSetCustoCap: (v: number | null) => void
+  onAutorizarCusto: (valor: number) => void
+  onRecusarCustoExtra: () => void
   onUpdateConfig: <K extends keyof AgentConfig>(agent: K, patch: Partial<AgentConfig[K]>) => void
   reunMessages: Message[]
   reunAgentStatus: Record<AgentId, AgentStatus>
@@ -55,6 +61,7 @@ interface Props {
   onMesaRedonda?: (agents: AgentId[], tese: string, briefing: string) => void
   onExportar?: (sessionId: string) => Promise<ExportResult>
   onClose?: () => void
+  onSetInMeeting?: (agents: AgentId[]) => void
   dragControls?: DragControls
   tagsSugeridas?: string[]
 }
@@ -151,10 +158,12 @@ function AgentMessage({ msg }: { msg: Message }) {
 }
 
 // ─── Config sidebar ───────────────────────────────────────────────────
-function ConfigSidebar({ agentConfig, onUpdateConfig, isRunning }: {
+function ConfigSidebar({ agentConfig, onUpdateConfig, isRunning, custoCap, onSetCustoCap }: {
   agentConfig: AgentConfig
   onUpdateConfig: Props['onUpdateConfig']
   isRunning: boolean
+  custoCap: number | null
+  onSetCustoCap: (v: number | null) => void
 }) {
   return (
     <div className="w-44 flex-shrink-0 border-r border-stone-200/50 flex flex-col bg-stone-50/70">
@@ -268,6 +277,38 @@ function ConfigSidebar({ agentConfig, onUpdateConfig, isRunning }: {
             ))}
           </div>
         </div>
+
+        {/* Custo-cap */}
+        <div>
+          <div className="flex items-center gap-1.5 mb-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            <span className="text-[9px] font-mono uppercase tracking-widest text-stone-500 font-bold">Custo-cap</span>
+          </div>
+          <p className="text-[8px] font-mono text-stone-400 mb-1.5">limite USD por sessão</p>
+          <div className="flex gap-1 items-center">
+            <input
+              type="number"
+              min="0"
+              step="0.10"
+              placeholder="sem limite"
+              value={custoCap ?? ''}
+              disabled={isRunning}
+              onChange={e => {
+                const v = parseFloat(e.target.value)
+                onSetCustoCap(isNaN(v) || v <= 0 ? null : v)
+              }}
+              className="flex-1 rounded-md border border-stone-200 bg-white px-2 py-1 text-[9px] font-mono text-stone-700
+                placeholder:text-stone-300 focus:outline-none focus:border-stone-400 disabled:opacity-50 min-w-0"
+            />
+            {custoCap !== null && (
+              <button onClick={() => onSetCustoCap(null)} disabled={isRunning}
+                className="text-stone-400 hover:text-stone-700 transition-colors text-[10px] flex-shrink-0 disabled:opacity-50">×</button>
+            )}
+          </div>
+          {custoCap !== null && (
+            <p className="text-[8px] font-mono text-emerald-600 mt-1">cap: ${custoCap.toFixed(2)}</p>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -277,11 +318,12 @@ function ConfigSidebar({ agentConfig, onUpdateConfig, isRunning }: {
 export default function ChatPanel({
   mode, onToggleMode,
   messages, agentStatus, inMeeting, isRunning, sessionId, avaliado, resumedFrom,
-  manualMode, fastTrack, sandbox, awaitingApproval, agentConfig, dragControls,
-  onSend, onReset, onAvaliar, onApprove, onAbort, onToggleManualMode, onToggleFastTrack, onToggleSandbox, onUpdateConfig,
+  manualMode, fastTrack, sandbox, custoCap, custoCapAtingido, custoAviso, awaitingApproval, agentConfig, dragControls,
+  onSend, onReset, onAvaliar, onApprove, onAbort, onToggleManualMode, onToggleFastTrack, onToggleSandbox,
+  onSetCustoCap, onAutorizarCusto, onRecusarCustoExtra, onUpdateConfig,
   reunMessages, reunAgentStatus, reunIsRunning, onReunSend, onReunReset, onReunAbort,
   onMesaRedonda,
-  onExportar, onClose,
+  onExportar, onClose, onSetInMeeting,
   tagsSugeridas = [],
 }: Props) {
   // Mode-aware aliases
@@ -296,8 +338,26 @@ export default function ChatPanel({
   const [reuniaoManual, setReuniaoManual] = useState(false)
   const [reuniaoRating, setReuniaoRating] = useState(0)
   const [tagsAceitas, setTagsAceitas] = useState<string[]>([])
+  const [sugestao, setSugestao] = useState<{ agentes: AgentId[]; razoes: Record<string, string> } | null>(null)
+  const [loadingSugestao, setLoadingSugestao] = useState(false)
 
   useEffect(() => { setTagsAceitas(tagsSugeridas) }, [tagsSugeridas])
+
+  const sugerirPipeline = async () => {
+    const q = input.trim()
+    if (!q || loadingSugestao) return
+    setLoadingSugestao(true)
+    setSugestao(null)
+    try {
+      const res = await fetch(`${API_URL}/sugerir_pipeline?briefing=${encodeURIComponent(q)}`)
+      const data = await res.json()
+      setSugestao(data)
+    } catch {
+      setSugestao(null)
+    } finally {
+      setLoadingSugestao(false)
+    }
+  }
 
   const activeReset = mode === 'reuniao' ? () => { onReunReset(); setReuniaoRating(0) } : onReset
   // @mention autocomplete
@@ -525,6 +585,43 @@ export default function ChatPanel({
       transition={{ type: 'spring', stiffness: 200, damping: 30 }}
       className="flex flex-row glass border border-stone-200/60 overflow-hidden flex-shrink-0 rounded-2xl relative"
     >
+      {/* Custo-cap atingido — blocking overlay */}
+      {custoCapAtingido && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm rounded-2xl">
+          <div className="bg-white rounded-2xl p-6 mx-6 shadow-2xl border border-stone-200 flex flex-col gap-4 max-w-xs w-full">
+            <div className="text-center">
+              <div className="text-3xl mb-2">💸</div>
+              <p className="text-sm font-display font-semibold text-stone-900 mb-1">Limite de custo atingido</p>
+              <p className="text-[10px] font-mono text-stone-500 leading-relaxed">
+                O pipeline foi pausado ao atingir o cap de{' '}
+                <span className="text-stone-700 font-bold tabular-nums">${custoCapAtingido.cap.toFixed(2)}</span>.
+                <br />
+                Custo acumulado: <span className="text-stone-700 tabular-nums">${custoCapAtingido.total.toFixed(3)}</span>
+              </p>
+            </div>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => onAutorizarCusto(custoCapAtingido.cap + 0.50)}
+                className="w-full py-2.5 rounded-xl bg-stone-900 text-white text-[10px] font-mono font-bold uppercase tracking-widest
+                  hover:bg-stone-700 active:scale-[0.98] transition-all">
+                Autorizar +$0.50 e continuar
+              </button>
+              <button
+                onClick={() => onAutorizarCusto(custoCapAtingido.cap + 2.00)}
+                className="w-full py-2.5 rounded-xl border border-stone-200 bg-white text-stone-600 text-[10px] font-mono uppercase tracking-widest
+                  hover:border-stone-400 hover:bg-stone-50 active:scale-[0.98] transition-all">
+                Autorizar +$2.00 e continuar
+              </button>
+              <button
+                onClick={onRecusarCustoExtra}
+                className="w-full py-2 rounded-xl text-[10px] font-mono text-red-500 hover:text-red-700 transition-colors uppercase tracking-widest">
+                Encerrar pipeline
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Resize handles */}
       {!minimized && <>
         <div className="absolute left-0 top-6 bottom-6 w-1.5 cursor-ew-resize z-50 hover:bg-stone-300/40 rounded-full transition-colors" onPointerDown={e => startResize(e, 'w')} />
@@ -549,7 +646,7 @@ export default function ChatPanel({
             transition={{ type: 'spring', stiffness: 260, damping: 28 }}
             className="overflow-hidden flex-shrink-0"
           >
-            <ConfigSidebar agentConfig={agentConfig} onUpdateConfig={onUpdateConfig} isRunning={isRunning} />
+            <ConfigSidebar agentConfig={agentConfig} onUpdateConfig={onUpdateConfig} isRunning={isRunning} custoCap={custoCap} onSetCustoCap={onSetCustoCap} />
           </motion.div>
         )}
       </AnimatePresence>
@@ -775,6 +872,27 @@ export default function ChatPanel({
           </AnimatePresence>
           <div ref={bottomRef} />
         </div>}
+
+        {/* Custo-aviso banner — pipeline only */}
+        {!minimized && mode === 'pipeline' && custoAviso && (
+          <motion.div
+            initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
+            className="mx-4 mb-0 mt-1 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 flex items-center justify-between gap-3 flex-shrink-0"
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-amber-500 text-sm flex-shrink-0">⚠</span>
+              <p className="text-[9px] font-mono text-amber-700 leading-relaxed">
+                Custo em <strong>{custoAviso.pct}%</strong> do limite —{' '}
+                <span className="tabular-nums">${custoAviso.total.toFixed(3)}</span> de{' '}
+                <span className="tabular-nums">${custoAviso.cap.toFixed(2)}</span>
+              </p>
+            </div>
+            <button onClick={() => onAutorizarCusto(custoAviso.cap)}
+              className="text-[8px] font-mono text-amber-600 hover:text-amber-800 uppercase tracking-widest flex-shrink-0 transition-colors">
+              ok
+            </button>
+          </motion.div>
+        )}
 
         {/* Approval bar — pipeline only */}
         {!minimized && mode === 'pipeline' && <AnimatePresence>
@@ -1131,15 +1249,23 @@ export default function ChatPanel({
             </div>
           )}
 
-          {/* Ver referências — pipeline mode only */}
+          {/* Ver referências + sugerir pipeline — pipeline mode only */}
           {mode === 'pipeline' && !activeIsRunning && input.trim().length > 20 && (
-            <div className="mt-1.5">
-              <button onClick={buscarReferencias} disabled={loadingRefs}
-                className="text-[8px] font-mono text-stone-400 hover:text-stone-600 transition-colors disabled:opacity-50 flex items-center gap-1">
-                {loadingRefs ? '⟳ buscando...' : '🔍 ver referências similares'}
-              </button>
+            <div className="mt-1.5 space-y-1.5">
+              <div className="flex items-center gap-3">
+                <button onClick={buscarReferencias} disabled={loadingRefs}
+                  className="text-[8px] font-mono text-stone-400 hover:text-stone-600 transition-colors disabled:opacity-50 flex items-center gap-1">
+                  {loadingRefs ? '⟳ buscando...' : '🔍 ver referências similares'}
+                </button>
+                {input.trim().length > 30 && (
+                  <button onClick={sugerirPipeline} disabled={loadingSugestao}
+                    className="text-[8px] font-mono text-violet-500 hover:text-violet-700 transition-colors disabled:opacity-50 flex items-center gap-1">
+                    {loadingSugestao ? '⟳ analisando...' : '✦ sugerir agentes'}
+                  </button>
+                )}
+              </div>
               {referencias && referencias.length > 0 && (
-                <div className="mt-1.5 space-y-1">
+                <div className="space-y-1">
                   {referencias.map(r => (
                     <div key={r.session_id} className="px-2 py-1.5 rounded-lg bg-stone-50 border border-stone-200">
                       <div className="flex items-center justify-between gap-2">
@@ -1154,7 +1280,37 @@ export default function ChatPanel({
                 </div>
               )}
               {referencias && referencias.length === 0 && (
-                <p className="text-[8px] font-mono text-stone-400 mt-1">Nenhuma referência encontrada.</p>
+                <p className="text-[8px] font-mono text-stone-400">Nenhuma referência encontrada.</p>
+              )}
+              {sugestao && (
+                <div className="px-3 py-2.5 rounded-xl bg-violet-50 border border-violet-200">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-[8px] font-mono text-violet-600 uppercase tracking-widest font-bold">sugestão de agentes</p>
+                    <button onClick={() => setSugestao(null)} className="text-violet-400 hover:text-violet-700 text-[10px] leading-none transition-colors">×</button>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {sugestao.agentes.map(a => {
+                      const ag = AGENT_MAP[a]
+                      return ag ? (
+                        <span key={a} className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-mono border"
+                          style={{ background: ag.colorDim, borderColor: `${ag.color}40`, color: ag.color }}>
+                          <span>{ag.name}</span>
+                          {sugestao.razoes[a] && (
+                            <span className="text-[7px] opacity-70">· {sugestao.razoes[a]}</span>
+                          )}
+                        </span>
+                      ) : null
+                    })}
+                  </div>
+                  {onSetInMeeting && (
+                    <button
+                      onClick={() => { onSetInMeeting(sugestao.agentes); setSugestao(null) }}
+                      className="w-full py-1.5 rounded-lg bg-violet-700 text-white text-[9px] font-mono font-bold uppercase tracking-widest
+                        hover:bg-violet-800 active:scale-[0.98] transition-all">
+                      Usar sugestão
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           )}
