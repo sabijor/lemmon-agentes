@@ -2,12 +2,28 @@
 import time
 from abc import ABC, abstractmethod
 from typing import Callable
-from anthropic import Anthropic, APIError, AuthenticationError, RateLimitError
+from anthropic import Anthropic, APIError, APIConnectionError, AuthenticationError, RateLimitError
 from .config import ANTHROPIC_API_KEY, MODELO_PADRAO, PROMPTS_DIR
 from .custo import Custo
 from .exemplares import formatar_exemplares_para_prompt
 from .historico import Historico
 from .logger import get_logger
+
+
+def formatar_erro_anthropic(e: Exception) -> str:
+    """Converte exceções do SDK Anthropic em mensagem pt-BR sem vazar internos."""
+    s = str(getattr(e, "message", "") or e).lower()
+    if "overloaded" in s:
+        return "API Anthropic temporariamente sobrecarregada. Tente em 30 segundos."
+    if "rate_limit" in s or "rate limit" in s:
+        return "Limite de chamadas atingido. Aguarde alguns segundos."
+    if "authentication" in s or "invalid api key" in s or "api key" in s:
+        return "Chave da API inválida. Verifique ANTHROPIC_API_KEY."
+    if "connection" in s or "timeout" in s:
+        return "Sem conexão com a API Anthropic. Verifique sua internet."
+    msg = str(getattr(e, "message", "") or e)
+    return f"Erro temporário da API: {msg[:200]}"
+
 
 class AgenteBase(ABC):
     nome: str = "agente_base"
@@ -52,16 +68,8 @@ class AgenteBase(ABC):
         inicio = time.time()
         try:
             response = self.client.messages.create(**params)
-        except AuthenticationError:
-            raise RuntimeError(
-                "Chave da API inválida. Verifique sua ANTHROPIC_API_KEY."
-            )
-        except RateLimitError:
-            raise RuntimeError(
-                "Rate limit atingido. Aguarde alguns segundos e tente novamente."
-            )
-        except APIError as e:
-            raise RuntimeError(f"Erro da API Anthropic: {e}")
+        except (AuthenticationError, RateLimitError, APIConnectionError, APIError) as e:
+            raise RuntimeError(formatar_erro_anthropic(e))
 
         duracao = round(time.time() - inicio, 2)
         custo = Custo.calcular(
@@ -93,16 +101,8 @@ class AgenteBase(ABC):
                 for text in stream.text_stream:
                     on_token(text)
                 response = stream.get_final_message()
-        except AuthenticationError:
-            raise RuntimeError(
-                "Chave da API inválida. Verifique sua ANTHROPIC_API_KEY."
-            )
-        except RateLimitError:
-            raise RuntimeError(
-                "Rate limit atingido. Aguarde alguns segundos e tente novamente."
-            )
-        except APIError as e:
-            raise RuntimeError(f"Erro da API Anthropic: {e}")
+        except (AuthenticationError, RateLimitError, APIConnectionError, APIError) as e:
+            raise RuntimeError(formatar_erro_anthropic(e))
 
         duracao = round(time.time() - inicio, 2)
         custo = Custo.calcular(

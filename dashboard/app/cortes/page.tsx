@@ -28,7 +28,10 @@ export default function CortesProntos() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ transcricao, duracoes }),
       })
-      if (!res.ok) throw new Error('Falha ao gerar cortes')
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.detail ?? 'Falha ao gerar cortes')
+      }
       const data = await res.json()
       setResultado(data.cortes)
       setCusto(data.custo_total_usd)

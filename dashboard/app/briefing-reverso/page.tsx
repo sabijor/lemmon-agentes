@@ -21,7 +21,10 @@ export default function BriefingReverso() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ transcricao }),
       })
-      if (!res.ok) throw new Error('Falha na análise')
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.detail ?? 'Falha na análise')
+      }
       const data = await res.json()
       setResultado(data.resultado)
       setCusto(data.custo_total_usd)
