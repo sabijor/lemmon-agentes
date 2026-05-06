@@ -9,24 +9,21 @@ Estratégia de mock:
 - Cada teste usa side_effect com lista de respostas correspondente ao número de chamadas
 """
 import os
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import patch
 
 # Garante ANTHROPIC_API_KEY antes de qualquer import de agente
 os.environ.setdefault("ANTHROPIC_API_KEY", "sk-test-fake-key-for-testing")
 
 from tests.conftest import (
     ANALISE_OTTO_FAKE,
+    _make_mock_client,
     aya_responses,
     heitor_responses,
     otto_responses,
     pedro_responses,
     salles_responses,
     sonia_responses,
-    _make_mock_client,
 )
-
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
