@@ -1,7 +1,8 @@
 'use client'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import Link from 'next/link'
 import { fetchHistorico, type Session } from '@/lib/api-client'
+import { useApiQuery } from '@/lib/use-api-query'
 import { AGENT_MAP } from '@/lib/agents'
 
 function pct(n: number, total: number) {
@@ -23,17 +24,10 @@ function getMonth(ts: string) {
 }
 
 export default function Saude() {
-  const [sessions, setSessions] = useState<Session[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    fetchHistorico()
-      .then((data: Session[]) => { setSessions(data); setLoading(false) })
-      .catch(() => setLoading(false))
-  }, [])
+  const { data: sessions, loading } = useApiQuery<Session[]>(fetchHistorico)
 
   const stats = useMemo(() => {
-    if (!sessions.length) return null
+    if (!sessions?.length) return null
 
     const total = sessions.length
     const totalCost = sessions.reduce((s, r) => s + (r.custo_total_usd || 0), 0)

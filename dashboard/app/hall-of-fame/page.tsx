@@ -1,7 +1,8 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import { fetchHistorico, type Session } from '@/lib/api-client'
+import { useApiQuery } from '@/lib/use-api-query'
 import { AGENT_MAP } from '@/lib/agents'
 
 function fmt(ts: string) {
@@ -12,18 +13,9 @@ function fmt(ts: string) {
 }
 
 export default function HallOfFame() {
-  const [sessions, setSessions] = useState<Session[]>([])
-  const [loading, setLoading] = useState(true)
+  const { data: allSessions, loading } = useApiQuery<Session[]>(fetchHistorico)
+  const sessions = allSessions?.filter(s => s.avaliacao === 5) ?? []
   const [filter, setFilter] = useState<{ formato: string; periodo: string }>({ formato: '', periodo: '' })
-
-  useEffect(() => {
-    fetchHistorico()
-      .then((data: Session[]) => {
-        setSessions(data.filter(s => s.avaliacao === 5))
-        setLoading(false)
-      })
-      .catch(() => setLoading(false))
-  }, [])
 
   const filtered = sessions.filter(s => {
     if (filter.formato && !s.agentes_usados.includes(filter.formato)) return false
