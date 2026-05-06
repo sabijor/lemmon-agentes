@@ -405,6 +405,8 @@ export default function ChatPanel({
   useEffect(() => {
     setExportState('idle')
     setExportResult(null)
+    setSharingState('idle')
+    setShareToken(null)
   }, [sessionId])
 
   const handleExportar = async () => {
@@ -453,9 +455,14 @@ export default function ChatPanel({
   const [imageError, setImageError] = useState('')
   const [isRecording, setIsRecording] = useState(false)
   const [noSpeechSupport, setNoSpeechSupport] = useState(false)
+  const [audioTranscribing, setAudioTranscribing] = useState(false)
+  const [audioError, setAudioError] = useState('')
+  const [shareToken, setShareToken] = useState<string | null>(null)
+  const [sharingState, setSharingState] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
   const recognitionRef = useRef<ISpeechRecognition | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const audioInputRef = useRef<HTMLInputElement>(null)
 
   const toggleRecording = () => {
     if (isRecording) {
@@ -486,6 +493,51 @@ export default function ChatPanel({
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [activeMessages])
+
+  const handleAudioSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    const allowed = ['audio/mpeg', 'audio/mp4', 'audio/wav', 'audio/ogg', 'audio/webm', 'audio/m4a', 'audio/x-m4a']
+    if (!allowed.includes(file.type) && !file.name.match(/\.(mp3|m4a|wav|ogg|webm)$/i)) {
+      setAudioError('Formatos suportados: mp3, m4a, wav, ogg.')
+      return
+    }
+    if (file.size > 25 * 1024 * 1024) { setAudioError('Máximo 25MB por arquivo de áudio.'); return }
+    setAudioError('')
+    setAudioTranscribing(true)
+    try {
+      const fd = new FormData()
+      fd.append('audio', file)
+      const res = await fetch(`${API_URL}/transcrever`, { method: 'POST', body: fd })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.detail ?? 'Erro ao transcrever')
+      setInput(prev => prev ? `${prev}\n\n${data.transcricao}` : data.transcricao)
+    } catch (err) {
+      setAudioError(err instanceof Error ? err.message : 'Erro ao transcrever áudio')
+    } finally {
+      setAudioTranscribing(false)
+    }
+  }
+
+  const compartilharAprovacao = async () => {
+    if (!sessionId) return
+    setSharingState('loading')
+    setShareToken(null)
+    try {
+      const res = await fetch(`${API_URL}/share`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: sessionId }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.detail ?? 'Erro ao gerar link')
+      setShareToken(data.token)
+      setSharingState('done')
+    } catch {
+      setSharingState('error')
+    }
+  }
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -1083,6 +1135,63 @@ export default function ChatPanel({
                   )}
                 </div>
               )}
+
+              {/* T35 — TTS: narrar Aya */}
+              {messages.some(m => m.role === 'aya' && m.done && m.content) && (
+                <div className="border-t border-stone-200/60 pt-2 flex items-center justify-between">
+                  <span className="text-[8px] font-mono text-stone-400 uppercase tracking-widest">Narração (TTS)</span>
+                  <button
+                    onClick={() => {
+                      const ayaMsg = messages.find(m => m.role === 'aya' && m.done && m.content)
+                      if (!ayaMsg) return
+                      if (window.speechSynthesis.speaking) { window.speechSynthesis.cancel(); return }
+                      const utt = new SpeechSynthesisUtterance(ayaMsg.content)
+                      utt.lang = 'pt-BR'
+                      utt.rate = 0.92
+                      window.speechSynthesis.speak(utt)
+                    }}
+                    className="flex items-center gap-1 px-2 py-1 rounded-lg border border-stone-200 bg-white text-[9px] font-mono text-stone-500 hover:border-stone-400 hover:text-stone-700 transition-all">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polygon points="5 3 19 12 5 21 5 3"/>
+                    </svg>
+                    ouvir dossiê
+                  </button>
+                </div>
+              )}
+
+              {/* T36 — Compartilhar aprovação */}
+              <div className="border-t border-stone-200/60 pt-2">
+                {sharingState === 'idle' && (
+                  <button onClick={compartilharAprovacao}
+                    className="w-full flex items-center justify-center gap-2 py-1.5 rounded-lg border border-stone-200 bg-white
+                      text-[9px] font-mono text-stone-500 hover:border-stone-400 hover:text-stone-700 hover:bg-stone-50 transition-all">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+                      <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+                    </svg>
+                    Gerar link de aprovação
+                  </button>
+                )}
+                {sharingState === 'loading' && (
+                  <p className="text-[9px] font-mono text-stone-400 uppercase tracking-widest text-center">gerando link...</p>
+                )}
+                {sharingState === 'done' && shareToken && (
+                  <div className="flex items-center gap-2">
+                    <input readOnly value={`${window.location.origin}/share/${shareToken}`}
+                      className="flex-1 text-[9px] font-mono text-stone-600 border border-stone-200 rounded-lg px-2 py-1.5 bg-stone-50 min-w-0" />
+                    <button onClick={() => navigator.clipboard.writeText(`${window.location.origin}/share/${shareToken}`)}
+                      className="flex-shrink-0 px-2 py-1.5 rounded-lg border border-stone-200 bg-white text-[8px] font-mono text-stone-500 hover:border-stone-400 transition-all">
+                      copiar
+                    </button>
+                  </div>
+                )}
+                {sharingState === 'error' && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9px] font-mono text-red-500">Falha ao gerar link</span>
+                    <button onClick={() => setSharingState('idle')} className="text-[9px] font-mono text-stone-400 hover:text-stone-600 transition-colors uppercase tracking-widest">tentar novamente</button>
+                  </div>
+                )}
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
@@ -1148,7 +1257,9 @@ export default function ChatPanel({
               </AnimatePresence>
 
               {imageError && <p className="text-[10px] font-mono text-red-500 mb-1.5 px-1">{imageError}</p>}
+              {audioError && <p className="text-[10px] font-mono text-red-500 mb-1.5 px-1">{audioError}</p>}
               {noSpeechSupport && <p className="text-[10px] font-mono text-amber-500 mb-1.5 px-1">Microfone não suportado neste browser.</p>}
+              {audioTranscribing && <p className="text-[10px] font-mono text-violet-500 mb-1.5 px-1">⟳ Transcrevendo áudio...</p>}
 
               <div className="relative">
                 {/* @mention autocomplete */}
@@ -1165,6 +1276,7 @@ export default function ChatPanel({
                   </div>
                 )}
                 <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
+                <input ref={audioInputRef} type="file" accept=".mp3,.m4a,.wav,.ogg,.webm,audio/*" className="hidden" onChange={handleAudioSelect} />
                 <textarea
                   ref={textareaRef}
                   value={input}
@@ -1189,11 +1301,11 @@ export default function ChatPanel({
                   }
                   rows={3}
                   className={`w-full resize-none rounded-xl border bg-white/90
-                    px-4 py-3 pl-12 pr-24 text-sm font-mono text-stone-800 placeholder:text-stone-400
+                    px-4 py-3 pl-20 pr-24 text-sm font-mono text-stone-800 placeholder:text-stone-400
                     focus:outline-none transition-all duration-200 leading-relaxed
                     ${isRecording ? 'border-red-300 focus:border-red-400' : 'border-stone-200 focus:border-stone-400'}`}
                 />
-                {/* Clipe */}
+                {/* Clipe (imagem) */}
                 <button type="button" onClick={() => fileInputRef.current?.click()} disabled={isRunning}
                   title="Anexar imagem"
                   className={`absolute left-3 bottom-3 w-8 h-8 rounded-lg border flex items-center justify-center transition-all
@@ -1204,6 +1316,17 @@ export default function ChatPanel({
                     <rect x="3" y="3" width="18" height="18" rx="2"/>
                     <circle cx="8.5" cy="8.5" r="1.5"/>
                     <polyline points="21 15 16 10 5 21"/>
+                  </svg>
+                </button>
+                {/* Upload de áudio (T34) */}
+                <button type="button" onClick={() => audioInputRef.current?.click()} disabled={isRunning || audioTranscribing}
+                  title="Upload de áudio — transcrição automática"
+                  className={`absolute left-13 bottom-3 w-8 h-8 rounded-lg border flex items-center justify-center transition-all
+                    disabled:opacity-30 disabled:cursor-not-allowed
+                    ${audioTranscribing ? 'border-violet-400 bg-violet-100 animate-pulse' : 'border-stone-200 bg-white/90 hover:bg-stone-50 hover:border-stone-400'}`}
+                  style={{ left: '3.25rem' }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={audioTranscribing ? '#7c3aed' : '#78716c'} strokeWidth="2">
+                    <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
                   </svg>
                 </button>
                 {/* Microfone */}

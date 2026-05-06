@@ -6,9 +6,13 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+import base64
+import os
+import secrets
+
 import anthropic as _anthropic
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, File, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi.responses import FileResponse, HTMLResponse
 
 _anthropic_client = _anthropic.Anthropic()
 from fastapi.middleware.cors import CORSMiddleware
@@ -23,6 +27,11 @@ from agentes.sonia import Sonia
 from agentes.aya import Aya
 from agentes.pedro_abrahao import PedroAbrahao
 from core.config import HISTORICO_DIR, OUTPUTS_DIR, AYA_GERAR_HTML, AYA_GERAR_PDF, AYA_PDF_ENGINE, MODELO_PADRAO as LEMMON_MODELO_PADRAO
+
+SHARES_DIR = HISTORICO_DIR.parent / "shares"
+SHARES_DIR.mkdir(exist_ok=True)
+
+CALIBRAGEM_FILE = HISTORICO_DIR.parent / "calibragem_pedro.json"
 from core.exportador_aya import exportar_dossie
 from core.discussao import construir_prompt_questionamento_mesa, construir_prompt_ata_mesa
 from core.exemplares import salvar_exemplar, carregar_exemplares, remover_exemplar
@@ -289,6 +298,41 @@ async def salvar_tags(payload: TagsPayload):
     return {"ok": True}
 
 
+@app.get("/sugerir_pipeline")
+async def sugerir_pipeline(briefing: str):
+    """T28: Haiku analisa o briefing e sugere quais agentes fazer sentido."""
+    loop = asyncio.get_running_loop()
+    AGENTES_DISPONIVEIS = ["otto", "heitor", "salles", "sonia", "aya"]
+    prompt = (
+        "Analise o briefing e sugira quais agentes da Lemmon Produções devem rodar:\n"
+        "- otto: análise estratégica, tese criativa (sempre útil)\n"
+        "- heitor: compliance (essencial se houver saúde, termos técnicos, suplementos, medicina)\n"
+        "- salles: roteiro filmável (use se precisar de conteúdo de vídeo/roteiro)\n"
+        "- sonia: performance e distribuição (use se o conteúdo vai para redes sociais)\n"
+        "- aya: compilação final (sempre recomendado no final)\n\n"
+        "Responda SOMENTE com JSON válido: "
+        '{\"agentes\": [\"otto\", ...], \"razoes\": {\"agente\": \"motivo curto\"}}'
+        f"\n\nBriefing:\n{briefing[:1000]}"
+    )
+    resp = await loop.run_in_executor(
+        None,
+        lambda: _anthropic_client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=200,
+            messages=[{"role": "user", "content": prompt}],
+        ),
+    )
+    raw = next((b.text for b in resp.content if hasattr(b, "text")), "")
+    try:
+        import re as _re
+        m = _re.search(r'\{.*\}', raw, _re.DOTALL)
+        sugestao = json.loads(m.group()) if m else {}
+    except Exception:
+        sugestao = {"agentes": AGENTES_DISPONIVEIS, "razoes": {}}
+    agentes = [a for a in sugestao.get("agentes", AGENTES_DISPONIVEIS) if a in AGENTES_DISPONIVEIS]
+    return {"agentes": agentes, "razoes": sugestao.get("razoes", {})}
+
+
 class BriefingReversoPayload(BaseModel):
     transcricao: str
 
@@ -347,6 +391,212 @@ async def gerar_cortes_prontos(payload: CortesProntosPayload):
     texto = next((b.text for b in resp.content if hasattr(b, "text")), "")
     custo = (resp.usage.input_tokens * 3e-6 + resp.usage.output_tokens * 1.5e-5)
     return {"cortes": texto, "custo_total_usd": round(custo, 6)}
+
+
+# ── T34 — Transcrição de áudio ──────────────────────────────────────────
+
+@app.post("/transcrever")
+async def transcrever_audio(audio: UploadFile = File(...)):
+    """T34: Transcreve arquivo de áudio .mp3/.m4a/.wav em texto (requer OPENAI_API_KEY)."""
+    openai_key = os.getenv("OPENAI_API_KEY")
+    if not openai_key:
+        raise HTTPException(
+            status_code=503,
+            detail="OPENAI_API_KEY não configurada. Adicione ao .env para usar transcrição de áudio.",
+        )
+    try:
+        import io
+        import openai as _openai  # type: ignore[import]
+        client = _openai.OpenAI(api_key=openai_key)
+        content = await audio.read()
+        buf = io.BytesIO(content)
+        buf.name = audio.filename or "audio.mp3"
+        transcription = await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: client.audio.transcriptions.create(
+                model="whisper-1",
+                file=buf,
+                language="pt",
+            ),
+        )
+        return {"transcricao": transcription.text}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Erro na transcrição: {exc}") from exc
+
+
+# ── T36 — Links de aprovação ─────────────────────────────────────────────
+
+class ComentarioPayload(BaseModel):
+    autor: str = "Cliente"
+    texto: str
+
+
+class SharePayload(BaseModel):
+    session_id: str
+
+
+def _load_share(token: str) -> dict:
+    path = SHARES_DIR / f"{token}.json"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Link não encontrado")
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+@app.post("/share")
+async def criar_share(payload: SharePayload):
+    """T36: Gera link de aprovação limpo para uma sessão."""
+    sessao_path = None
+    for f in sorted(HISTORICO_DIR.glob("*.json"), reverse=True):
+        try:
+            data = json.loads(f.read_text(encoding="utf-8"))
+            if data.get("session_id") == payload.session_id:
+                sessao_path = f
+                break
+        except Exception:
+            continue
+    if not sessao_path:
+        raise HTTPException(status_code=404, detail="Sessão não encontrada")
+    sessao = json.loads(sessao_path.read_text(encoding="utf-8"))
+    token = secrets.token_urlsafe(16)
+    share = {
+        "token": token,
+        "session_id": payload.session_id,
+        "created_at": datetime.now().isoformat(),
+        "briefing": sessao.get("briefing", ""),
+        "agentes_usados": sessao.get("agentes_usados", []),
+        "respostas": sessao.get("respostas", {}),
+        "comentarios": [],
+    }
+    (SHARES_DIR / f"{token}.json").write_text(
+        json.dumps(share, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    return {"token": token}
+
+
+@app.get("/share/{token}", response_class=HTMLResponse)
+async def ver_share(token: str):
+    """T36: Página pública de aprovação — dossiê limpo sem custos/técnico."""
+    share = _load_share(token)
+    agentes = share.get("agentes_usados", [])
+    respostas = share.get("respostas", {})
+    blocos_html = ""
+    for ag in agentes:
+        txt = respostas.get(ag, "")
+        if not txt:
+            continue
+        blocos_html += f"""
+        <section class="agent-block">
+          <h2 class="agent-name">{ag.capitalize()}</h2>
+          <pre class="agent-content">{txt}</pre>
+        </section>"""
+    comentarios_html = ""
+    for c in share.get("comentarios", []):
+        comentarios_html += f"""<div class="comment"><strong>{c["autor"]}</strong>: {c["texto"]}</div>"""
+    briefing = share.get("briefing", "")
+    return HTMLResponse(f"""<!DOCTYPE html>
+<html lang="pt-BR"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lemmon — Aprovação</title>
+<style>
+  body{{font-family:system-ui,sans-serif;max-width:800px;margin:0 auto;padding:2rem;color:#1c1917;background:#fafaf9}}
+  h1{{font-size:1.5rem;font-weight:700;margin-bottom:.5rem}}
+  .briefing{{background:#f5f5f4;border-left:4px solid #a8a29e;padding:1rem;border-radius:4px;margin-bottom:2rem;font-size:.9rem}}
+  .agent-block{{margin-bottom:2rem;border:1px solid #e7e5e4;border-radius:8px;overflow:hidden}}
+  .agent-name{{background:#292524;color:#fff;padding:.75rem 1rem;margin:0;font-size:.85rem;text-transform:uppercase;letter-spacing:.1em}}
+  .agent-content{{white-space:pre-wrap;padding:1rem;margin:0;font-size:.875rem;line-height:1.6;font-family:inherit}}
+  .comment-section{{margin-top:2rem}}
+  .comment{{padding:.75rem;border:1px solid #e7e5e4;border-radius:6px;margin-bottom:.5rem}}
+  form{{margin-top:1rem;display:flex;flex-direction:column;gap:.5rem}}
+  input,textarea{{border:1px solid #d6d3d1;border-radius:6px;padding:.5rem .75rem;font-family:inherit}}
+  button{{background:#292524;color:#fff;border:none;border-radius:6px;padding:.75rem 1.5rem;cursor:pointer;font-weight:600}}
+  button:hover{{background:#44403c}}
+</style>
+</head><body>
+<h1>Lemmon Produções — Aprovação de Conteúdo</h1>
+<div class="briefing"><strong>Briefing:</strong> {briefing[:500]}</div>
+{blocos_html}
+<div class="comment-section">
+  <h2>Comentários</h2>
+  {comentarios_html or '<p style="color:#a8a29e;font-size:.875rem">Nenhum comentário ainda.</p>'}
+  <form onsubmit="sendComment(event)">
+    <input id="autor" placeholder="Seu nome" required />
+    <textarea id="texto" rows="3" placeholder="Seu comentário..." required></textarea>
+    <button type="submit">Enviar comentário</button>
+  </form>
+</div>
+<script>
+async function sendComment(e){{
+  e.preventDefault();
+  const r=await fetch(window.location.href+'/comentar',{{method:'POST',headers:{{'Content-Type':'application/json'}},
+    body:JSON.stringify({{autor:document.getElementById('autor').value,texto:document.getElementById('texto').value}})}});
+  if(r.ok)location.reload();
+}}
+</script>
+</body></html>""")
+
+
+@app.post("/share/{token}/comentar")
+async def comentar_share(token: str, payload: ComentarioPayload):
+    """T36: Adiciona comentário inline à sessão compartilhada."""
+    share = _load_share(token)
+    share.setdefault("comentarios", []).append({
+        "autor": payload.autor,
+        "texto": payload.texto,
+        "created_at": datetime.now().isoformat(),
+    })
+    (SHARES_DIR / f"{token}.json").write_text(
+        json.dumps(share, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    return {"ok": True}
+
+
+# ── T37 — Calibragem espelho IA × real ─────────────────────────────────
+
+class FeedbackPedroPayload(BaseModel):
+    session_id: str
+    elemento: str
+    predicao_ia: str
+    feedback_real: str
+    nota_acerto: int
+
+
+@app.post("/calibragem_pedro")
+async def registrar_calibragem(payload: FeedbackPedroPayload):
+    """T37: Registra divergência entre Pedro IA e Pedro real para calibragem do espelho."""
+    historico: list = []
+    if CALIBRAGEM_FILE.exists():
+        try:
+            historico = json.loads(CALIBRAGEM_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            historico = []
+    historico.append({
+        "id": secrets.token_hex(6),
+        "session_id": payload.session_id,
+        "elemento": payload.elemento,
+        "predicao_ia": payload.predicao_ia,
+        "feedback_real": payload.feedback_real,
+        "nota_acerto": max(0, min(5, payload.nota_acerto)),
+        "created_at": datetime.now().isoformat(),
+    })
+    CALIBRAGEM_FILE.write_text(
+        json.dumps(historico, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    return {"ok": True, "total_registros": len(historico)}
+
+
+@app.get("/calibragem_pedro")
+async def ver_calibragem():
+    """T37: Retorna histórico de calibragem e métricas de precisão do espelho."""
+    if not CALIBRAGEM_FILE.exists():
+        return {"registros": [], "media_acerto": None, "total": 0}
+    try:
+        historico = json.loads(CALIBRAGEM_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        historico = []
+    if not historico:
+        return {"registros": [], "media_acerto": None, "total": 0}
+    media = sum(r.get("nota_acerto", 0) for r in historico) / len(historico)
+    return {"registros": historico, "media_acerto": round(media, 2), "total": len(historico)}
 
 
 async def _stream(ws: WebSocket, agent: str, text: str):
@@ -442,6 +692,7 @@ async def chat(ws: WebSocket):
             manual_mode: bool = data.get("manual_mode", False)
             fast_track: bool = data.get("fast_track", False)
             sandbox: bool = data.get("sandbox", False)
+            custo_cap_usd: float | None = data.get("custo_cap_usd") or None
             config: dict = data.get("config", {})
             loop = asyncio.get_running_loop()
 
@@ -455,6 +706,7 @@ async def chat(ws: WebSocket):
             respostas: dict[str, str] = dict(resume_context.get("respostas", {}))
             custos: dict[str, float] = dict(resume_context.get("custos_usd", {}))
             pipeline_cancelled = False
+            heitor_risco_vermelho = False  # T29: roteamento condicional
 
             # Se resume_context tem briefing e o usuário não digitou nada novo, mantém o original
             if resume_context.get("briefing") and briefing == resume_context["briefing"]:
@@ -489,6 +741,7 @@ async def chat(ws: WebSocket):
                     return res.get("output_humano", ""), res.get("custo_total_usd", 0)
 
                 elif name == "heitor":
+                    nonlocal heitor_risco_vermelho
                     ag = Heitor()
                     max_buscas = int(cfg_heitor.get("max_buscas", 3))
                     cb = _make_confirmacao_callback(ws, loop, "heitor")
@@ -505,16 +758,31 @@ async def chat(ws: WebSocket):
                     )
                     if res and not res.get("cancelado"):
                         diretrizes_heitor = res.get("output_tecnico")
-                        return res.get("output_humano", ""), res.get("custo_total_usd", 0)
+                        output_humano = res.get("output_humano", "")
+                        # T29: detectar risco vermelho para routing condicional
+                        if "🔴" in output_humano or "risco_geral: vermelho" in str(diretrizes_heitor or ""):
+                            heitor_risco_vermelho = True
+                            await ws.send_json({"type": "routing_condicional", "motivo": "heitor_risco_vermelho",
+                                                "mensagem": "🔴 Risco vermelho detectado — Salles será instruído a adotar modo seguro automaticamente."})
+                        return output_humano, res.get("custo_total_usd", 0)
                     return "Análise de compliance cancelada.", 0
 
                 elif name == "salles":
                     ag = Salles()
                     formato = cfg_salles.get("formato", "auto")
+                    # T29: modo seguro se Heitor sinalizou risco vermelho
+                    briefing_salles = briefing
+                    if heitor_risco_vermelho:
+                        briefing_salles = (
+                            briefing + "\n\n[MODO SEGURO ATIVADO POR RISCO HEITOR]: "
+                            "Evite qualquer claim terapêutico, promessa de resultado, "
+                            "linguagem de antes/depois. Use linguagem de awareness e educação "
+                            "apenas. Heitor identificou risco vermelho de compliance neste briefing."
+                        )
                     res = await loop.run_in_executor(
                         None,
                         lambda: ag.executar(
-                            briefing=briefing,
+                            briefing=briefing_salles,
                             formato=formato,
                             analise_otto_existente=analise_otto,
                             diretrizes_heitor=diretrizes_heitor,
@@ -671,6 +939,36 @@ async def chat(ws: WebSocket):
                     await ws.send_json({"type": "agent_error", "agent": "gate_espelho", "error": str(e)})
                     return True  # gate falhou, não bloqueia
 
+            custo_cap_autorizado = custo_cap_usd  # pode ser aumentado por autorizações
+
+            async def _verificar_custo_cap() -> bool:
+                """T30: verifica custo acumulado vs cap. Retorna False se pipeline cancelado."""
+                nonlocal pipeline_cancelled, custo_cap_autorizado
+                if custo_cap_autorizado is None:
+                    return True
+                total_atual = sum(custos.values())
+                pct = total_atual / custo_cap_autorizado
+                if pct >= 0.8 and pct < 1.0:
+                    await ws.send_json({
+                        "type": "custo_aviso",
+                        "total_atual": round(total_atual, 5),
+                        "cap": custo_cap_autorizado,
+                        "pct": round(pct * 100),
+                    })
+                elif pct >= 1.0:
+                    await ws.send_json({
+                        "type": "custo_cap_atingido",
+                        "total_atual": round(total_atual, 5),
+                        "cap": custo_cap_autorizado,
+                    })
+                    ctrl = await ws.receive_json()
+                    if ctrl.get("type") == "autorizar_custo":
+                        custo_cap_autorizado += float(ctrl.get("valor", 0.5))
+                    else:
+                        pipeline_cancelled = True
+                        return False
+                return True
+
             async def _run_salles_alternativas() -> bool:
                 """T24: roda Salles 3x com variações e combina para Sônia. Retorna False se cancelado."""
                 nonlocal roteiro_salles, pipeline_cancelled
@@ -736,6 +1034,9 @@ async def chat(ws: WebSocket):
                 else:
                     ok = await _execute_with_approval(name)
                 if not ok:
+                    break
+                # T30: verificar custo-cap após cada agente
+                if not await _verificar_custo_cap():
                     break
                 # Gate de espelho Pedro entre Salles e Sônia (skip em fast_track)
                 if name == "salles" and not pipeline_cancelled and not fast_track:

@@ -158,6 +158,10 @@ export default function Home() {
             className="w-8 h-8 rounded-lg border border-stone-200 bg-white flex items-center justify-center hover:bg-stone-50 hover:border-stone-400 transition-all text-stone-500 text-sm">
             ✂️
           </Link>
+          <Link href="/calibragem" title="Calibragem Pedro"
+            className="w-8 h-8 rounded-lg border border-stone-200 bg-white flex items-center justify-center hover:bg-stone-50 hover:border-stone-400 transition-all text-stone-500 text-sm">
+            🎯
+          </Link>
           <button
             onClick={() => setHistoryOpen(v => !v)}
             className={`w-8 h-8 rounded-lg border flex items-center justify-center transition-all
