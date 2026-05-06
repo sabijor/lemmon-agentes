@@ -37,7 +37,7 @@ interface Props {
   onSend: (msg: string, image?: ImageData) => void
   resumedFrom?: string | null
   onReset: () => void
-  onAvaliar: (nota: number, obs?: string) => void
+  onAvaliar: (nota: number, obs?: string, tags?: string[]) => void
   onApprove: (action: 'approve' | 'retry' | 'skip' | 'cancel' | 'confirmar_sim' | 'confirmar_nao') => void
   onAbort: () => void
   onToggleManualMode: () => void
@@ -52,6 +52,7 @@ interface Props {
   onExportar?: (sessionId: string) => Promise<ExportResult>
   onClose?: () => void
   dragControls?: DragControls
+  tagsSugeridas?: string[]
 }
 
 // ─── Export ──────────────────────────────────────────────────────────
@@ -265,6 +266,7 @@ export default function ChatPanel({
   reunMessages, reunAgentStatus, reunIsRunning, onReunSend, onReunReset, onReunAbort,
   onMesaRedonda,
   onExportar, onClose,
+  tagsSugeridas = [],
 }: Props) {
   // Mode-aware aliases
   const activeMessages    = mode === 'reuniao' ? reunMessages    : messages
@@ -277,6 +279,9 @@ export default function ChatPanel({
   const [configOpen, setConfigOpen] = useState(false)
   const [reuniaoManual, setReuniaoManual] = useState(false)
   const [reuniaoRating, setReuniaoRating] = useState(0)
+  const [tagsAceitas, setTagsAceitas] = useState<string[]>([])
+
+  useEffect(() => { setTagsAceitas(tagsSugeridas) }, [tagsSugeridas])
 
   const activeReset = mode === 'reuniao' ? () => { onReunReset(); setReuniaoRating(0) } : onReset
   // @mention autocomplete
@@ -466,6 +471,20 @@ export default function ChatPanel({
       setReferencias([])
     } finally {
       setLoadingRefs(false)
+    }
+  }
+
+  const dispensarTag = async (tag: string) => {
+    const next = tagsAceitas.filter(t => t !== tag)
+    setTagsAceitas(next)
+    if (sessionId) {
+      try {
+        await fetch(`${API_URL}/tags`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session_id: sessionId, tags: next }),
+        })
+      } catch { /* silencia */ }
     }
   }
 
@@ -796,6 +815,22 @@ export default function ChatPanel({
               initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
               className="mx-4 mb-1 flex flex-col gap-3 px-4 py-3 rounded-xl border border-stone-200/60 bg-stone-50/80 flex-shrink-0"
             >
+              {/* Tags sugeridas */}
+              {tagsAceitas.length > 0 && (
+                <div className="border-b border-stone-200/60 pb-3 mb-3">
+                  <p className="text-[8px] font-mono text-stone-400 uppercase tracking-widest mb-2">tags sugeridas</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {tagsAceitas.map(tag => (
+                      <span key={tag} className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-stone-100 border border-stone-200 text-[9px] font-mono text-stone-600">
+                        {tag}
+                        <button onClick={() => dispensarTag(tag)}
+                          className="ml-0.5 text-stone-400 hover:text-stone-700 transition-colors leading-none">×</button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Estrelas */}
               {avaliado ? (
                 <p className="text-[10px] font-mono text-green-600 uppercase tracking-widest text-center">
@@ -806,7 +841,7 @@ export default function ChatPanel({
                   <span className="text-[10px] font-mono text-stone-400 uppercase tracking-widest">Como foi essa sessão?</span>
                   <div className="flex gap-1">
                     {[1, 2, 3, 4, 5].map(n => (
-                      <button key={n} onClick={() => onAvaliar(n)}
+                      <button key={n} onClick={() => onAvaliar(n, '', tagsAceitas)}
                         onMouseEnter={() => setHoveredStar(n)} onMouseLeave={() => setHoveredStar(0)}
                         className="text-lg transition-transform hover:scale-125 active:scale-110">
                         <span style={{ color: n <= hoveredStar ? '#f59e0b' : '#d6d3d1' }}>★</span>

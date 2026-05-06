@@ -63,6 +63,7 @@ export function useChat() {
   const [awaitingApproval, setAwaitingApproval] = useState<ApprovalRequest | null>(null)
   const [agentConfig, setAgentConfig] = useState<AgentConfig>(DEFAULT_CONFIG)
   const [resumedFrom, setResumedFrom] = useState<string | null>(null)
+  const [tagsSugeridas, setTagsSugeridas] = useState<string[]>([])
   const wsRef = useRef<WebSocket | null>(null)
   const currentMsgId = useRef<Record<string, string>>({})
   const resumeContextRef = useRef<Record<string, unknown> | null>(null)
@@ -110,6 +111,7 @@ export function useChat() {
     setSessionId(null)
     setAvaliado(false)
     setAwaitingApproval(null)
+    setTagsSugeridas([])
 
     const userId = crypto.randomUUID()
     setMessages(prev => [...prev, { id: userId, role: 'user', content: userMessage, done: true, hasImage: !!image }])
@@ -186,6 +188,10 @@ export function useChat() {
         setAwaitingApproval({ agent: data.agent, mode: 'confirmar', mensagem: data.mensagem })
       }
 
+      if (data.type === 'tags_sugeridas') {
+        setTagsSugeridas(data.tags ?? [])
+      }
+
       if (data.type === 'pipeline_done') {
         setIsRunning(false)
         setAwaitingApproval(null)
@@ -221,13 +227,13 @@ export function useChat() {
 
   const toggleManualMode = useCallback(() => setManualMode(v => !v), [])
 
-  const avaliar = useCallback(async (nota: number, observacoes = '') => {
+  const avaliar = useCallback(async (nota: number, observacoes = '', tags?: string[]) => {
     if (!sessionId || avaliado) return
     try {
       await fetch(`${API_URL}/avaliar`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ session_id: sessionId, nota, observacoes }),
+        body: JSON.stringify({ session_id: sessionId, nota, observacoes, tags: tags ?? [] }),
       })
       setAvaliado(true)
     } catch {
@@ -270,13 +276,14 @@ export function useChat() {
     setAvaliado(false)
     setAwaitingApproval(null)
     setResumedFrom(null)
+    setTagsSugeridas([])
     resumeContextRef.current = null
     currentMsgId.current = {}
   }, [])
 
   return {
     messages, agentStatus, isRunning, sessionId, avaliado, resumedFrom,
-    manualMode, awaitingApproval, agentConfig,
+    manualMode, awaitingApproval, agentConfig, tagsSugeridas,
     send, approve, abort, toggleManualMode, updateConfig, avaliar, exportar, reset, loadSession,
   }
 }

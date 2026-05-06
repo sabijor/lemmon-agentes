@@ -271,6 +271,24 @@ async def avaliar(payload: AvaliacaoPayload):
     return {"ok": True}
 
 
+class TagsPayload(BaseModel):
+    session_id: str
+    tags: list[str] = []
+
+
+@app.post("/tags")
+async def salvar_tags(payload: TagsPayload):
+    """Persiste tags aceitas pelo operador, sem exigir avaliação."""
+    session_dir = HISTORICO_DIR / "dashboard"
+    path = session_dir / f"{payload.session_id}.json"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Sessão não encontrada")
+    dados = json.loads(path.read_text(encoding="utf-8"))
+    dados["tags"] = payload.tags
+    path.write_text(json.dumps(dados, ensure_ascii=False, indent=2), encoding="utf-8")
+    return {"ok": True}
+
+
 async def _stream(ws: WebSocket, agent: str, text: str):
     words = text.split(" ")
     chunk_size = 10
@@ -617,6 +635,30 @@ async def chat(ws: WebSocket):
             }
             session_path = _salvar_sessao(briefing, all_agents, respostas, custos, contexto_tecnico)
             session_id = session_path.stem
+
+            # Sugerir tags automaticamente via Aya (T15)
+            if not pipeline_cancelled and respostas:
+                try:
+                    _haiku = _anthropic_client.messages.create(
+                        model="claude-haiku-4-5-20251001",
+                        max_tokens=120,
+                        messages=[{
+                            "role": "user",
+                            "content": (
+                                f"Briefing: {briefing[:300]}\n"
+                                f"Agentes: {', '.join(all_agents)}\n\n"
+                                "Liste 3 a 5 tags curtas (1-3 palavras cada) que descrevem esta sessão. "
+                                "Responda APENAS as tags separadas por vírgula, sem explicação. "
+                                "Ex: reels, hator, compliance, tese-identidade"
+                            ),
+                        }],
+                    )
+                    raw_tags = next((b.text for b in _haiku.content if hasattr(b, "text")), "")
+                    tags_sugeridas = [t.strip().lower().replace(" ", "-") for t in raw_tags.split(",") if t.strip()][:5]
+                    await ws.send_json({"type": "tags_sugeridas", "tags": tags_sugeridas, "session_id": session_id})
+                except Exception:
+                    pass
+
             await ws.send_json({"type": "pipeline_done", "session_id": session_id})
 
     except WebSocketDisconnect:
