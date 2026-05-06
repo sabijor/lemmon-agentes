@@ -3,6 +3,11 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { API_URL } from '@/lib/api'
 
+interface SessionOption {
+  session_id: string
+  briefing: string
+}
+
 interface FeedbackEntry {
   id: string
   session_id: string
@@ -31,6 +36,7 @@ export default function CalibragemPage() {
   })
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [sessionOptions, setSessionOptions] = useState<SessionOption[]>([])
 
   const fetchData = async () => {
     try {
@@ -43,7 +49,19 @@ export default function CalibragemPage() {
     }
   }
 
-  useEffect(() => { fetchData() }, [])
+  useEffect(() => {
+    fetchData()
+    fetch(`${API_URL}/historico`)
+      .then(r => r.json())
+      .then((sessions: Array<{ session_id: string; briefing: string; agentes_usados: string[] }>) => {
+        const withPedro = sessions
+          .filter(s => s.agentes_usados?.includes('pedro'))
+          .slice(0, 20)
+          .map(s => ({ session_id: s.session_id, briefing: s.briefing?.slice(0, 60) ?? '' }))
+        setSessionOptions(withPedro)
+      })
+      .catch(() => {})
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -114,8 +132,14 @@ export default function CalibragemPage() {
               <div>
                 <label className="text-[9px] font-mono text-stone-400 uppercase tracking-widest block mb-1">Session ID</label>
                 <input value={form.session_id} onChange={e => setForm(f => ({ ...f, session_id: e.target.value }))}
-                  placeholder="sess_xxxx"
+                  list="session-opts"
+                  placeholder={sessionOptions.length ? 'Selecione ou digite...' : 'Ex: 20260505_152641_sessao'}
                   className="w-full border border-stone-200 rounded-lg px-3 py-2 text-[11px] font-mono text-stone-700 focus:outline-none focus:border-stone-400" />
+                <datalist id="session-opts">
+                  {sessionOptions.map(s => (
+                    <option key={s.session_id} value={s.session_id}>{s.briefing}</option>
+                  ))}
+                </datalist>
               </div>
               <div>
                 <label className="text-[9px] font-mono text-stone-400 uppercase tracking-widest block mb-1">Elemento avaliado</label>
