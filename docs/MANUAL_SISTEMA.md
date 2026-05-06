@@ -1,6 +1,6 @@
 # LEMMON AGENTES — Manual do Sistema
 
-**Versão atual:** v1.6
+**Versão atual:** v1.7
 **Última atualização:** 2026-05-06
 **Mantido por:** Calebe Alves / Lemmon Produções
 
@@ -11,6 +11,16 @@
 ## Histórico de versões
 
 > **Convenção:** versões mais novas no topo. Cada release lista o que mudou em relação à anterior, mantendo histórico completo.
+
+### v1.7 — 2026-05-06
+
+**Épico G — Camada visual.**
+
+- **Whiteboard ao vivo (T31):** O quadro branco da sala de trabalho responde ao pipeline em tempo real. Enquanto um agente processa, barras horizontais na cor daquele agente vão se preenchendo da esquerda para a direita, proporcional ao volume de texto gerado (0–100%). Quando o pipeline fica idle, o whiteboard retorna às decorações estáticas. Implementado sem texto projetado no plano isométrico — a metáfora visual é de barras de progresso coloridas.
+- **Status físico expressivo (T32):** Sprites ganham dois novos estados animados. `done` dispara `animate-celebrate` (pop suave de escala + translação) e exibe badge ✓ verde. `error` dispara `animate-error` (shake lateral) e exibe badge ✕ vermelho. O ponto genérico de status foi preservado apenas para `speaking` (amarelo) e `thinking` (roxo).
+- **Mic destaque em reunião (T33):** Quando um agente está em `inMeeting` e com status `speaking`, dois anéis pulsantes (keyframe `mic-ring`) irradiam ao redor do sprite na cor do agente, e um ícone de microfone aparece acima da cabeça. O efeito é exclusivo do modo reunião para não confundir com o pipeline normal.
+
+---
 
 ### v1.6 — 2026-05-06
 
@@ -514,9 +524,9 @@ done
 
 O `PLANO_ACAO_2026-05-05.md` na raiz do projeto contém o plano completo com 9 épicos e 39 tarefas. Resumo do que está no horizonte:
 
-**Concluídos.** ~~Família de espelhos de cliente~~ ✅ (v1.1), ~~Pedro como gate de qualidade~~ ✅ (v1.2), ~~Memória institucional e saúde~~ ✅ (v1.3), ~~Workflows avançados~~ ✅ (v1.4), ~~Inteligência operacional / custo-cap~~ ✅ (v1.5), ~~Multimodal e aprovação de cliente~~ ✅ (v1.6).
+**Concluídos.** ~~Família de espelhos de cliente~~ ✅ (v1.1), ~~Pedro como gate de qualidade~~ ✅ (v1.2), ~~Memória institucional e saúde~~ ✅ (v1.3), ~~Workflows avançados~~ ✅ (v1.4), ~~Inteligência operacional / custo-cap~~ ✅ (v1.5), ~~Multimodal e aprovação de cliente~~ ✅ (v1.6), ~~Camada visual~~ ✅ (v1.7).
 
-**Próximo: Épico G — Camada visual.** Whiteboards que se preenchem em tempo real, sprites com status físico mais expressivo, mesa de reunião com mic destacado quando alguém fala.
+**Todos os épicos do plano de ação 2026-05-05 foram implementados.** O sistema está em v1.7 com 37 tarefas concluídas em 7 épicos. Para próximos ciclos, revisar o backlog e criar novo plano de ação baseado em feedback de uso real.
 
 **Camada visual (Épico G).** Whiteboards que se preenchem em tempo real, sprites com status físico mais expressivo, mesa de reunião com mic destacado quando alguém fala.
 
