@@ -1,6 +1,6 @@
 # LEMMON AGENTES — Manual do Sistema
 
-**Versão atual:** v1.3
+**Versão atual:** v1.4
 **Última atualização:** 2026-05-06
 **Mantido por:** Calebe Alves / Lemmon Produções
 
@@ -11,6 +11,19 @@
 ## Histórico de versões
 
 > **Convenção:** versões mais novas no topo. Cada release lista o que mudou em relação à anterior, mantendo histórico completo.
+
+### v1.4 — 2026-05-06
+
+**Épico E — Workflows avançados.**
+
+- **Modo remix (T22):** Botão 🔀 Remix no detalhe de qualquer sessão de pipeline no histórico. Carrega a sessão como retomada, mas pré-seleciona automaticamente Salles+Sônia+Aya (mantendo a tese Otto e o contexto Heitor). Ideal para "mesma estratégia, novo formato/cliente".
+- **Briefing reverso (T23):** Página `/briefing-reverso` (ícone 🔍 no header). Cole transcrição, roteiro ou texto já produzido — Otto infere o briefing original, a tese criativa e o posicionamento de marca. Endpoint: `POST /briefing_reverso`.
+- **Comparativo A/B Salles (T24):** Toggle "3 variantes A/B" no ConfigSidebar do Salles. Quando ativo, Salles roda 3 vezes com variações de estilo: padrão, impactante/direto, emocional/pessoal. Os 3 roteiros aparecem em sequência no chat; Sônia vê todos ao ranquear.
+- **Cortes-prontos (T25):** Página `/cortes` (ícone ✂️ no header). Cole transcrição longa, selecione durações alvo (15s/30s/60s/90s) — sistema gera tabela de cortes com timestamps, hook e CTA por duração. Endpoint: `POST /cortes_prontos`.
+- **Fast-track / Modo emergência (T26):** Botão ⚡ no header do pipeline. Quando ativo: Otto roda em modo resumido, Heitor é pulado (com aviso de risco assumido no chat), gate espelho ignorado. Resultado em <3 min. Atenção: sem Heitor, valide compliance manualmente antes de publicar.
+- **Lab/Sandbox (T27):** Botão 🧪 no header do pipeline. Quando ativo: sessão não é salva no histórico, sem sugestão de tags. Ideal para testar ideias sem poluir registros ou virar referência futura.
+
+---
 
 ### v1.3 — 2026-05-06
 
@@ -480,7 +493,7 @@ done
 
 O `PLANO_ACAO_2026-05-05.md` na raiz do projeto contém o plano completo com 9 épicos e 39 tarefas. Resumo do que está no horizonte:
 
-**Próximos passos imediatos.** ~~Família de espelhos de cliente~~ ✅ (v1.1), ~~Pedro como gate de qualidade~~ ✅ (v1.2), ~~Memória institucional e saúde~~ ✅ (v1.3). Próximo: Épico E — workflows avançados (remix, briefing reverso, A/B, cortes-prontos, fast-track, lab).
+**Próximos passos imediatos.** ~~Família de espelhos de cliente~~ ✅ (v1.1), ~~Pedro como gate de qualidade~~ ✅ (v1.2), ~~Memória institucional e saúde~~ ✅ (v1.3), ~~Workflows avançados~~ ✅ (v1.4). Próximo: Épico F — inteligência de pipeline (sugestor, routing condicional, custo-cap).
 
 **Médio prazo.** Novos agentes (Marcia/pós-produção, Felipe/concorrente, Renata/distribuição, Lia/voz Lemmon). Roteamento condicional baseado em Heitor. Custo-cap por sessão.
 
