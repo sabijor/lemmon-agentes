@@ -25,6 +25,7 @@ from core.config import (
     RENATA_PREVISAO_RANGE_USD,
     RENATA_ROTEIRO_MAX_CHARS,
     RENATA_SONIA_MAX_CHARS,
+    RENATA_VOZ_CLIENTE_MAX_CHARS,
 )
 from core.tipos import AgenteResultado
 
@@ -184,12 +185,14 @@ class Renata(AgenteBase):
         data_fim = data_inicio + timedelta(days=duracao_dias - 1)
 
         nichos = self._extrair_nichos_cliente(cliente_id)
+        voz_cliente = self._extrair_voz_cliente(cliente_id)
         datas_comemorativas = datas_na_janela(data_inicio, data_fim, nichos)
 
         cmin, cmax = RENATA_PREVISAO_RANGE_USD
         self.logger.info(
             f"Renata iniciando | modo={modo} | dias={duracao_dias} | "
             f"cliente={cliente_id or '(nenhum)'} | nichos={nichos} | "
+            f"voz_cliente={'sim' if voz_cliente else 'não'} | "
             f"datas_relevantes={len(datas_comemorativas)} | "
             f"custo previsto: ${cmin:.2f}–${cmax:.2f}"
         )
@@ -204,6 +207,7 @@ class Renata(AgenteBase):
             diretrizes_heitor=diretrizes_heitor,
             contexto_solo=contexto_solo,
             cliente_id=cliente_id,
+            voz_cliente=voz_cliente,
             eventos_cliente=eventos_cliente or [],
             datas_comemorativas=datas_comemorativas,
         )
@@ -291,6 +295,24 @@ class Renata(AgenteBase):
         )
         return ["nacional"]
 
+    def _extrair_voz_cliente(self, cliente_id: Optional[str]) -> Optional[str]:
+        """Lê trecho das transcrições do cliente para calibrar a voz nas descricao_cliente.
+
+        Prioriza transcricoes.md (fala real). Fallback: primeiros chars do dossie.md.
+        Retorna None se não há material disponível.
+        """
+        if not cliente_id:
+            return None
+        base = ESPELHO_CLIENTES_DIR / cliente_id
+        for nome_arq in ("transcricoes.md", "dossie.md"):
+            arq = base / nome_arq
+            if arq.exists():
+                texto = arq.read_text(encoding="utf-8")
+                if len(texto) > RENATA_VOZ_CLIENTE_MAX_CHARS:
+                    texto = texto[:RENATA_VOZ_CLIENTE_MAX_CHARS] + "\n[...trecho inicial]"
+                return texto.strip()
+        return None
+
     def _montar_prompt(
         self,
         modo: str,
@@ -302,6 +324,7 @@ class Renata(AgenteBase):
         diretrizes_heitor: Optional[dict],
         contexto_solo: Optional[str],
         cliente_id: Optional[str],
+        voz_cliente: Optional[str],
         eventos_cliente: list,
         datas_comemorativas: list,
     ) -> str:
@@ -315,6 +338,13 @@ class Renata(AgenteBase):
         )
         if cliente_id:
             partes.append(f"CLIENTE: {cliente_id}\n")
+
+        if voz_cliente:
+            partes.append(
+                f"\n── VOZ DO CLIENTE (use nas descricao_cliente de cada peça) ──\n"
+                f"{voz_cliente}\n"
+                f"── FIM DA VOZ DO CLIENTE ──\n"
+            )
 
         if datas_comemorativas:
             partes.append("\n── DATAS COMEMORATIVAS NA JANELA ──\n")

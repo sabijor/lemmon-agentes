@@ -241,16 +241,21 @@ async def chat(ws: WebSocket):
                     _rot_salles = roteiro_salles or None
                     _an_sonia   = respostas.get("sonia") or None
                     _dir_heitor = diretrizes_heitor or None
+                    # Se não há contexto de pipeline, cai em modo solo com o briefing
+                    _has_pipeline_context = bool(_dossie_aya or _rot_salles)
+                    _modo = "pipeline" if _has_pipeline_context else "solo"
+                    _ctx_solo = briefing if not _has_pipeline_context else None
                     res = await loop.run_in_executor(
                         None,
                         lambda: ag.executar(
-                            modo="pipeline",
+                            modo=_modo,
                             duracao_dias=duracao_dias,
                             dossie_aya=_dossie_aya,
                             roteiro_salles=_rot_salles,
                             analise_sonia=_an_sonia,
                             diretrizes_heitor=_dir_heitor,
                             cliente_id=_cliente_id,
+                            contexto_solo=_ctx_solo,
                         ),
                     )
                     return res.get("output_humano", ""), res.get("custo_total_usd", 0)
