@@ -77,7 +77,7 @@ export function SessionList({ sessions, loading, selectedId, onSelect }: {
                     ${s.custo_total_usd.toFixed(4)}
                   </span>
                 )}
-                <Stars n={s.avaliacao} />
+                {s.favorito && <span className="text-[10px]" style={{ color: '#f59e0b' }}>★</span>}
               </div>
             </div>
             <div className="flex gap-1 mt-1.5">

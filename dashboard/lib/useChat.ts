@@ -71,7 +71,7 @@ export function useChat() {
   })
   const [isRunning, setIsRunning] = useState(false)
   const [sessionId, setSessionId] = useState<string | null>(null)
-  const [avaliado, setAvaliado] = useState(false)
+  const [favoritado, setFavoritado] = useState(false)
   const [manualMode, setManualMode] = useState(false)
   const [awaitingApproval, setAwaitingApproval] = useState<ApprovalRequest | null>(null)
   const [agentConfig, setAgentConfig] = useState<AgentConfig>(DEFAULT_CONFIG)
@@ -124,7 +124,7 @@ export function useChat() {
     ]
     setMessages(msgs)
     setSessionId(detail.session_id)
-    setAvaliado(detail.avaliacao !== null)
+    setFavoritado(detail.favorito ?? false)
     setIsRunning(false)
     setAwaitingApproval(null)
     setAgentStatus({ otto: 'idle', heitor: 'idle', salles: 'idle', sonia: 'idle', aya: 'idle', pedro_abrahao: 'idle', renata: 'idle' })
@@ -142,7 +142,7 @@ export function useChat() {
     if (isRunning || !userMessage.trim() || agents.length === 0) return
 
     setSessionId(null)
-    setAvaliado(false)
+    setFavoritado(false)
     setAwaitingApproval(null)
     setTagsSugeridas([])
     setCustoCapAtingido(null)
@@ -389,19 +389,20 @@ export function useChat() {
     setIsRunning(false)
   }, [])
 
-  const avaliar = useCallback(async (nota: number, observacoes = '', tags?: string[]) => {
-    if (!sessionId || avaliado) return
+  const favoritar = useCallback(async (novoEstado?: boolean) => {
+    if (!sessionId) return
+    const next = novoEstado !== undefined ? novoEstado : !favoritado
     try {
-      await fetch(`${API_URL}/avaliar`, {
+      await fetch(`${API_URL}/favoritar`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ session_id: sessionId, nota, observacoes, tags: tags ?? [] }),
+        body: JSON.stringify({ session_id: sessionId, favorito: next }),
       })
-      setAvaliado(true)
+      setFavoritado(next)
     } catch {
       // silencia — não bloqueia o usuário
     }
-  }, [sessionId, avaliado])
+  }, [sessionId, favoritado])
 
   const exportar = useCallback(async (sid: string, agente = 'aya'): Promise<ExportResult> => {
     const res = await fetch(`${API_URL}/exportar`, {
@@ -441,7 +442,7 @@ export function useChat() {
     setAgentStatus({ otto: 'idle', heitor: 'idle', salles: 'idle', sonia: 'idle', aya: 'idle', pedro_abrahao: 'idle', renata: 'idle' })
     setIsRunning(false)
     setSessionId(null)
-    setAvaliado(false)
+    setFavoritado(false)
     setAwaitingApproval(null)
     setResumedFrom(null)
     setTagsSugeridas([])
@@ -460,11 +461,11 @@ export function useChat() {
   }, [])
 
   return {
-    messages, agentStatus, isRunning, sessionId, avaliado, resumedFrom,
+    messages, agentStatus, isRunning, sessionId, favoritado, resumedFrom,
     manualMode, fastTrack, sandbox, custoCap, custoCapAtingido, custoAviso,
     awaitingApproval, agentConfig, tagsSugeridas, agentProgress, agentProgressMeta,
     send, approve, abort, toggleManualMode, toggleFastTrack, toggleSandbox,
     setCustoCap, autorizarCusto, recusarCustoExtra,
-    updateConfig, avaliar, exportar, reset, loadSession,
+    updateConfig, favoritar, exportar, reset, loadSession,
   }
 }

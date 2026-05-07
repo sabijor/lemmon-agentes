@@ -19,6 +19,7 @@ export interface Session {
   agentes_usados: string[]
   custo_total_usd: number
   avaliacao: number | null
+  favorito?: boolean
   origem: string
 }
 
@@ -80,6 +81,15 @@ async function apiFetch<T>(
 }
 
 // ─── Endpoints ────────────────────────────────────────────────────────────────
+
+/** POST /favoritar */
+export async function favoritarSessao(sessionId: string, favorito: boolean): Promise<{ ok: boolean; favorito: boolean }> {
+  return apiFetch('/favoritar', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ session_id: sessionId, favorito }),
+  })
+}
 
 /** POST /briefing_reverso */
 export async function fetchBriefingReverso(

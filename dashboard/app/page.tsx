@@ -50,7 +50,7 @@ export default function Home() {
   const [chatMode, setChatMode] = useState<'pipeline' | 'reuniao'>('pipeline')
   const [historyOpen, setHistoryOpen] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
-  const { messages, agentStatus, isRunning, sessionId, avaliado, resumedFrom, manualMode, fastTrack, sandbox, custoCap, custoCapAtingido, custoAviso, awaitingApproval, agentConfig, tagsSugeridas, agentProgress, agentProgressMeta, send, approve, abort, toggleManualMode, toggleFastTrack, toggleSandbox, setCustoCap, autorizarCusto, recusarCustoExtra, updateConfig, avaliar, exportar, reset, loadSession } = useChat()
+  const { messages, agentStatus, isRunning, sessionId, favoritado, resumedFrom, manualMode, fastTrack, sandbox, custoCap, custoCapAtingido, custoAviso, awaitingApproval, agentConfig, tagsSugeridas, agentProgress, agentProgressMeta, send, approve, abort, toggleManualMode, toggleFastTrack, toggleSandbox, setCustoCap, autorizarCusto, recusarCustoExtra, updateConfig, favoritar, exportar, reset, loadSession } = useChat()
   const {
     messages: reunMessages, agentStatus: reunAgentStatus, isRunning: reunIsRunning,
     agentProgress: reunAgentProgress, agentProgressMeta: reunAgentProgressMeta,
@@ -237,7 +237,7 @@ export default function Home() {
             inMeeting={inMeeting}
             isRunning={isRunning}
             sessionId={sessionId}
-            avaliado={avaliado}
+            favoritado={favoritado}
             resumedFrom={resumedFrom}
             manualMode={manualMode}
             fastTrack={fastTrack}
@@ -250,7 +250,7 @@ export default function Home() {
             dragControls={dragControls}
             onSend={handleSend}
             onReset={reset}
-            onAvaliar={avaliar}
+            onFavoritar={favoritar}
             onApprove={approve}
             onAbort={abort}
             onToggleManualMode={toggleManualMode}

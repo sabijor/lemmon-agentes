@@ -9,6 +9,7 @@ export interface HistoryItem {
   agentes_usados: string[]
   custo_total_usd: number
   avaliacao: number | null
+  favorito?: boolean
   origem?: 'dashboard' | 'reuniao'
 }
 

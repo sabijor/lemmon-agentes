@@ -5,7 +5,7 @@ import { AGENT_MAP } from '@/lib/agents'
 import { type HistoryDetail } from '@/lib/useHistory'
 import { API_URL } from '@/lib/api'
 import CharacterSprite from '../office/CharacterSprite'
-import { Stars } from './SessionCard'
+import { favoritarSessao } from '@/lib/api-client'
 
 interface ExportResult {
   html_gerado: boolean
@@ -44,6 +44,7 @@ export function SessionDetail({
   const [exemplaresMarked, setExemplaresMarked] = useState<Record<string, boolean>>({})
   const [exportStates, setExportStates] = useState<Record<string, 'idle' | 'loading' | 'done' | 'error'>>({})
   const [exportResults, setExportResults] = useState<Record<string, ExportResult | null>>({})
+  const [favoritado, setFavoritado] = useState(false)
 
   const handleExportar = async (agente: ExportAgente) => {
     if (!detail) return
@@ -100,7 +101,19 @@ export function SessionDetail({
     setBriefingExpanded(false)
     setExportStates({})
     setExportResults({})
-  }, [detail?.session_id])
+    setFavoritado(detail?.favorito ?? false)
+  }, [detail?.session_id, detail?.favorito])
+
+  const handleFavoritar = async () => {
+    if (!detail) return
+    const next = !favoritado
+    setFavoritado(next)
+    try {
+      await favoritarSessao(detail.session_id, next)
+    } catch {
+      setFavoritado(!next)
+    }
+  }
 
   if (loadingDetail) return (
     <div style={{ height: bodyH }} className="flex items-center justify-center">
@@ -153,7 +166,13 @@ export function SessionDetail({
             {detail.custo_total_usd > 0 && (
               <span className="text-[8px] font-mono text-stone-400">Total: ${detail.custo_total_usd.toFixed(5)}</span>
             )}
-            <Stars n={detail.avaliacao} />
+            <button
+              onClick={handleFavoritar}
+              title={favoritado ? 'Remover dos favoritos' : 'Marcar como favorita'}
+              className="text-sm transition-transform hover:scale-110 active:scale-95"
+            >
+              <span style={{ color: favoritado ? '#f59e0b' : '#d6d3d1' }}>{favoritado ? '★' : '☆'}</span>
+            </button>
           </div>
         </div>
         <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -309,7 +328,7 @@ export function SessionDetail({
                         </span>
                       )
                     })()}
-                    {detail.avaliacao === 5 && (
+                    {detail.favorito === true && (
                       <button
                         onClick={() => marcarExemplar(agentId, text)}
                         className={`ml-auto text-[8px] font-mono px-2 py-0.5 rounded-full border transition-all ${

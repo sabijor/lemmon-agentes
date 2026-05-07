@@ -35,7 +35,7 @@ interface Props {
   inMeeting: Set<AgentId>
   isRunning: boolean
   sessionId: string | null
-  avaliado: boolean
+  favoritado: boolean
   manualMode: boolean
   fastTrack: boolean
   sandbox: boolean
@@ -47,7 +47,7 @@ interface Props {
   onSend: (msg: string, image?: ImageData) => void
   resumedFrom?: string | null
   onReset: () => void
-  onAvaliar: (nota: number, obs?: string, tags?: string[]) => void
+  onFavoritar: (novoEstado?: boolean) => void
   onApprove: (action: 'approve' | 'retry' | 'skip' | 'cancel' | 'confirmar_sim' | 'confirmar_nao') => void
   onAbort: () => void
   onToggleManualMode: () => void
@@ -89,11 +89,11 @@ interface Props {
 // ─── Main panel ──────────────────────────────────────────────────────
 export default function ChatPanel({
   mode, onToggleMode,
-  messages, agentStatus, inMeeting, isRunning, sessionId, avaliado, resumedFrom,
+  messages, agentStatus, inMeeting, isRunning, sessionId, favoritado, resumedFrom,
   manualMode, fastTrack, sandbox, custoCap, custoCapAtingido, custoAviso, awaitingApproval, agentConfig, dragControls,
   agentProgress, agentProgressMeta,
   reunAgentProgress, reunAgentProgressMeta,
-  onSend, onReset, onAvaliar, onApprove, onAbort, onToggleManualMode, onToggleFastTrack, onToggleSandbox,
+  onSend, onReset, onFavoritar, onApprove, onAbort, onToggleManualMode, onToggleFastTrack, onToggleSandbox,
   onSetCustoCap, onAutorizarCusto, onRecusarCustoExtra, onUpdateConfig,
   reunMessages, reunAgentStatus, reunIsRunning, onReunSend, onReunReset, onReunAbort,
   onMesaRedonda,
@@ -935,25 +935,17 @@ export default function ChatPanel({
                 </div>
               )}
 
-              {/* Estrelas */}
-              {avaliado ? (
-                <p className="text-[10px] font-mono text-green-600 uppercase tracking-widest text-center">
-                  ✓ Avaliação salva no histórico
-                </p>
-              ) : (
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-mono text-stone-400 uppercase tracking-widest">Como foi essa sessão?</span>
-                  <div className="flex gap-1">
-                    {[1, 2, 3, 4, 5].map(n => (
-                      <button key={n} onClick={() => onAvaliar(n, '', tagsAceitas)}
-                        onMouseEnter={() => setHoveredStar(n)} onMouseLeave={() => setHoveredStar(0)}
-                        className="text-lg transition-transform hover:scale-125 active:scale-110">
-                        <span style={{ color: n <= hoveredStar ? '#f59e0b' : '#d6d3d1' }}>★</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
+              {/* Favoritar */}
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono text-stone-400 uppercase tracking-widest">Sessão favorita?</span>
+                <button
+                  onClick={() => onFavoritar()}
+                  title={favoritado ? 'Remover dos favoritos' : 'Favoritar esta sessão'}
+                  className="text-lg transition-transform hover:scale-125 active:scale-110"
+                >
+                  <span style={{ color: favoritado ? '#f59e0b' : '#d6d3d1' }}>{favoritado ? '★' : '☆'}</span>
+                </button>
+              </div>
 
               {/* Export por agente — Aya (dossiê) e/ou Renata (editorial) */}
               {onExportar && (() => {

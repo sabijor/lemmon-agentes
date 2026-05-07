@@ -5,23 +5,20 @@ import { type HistoryItem } from '@/lib/useHistory'
 export interface FilterState {
   periodo: '' | '7d' | '30d' | '90d'
   agente: string
-  avaliacaoMin: '' | '1' | '2' | '3' | '4' | '5'
+  apenasFavoritas: boolean
   origem: string
-  semAvaliacao: boolean
 }
 
 export const DEFAULT_FILTER: FilterState = {
   periodo: '',
   agente: '',
-  avaliacaoMin: '',
+  apenasFavoritas: false,
   origem: '',
-  semAvaliacao: false,
 }
 
 export function applyFilter(sessions: HistoryItem[], f: FilterState): HistoryItem[] {
   return sessions.filter(s => {
-    if (f.semAvaliacao && s.avaliacao !== null) return false
-    if (!f.semAvaliacao && f.avaliacaoMin && (s.avaliacao === null || s.avaliacao < Number(f.avaliacaoMin))) return false
+    if (f.apenasFavoritas && !s.favorito) return false
     if (f.agente && !s.agentes_usados.includes(f.agente)) return false
     if (f.origem && s.origem !== f.origem) return false
     if (f.periodo) {
@@ -78,20 +75,17 @@ export function FilterBar({ filter, onChange, sessions }: {
           <option value="">todo agente</option>
           {Object.values(AGENT_MAP).map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
         </select>
-        {/* Avaliação mínima */}
-        <select
-          value={filter.semAvaliacao ? 'sem' : filter.avaliacaoMin}
-          onChange={e => {
-            if (e.target.value === 'sem') onChange({ semAvaliacao: true, avaliacaoMin: '' })
-            else onChange({ semAvaliacao: false, avaliacaoMin: e.target.value as FilterState['avaliacaoMin'] })
-          }}
-          className="px-1.5 py-0.5 rounded-md bg-stone-100 border border-stone-200 text-[8px] font-mono text-stone-600 focus:outline-none">
-          <option value="">qualquer nota</option>
-          <option value="sem">sem avaliação</option>
-          <option value="5">★★★★★ (5)</option>
-          <option value="4">★★★★+ (4+)</option>
-          <option value="3">★★★+ (3+)</option>
-        </select>
+        {/* Favoritas */}
+        <button
+          onClick={() => onChange({ apenasFavoritas: !filter.apenasFavoritas })}
+          className={`px-1.5 py-0.5 rounded-md border text-[8px] font-mono transition-colors ${
+            filter.apenasFavoritas
+              ? 'bg-amber-100 border-amber-300 text-amber-700'
+              : 'bg-stone-100 border-stone-200 text-stone-500 hover:border-stone-300'
+          }`}
+        >
+          ★ favoritas
+        </button>
       </div>
     </div>
   )
