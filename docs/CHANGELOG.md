@@ -4,6 +4,17 @@ Convenção: novidades no topo. Datas em formato ISO. Cada entrada referencia o 
 
 ---
 
+## v1.29 — 2026-05-07
+
+**FASE 6 — T101 + T99 + T104 (T102 já era semanal).**
+
+- T101: `ChatPanel.tsx` — botão 📌/📍 no header; `pinned=true` desabilita drag + muda cursor; localStorage `lemmon-chat-pinned`
+- T99: `SessionDetail.tsx` — botões "↓ Dossiê" / "↓ Editorial" para agentes exportáveis; estado idle/loading/done/error por agente; retry automático ao clicar no botão de erro
+- T104: `AgentConfig.salles.formato → formatos_permitidos: string[]` (default `[]`); ConfigSidebar com chips + indicador + botão limpar; `ws_chat.py` propaga array para `executar()` e `_run_salles_alternativas`; `salles.py _produzir_roteiro` injeta "RESTRIÇÃO DE FORMATO" quando array não vazio
+- T102: verificação confirmou gráfico já usa `dataKey="semana"` / `data.semanas` — sem código alterado, manual atualizado em v1.28
+
+---
+
 ## v1.28 — 2026-05-07
 
 **FASE 6 — T103 + T105 + T102: watchdog uniforme, ease-in e latência semanal.**

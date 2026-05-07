@@ -1,6 +1,6 @@
 # LEMMON AGENTES — Manual do Sistema
 
-**Versão atual:** v1.28
+**Versão atual:** v1.29
 **Última atualização:** 2026-05-07
 **Mantido por:** Calebe Alves / Lemmon Produções
 
@@ -11,6 +11,18 @@
 ## Histórico de versões
 
 > **Convenção:** versões mais novas no topo. Cada release lista o que mudou em relação à anterior, mantendo histórico completo.
+
+### v1.29 — 2026-05-07
+
+**FASE 6 — T102 verificação + T101 + T99 + T104: UX em uso real.**
+
+- T102: gráfico de latência `/saude` confirmado semanal ponta a ponta — sem correção de código necessária
+- T101: botão 📌/📍 no ChatPanel — fixa posição, bloqueia drag; estado em `localStorage` (`lemmon-chat-pinned`)
+- T99: `HistoryPanel.SessionDetail` exibe botões "↓ Dossiê" / "↓ Editorial" para sessões com output Aya/Renata; gera HTML+PDF via `POST /exportar` e permite download direto
+- T104: `AgentConfig.salles.formato` → `formatos_permitidos: string[]`; ConfigSidebar com 5 chips toggleáveis; restrição injetada no prompt de produção do Salles; `ws_chat.py` atualizado para pipeline e alternativas
+- Manual §2.3 (multi-select Salles), §4.9 (pin), §4.16 (download reader)
+
+---
 
 ### v1.28 — 2026-05-07
 
@@ -451,7 +463,12 @@ não vendedora de tratamento.
 
 | Parâmetro | Valores |
 |-----------|---------|
-| `formato` | `auto`, `reels`, `documental`, `mini-doc`, `tese`, `aftermovie` |
+| `formatos_permitidos` | `[]` (Salles decide), ou subset de `reels`, `documental`, `mini-doc`, `tese`, `aftermovie` |
+
+**Multi-select de formatos (T104).** Em vez de um único formato fixo, você seleciona quais formatos o Salles pode usar. Chips toggleáveis no ConfigSidebar:
+- **Nenhum chip selecionado** → "Salles decide entre 5 formatos" (comportamento padrão, mais criativo)
+- **Subset selecionado** → restrição injetada no prompt: "escolha entre apenas: X, Y; não use: Z, W"
+- **Botão "limpar"** → reseta para auto emergente
 
 **Saída.** Roteiro em markdown com bloco-a-bloco, indicação de ação, fala, b-roll sugerido. Estrutura técnica em JSON paralelo (formato_aplicado, num_blocos, titulo_roteiro).
 
@@ -704,6 +721,8 @@ Ao fim de cada pipeline, Haiku gera automaticamente 3-5 tags descritivas. Aparec
 
 Tanto o ChatPanel quanto o HistoryPanel são arrastáveis (drag pelo header) e redimensionáveis (handles nas bordas). Posições persistem na sessão atual; resetam ao recarregar.
 
+**Pin/Unpin (T101).** O botão 📌/📍 no header do ChatPanel fixa o painel na posição atual. Quando fixado (📍), o drag fica desabilitado e o cursor muda para `default`. Clique novamente para liberar. Estado persiste em `localStorage` (`lemmon-chat-pinned`) entre sessões.
+
 ## 4.11 Barra de progresso + ETA (T90)
 
 Durante a execução do pipeline, cada agente exibe uma micro barra de progresso abaixo do seu bubble de resposta. A barra sobe de 0% a 95% com base na mediana histórica de duração daquele agente (calculada nas últimas 20 sessões). Ao chegar em 100%, ela indica conclusão e desaparece.
@@ -757,6 +776,8 @@ Cada export gera HTML + PDF independente em `outputs/<agente>/<session_id>.{html
 **Backend:** `POST /exportar` aceita campo `agente: str = "aya"` (default mantém compatibilidade com clientes antigos). `GET /download/{session_id}/{tipo}?agente=X` serve o arquivo do subdiretório correto.
 
 **Nota visual:** ambos os formatos usam o CSS AURA (identidade Lemmon). O dossiê da Aya (90k chars) é o caso de uso central do AURA; o editorial da Renata (~4k chars) renderiza corretamente mas com mais espaço em branco que o ideal. Ajuste visual planejado como T96 se necessário.
+
+**Download direto do reader (T99).** O `HistoryPanel.SessionDetail` também exibe botões de export para sessões salvas com output da Aya ou Renata. Clique "↓ Dossiê" / "↓ Editorial" para gerar e baixar — mesmo fluxo de `POST /exportar` + `GET /download`, sem precisar reabrir a sessão no ChatPanel.
 
 ## 4.17 Watchdog + barra de progresso em Reunião (T95)
 
