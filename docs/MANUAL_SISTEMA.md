@@ -1,6 +1,6 @@
 # LEMMON AGENTES — Manual do Sistema
 
-**Versão atual:** v1.23
+**Versão atual:** v1.24
 **Última atualização:** 2026-05-07
 **Mantido por:** Calebe Alves / Lemmon Produções
 
@@ -11,6 +11,19 @@
 ## Histórico de versões
 
 > **Convenção:** versões mais novas no topo. Cada release lista o que mudou em relação à anterior, mantendo histórico completo.
+
+### v1.24 — 2026-05-07
+
+**FASE 6 — T93: export agente-agnóstico (Renata sem export próprio).**
+
+- **Bug corrigido em uso real:** `POST /exportar` era hardcoded para `respostas.aya`; output da Renata ficava órfão (gerado, salvo no JSON, exibido no chat — mas sem caminho de export).
+- **`ExportarPayload`** ganha `agente: str = "aya"` — default mantém compatibilidade total com chamadas antigas.
+- **`/exportar`** usa `payload.agente` para extrair markdown, definir `out_dir = OUTPUTS_DIR / agente` (com `mkdir`), e montar mensagem de erro descritiva. `agentes_detectados` passado como `[]` para agentes != "aya".
+- **`/download/{session_id}/{tipo}`** aceita `?agente=X` (Query param, default "aya") para servir o arquivo do subdiretório correto.
+- **Frontend `ChatPanel`:** dois botões independentes ("Exportar Dossiê (Aya)" / "Exportar Editorial (Renata)"), cada um com estado próprio (`exportStates`/`exportResults` como `Record<string, ...>`). Aparecem somente quando o agente correspondente rodou. Download inclui `?agente=X`.
+- **Manual §4.16.**
+
+---
 
 ### v1.23 — 2026-05-07
 
@@ -649,6 +662,16 @@ Na página `/saude`, nova seção "Latência Semanal". Mostra a média de duraç
 ## 4.15 Toast global de erros (T86)
 
 Erros de API exibidos em toast (bottom-right) via [sonner](https://github.com/emilkowalski/sonner). Cobre: falhas de fetch em `useApiQuery` (páginas `/saude`, `/historico`, etc.) e chamadas manuais em `/briefing-reverso` e `/cortes`. `notify.error()` / `notify.success()` disponíveis em `@/lib/toast` para uso em qualquer página.
+
+## 4.16 Export por agente — Aya e Renata (T93)
+
+Quando uma sessão inclui output da **Aya**, o botão "Exportar Dossiê (Aya)" aparece na área de avaliação. Quando inclui output da **Renata**, aparece "Exportar Editorial (Renata)". Os dois botões coexistem se o pipeline rodou ambos.
+
+Cada export gera HTML + PDF independente em `outputs/<agente>/<session_id>.{html,pdf}`.
+
+**Backend:** `POST /exportar` aceita campo `agente: str = "aya"` (default mantém compatibilidade com clientes antigos). `GET /download/{session_id}/{tipo}?agente=X` serve o arquivo do subdiretório correto.
+
+**Nota visual:** ambos os formatos usam o CSS AURA (identidade Lemmon). O dossiê da Aya (90k chars) é o caso de uso central do AURA; o editorial da Renata (~4k chars) renderiza corretamente mas com mais espaço em branco que o ideal. Ajuste visual planejado como T96 se necessário.
 
 ---
 
