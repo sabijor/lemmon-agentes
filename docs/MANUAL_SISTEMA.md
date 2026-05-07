@@ -471,6 +471,8 @@ Toggle no header do chat panel. Em vez de o pipeline correr direto até o fim, o
 
 **Aceite por step.** Em caso de erro do agente em modo manual, três opções aparecem na barra de aprovação: **Retry** (tenta de novo), **Pular** (segue sem o output desse agente) ou **Cancelar** (encerra pipeline).
 
+**Barra de progresso em modo manual.** A barra abaixo do bubble do agente sobe normalmente até 95% durante o processamento. Quando o agente termina (`agent_done`), trava em 100% e exibe "🔒 Aguardando aprovação..." enquanto o operador decide. A barra desaparece ao aprovar, pular ou cancelar.
+
 ## 3.4 Retomada de sessão
 
 Você pode pegar uma sessão antiga do histórico, clicar **Retomar**, e o sistema recarrega contexto técnico (análise Otto, diretrizes Heitor, roteiro Salles, etc.) e abre o chat para você continuar.
@@ -540,6 +542,22 @@ Ao fim de cada pipeline, Haiku gera automaticamente 3-5 tags descritivas. Aparec
 ## 4.9 Painéis flutuantes
 
 Tanto o ChatPanel quanto o HistoryPanel são arrastáveis (drag pelo header) e redimensionáveis (handles nas bordas). Posições persistem na sessão atual; resetam ao recarregar.
+
+## 4.11 Barra de progresso + ETA (T90)
+
+Durante a execução do pipeline, cada agente exibe uma micro barra de progresso abaixo do seu bubble de resposta. A barra sobe de 0% a 95% com base na mediana histórica de duração daquele agente (calculada nas últimas 20 sessões). Ao chegar em 100%, ela indica conclusão e desaparece.
+
+**MacroBar (visão geral).** Acima das mensagens do pipeline, uma barra de status mostra todos os agentes em execução com ícone de estado: ⏱ aguardando, ▶ processando, ✓ concluído, ✕ erro. Agentes ativos exibem uma mini barra de progresso individual.
+
+**ETA e detalhes.** Passe o cursor sobre qualquer barra para ver o tooltip: `Tempo médio: 30s · decorrido: 18s · n=15 amostras`.
+
+**Overloaded (âmbar).** Se o agente ultrapassar 1,5× a mediana histórica sem terminar, a barra muda para âmbar e exibe "Mais lento que o normal". Não implica erro — apenas sinaliza que essa execução está mais devagar que o habitual.
+
+**Fallback sem dados.** Enquanto o sistema não acumula 3 amostras para um agente, usa tempos fixos de referência: Otto 20s, Heitor 40s, Salles 30s, Sônia 30s, Aya 15s, Pedro 25s, Renata 30s.
+
+**Salles A/B.** Quando `config.salles.alternativas = 3`, a mediana estimada é multiplicada por 3 automaticamente — o agente produz 3 roteiros completos, demora proporcionalmente.
+
+**Endpoint backend.** `GET /sessoes/medianas?agente=X` retorna `{mediana_segundos, amostras}` ou `null` se < 3 amostras. Cache in-memory TTL 60s.
 
 ## 4.10 Escritório virtual
 
@@ -973,6 +991,31 @@ Cada PDF gerado em `docs/releases/` permanece para sempre como snapshot históri
 - Comparação de evolução
 - Onboarding de pessoa nova ("o sistema em v1.0 era assim, agora está em v1.5")
 - Documentação para cliente externo (Hator pode receber v atual sem ver a próxima ainda em desenvolvimento)
+
+## 9.5 Atualização contínua é critério de aceite (T92, regra a partir de v1.18)
+
+**Regra:** toda tarefa que adicionar feature, agente, configuração, modo de operação, página do dashboard, CLI ou comportamento visível ao operador **DEVE atualizar as seções §2 a §8 deste manual** antes do bump de versão. Sem isso, a tarefa não é considerada concluída — mesmo com código funcional, testes verdes e changelog atualizado.
+
+**Por quê:** o changelog é o diário cronológico do que mudou; o manual é o livro de instruções atualizado. São documentos diferentes com função diferente:
+
+- Quem abre o **changelog** quer saber: "o que entrou na v1.X?"
+- Quem abre o **manual** quer saber: "como uso o sistema HOJE?"
+
+Se só o changelog é atualizado, em pouco tempo o manual fossiliza enquanto o sistema cresce — foi exatamente o que aconteceu entre v1.0 e v1.17 (motivou T91).
+
+**Onde atualizar de acordo com o tipo de mudança:**
+
+| Tipo de mudança | Seção do manual a atualizar |
+|---|---|
+| Agente novo | §2 (subseção dedicada) |
+| Modo de operação novo | §3 |
+| Função do dashboard | §4 |
+| CLI novo ou alterado | §5 |
+| Workflow novo | §6 (receita) |
+| Item de roadmap entregue | §7 (mover de roadmap pra estável) |
+| Custo, limite ou env var | §8 |
+
+**Como verificar antes do PR:** ler o diff completo da tarefa, perguntar "alguém usando o sistema veria isso de alguma forma?". Se sim → seção do manual atualizada. Se não (refatoração interna, dívida técnica) → manual permanece igual, marcar tarefa como `Afeta output: NÃO` no commit.
 
 ---
 
