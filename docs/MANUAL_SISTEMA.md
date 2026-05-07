@@ -1,6 +1,6 @@
 # LEMMON AGENTES — Manual do Sistema
 
-**Versão atual:** v1.18
+**Versão atual:** v1.19
 **Última atualização:** 2026-05-07
 **Mantido por:** Calebe Alves / Lemmon Produções
 
@@ -11,6 +11,18 @@
 ## Histórico de versões
 
 > **Convenção:** versões mais novas no topo. Cada release lista o que mudou em relação à anterior, mantendo histórico completo.
+
+### v1.19 — 2026-05-07
+
+**BLOCO 6 — T89: tema claro/escuro.**
+
+- **`next-themes`:** `ThemeProvider` em `layout.tsx`. `darkMode: 'class'` em `tailwind.config.js`. Preferência persiste em localStorage (`lemmon-theme`); default: `prefers-color-scheme` do SO.
+- **Toggle ☀/🌙** no header ao lado do botão de histórico.
+- **`dark:` classes** cobrindo: `body` + `.glass` (via globals.css), `.iso-tile`, header e logo, agent pills, botões de navegação, ChatPanel (header, content, textarea), MacroBar, ProgressBar.
+- **Cores dos agentes:** mantidas (`colorDim` pasteis funcionam em dark). Aya #18181b não inverte — bolha near-white em fundo escuro tem contraste adequado.
+- **Exportações:** HTML/PDF da Aya não afetados (documento de impressão).
+
+---
 
 ### v1.18 — 2026-05-07
 
@@ -574,6 +586,16 @@ Durante a execução do pipeline, cada agente exibe uma micro barra de progresso
 **Salles A/B.** Quando `config.salles.alternativas = 3`, a mediana estimada é multiplicada por 3 automaticamente — o agente produz 3 roteiros completos, demora proporcionalmente.
 
 **Endpoint backend.** `GET /sessoes/medianas?agente=X` retorna `{mediana_segundos, amostras}` ou `null` se < 3 amostras. Cache in-memory TTL 60s.
+
+## 4.12 Tema claro/escuro (T89)
+
+Toggle no header da aplicação (ícone ☀/🌙). Alterna entre modo claro e escuro. Por padrão, segue `prefers-color-scheme` do sistema operacional. Preferência persiste em `localStorage` entre sessões.
+
+**Implementação.** `next-themes` via `ThemeProvider` em `layout.tsx`. Tailwind `darkMode: 'class'` — a classe `dark` é adicionada ao `<html>` pelo provider. `dark:` classes cobrindo: body, `.glass`, header, ChatPanel, textarea de input, MacroBar e ProgressBar.
+
+**Cores dos agentes.** Mantidas como estão — os valores `colorDim` (pasteis) funcionam bem em modo escuro: bolhas claras sobre fundo escuro proveem alto contraste. Aya (#18181b / colorDim #f4f4f5) em modo escuro exibe bolha near-white no fundo escuro — legibilidade preservada.
+
+**Exportações não afetadas.** O HTML/PDF gerado pela Aya é documento de impressão/cliente e permanece em modo claro independente do tema da interface.
 
 ## 4.10 Escritório virtual
 
