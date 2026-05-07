@@ -1,6 +1,6 @@
 # LEMMON AGENTES — Manual do Sistema
 
-**Versão atual:** v1.26
+**Versão atual:** v1.27
 **Última atualização:** 2026-05-07
 **Mantido por:** Calebe Alves / Lemmon Produções
 
@@ -11,6 +11,22 @@
 ## Histórico de versões
 
 > **Convenção:** versões mais novas no topo. Cada release lista o que mudou em relação à anterior, mantendo histórico completo.
+
+### v1.27 — 2026-05-07
+
+**FASE 6 — T94: Modo Loop Autônomo em Reunião.**
+
+- **Loop:** novo modo de orquestração em que os agentes conversam entre si autonomamente até um critério de parada. Ativado pelo pill "Loop" no segmented control do painel de Reunião.
+- **4 critérios de parada:** `[ENTREGA FINAL]` no output de algum agente (loop cumpriu o objetivo), `[PRECISO DE AYUDA OPERADOR]` (agente pausa pedindo intervenção), limite de turnos atingido, cap de custo atingido.
+- **Roteamento por @mentions:** após cada turno, o sistema lê o output do agente e detecta `@nome` para decidir o próximo. Sem menção, usa round-robin pelos agentes convocados.
+- **Prevenção de estagnação:** se o mesmo agente responder 3 vezes consecutivas (sem mencionar outro), o loop encerra por `stagnacao`.
+- **Interrupção do operador:** botão "parar" envia `{type: loop_stop}` via WS; o loop verifica a mensagem a cada turno. Loop também aceita mensagens do operador durante a execução (o texto é injetado no histórico).
+- **Persistência incremental:** JSON salvo a cada turno com `skip_index=True`; índice histórico atualizado uma única vez no `loop_stopped` para evitar escrita redundante em loops longos.
+- **Frontend:** segmented control 3-pill (Auto/Manual/Loop) substitui o toggle binário anterior. Inputs de `turnos` e `cap $` ficam visíveis quando Loop está selecionado. Header de loop "Turno N/M · $X/$Y" + botão vermelho "parar" aparecem enquanto loop está ativo. Banners pós-loop: verde (entrega), azul (ayuda), âmbar (turnos_max/estagnação/operador), overlay bloqueante (custo_max).
+- **Prompts:** todos os 7 agentes recebem bloco "QUANDO EM MODO LOOP" ao final do system prompt.
+- **Manual:** §3.2 + §4.18 adicionados.
+
+---
 
 ### v1.26 — 2026-05-07
 
@@ -571,6 +587,31 @@ Conversacional, multi-turno. Você manda mensagem, agentes respondem (em ordem).
 
 **Watchdog.** Se um agente não responder em `max(180, min(mediana×3, 1200))` segundos (mínimo 3 min, cap 20 min), o sistema cancela o timer, marca o agente como erro e exibe mensagem "Agente travou (timeout Xmin)". Eventos tardios (`agent_done`, `token`) chegados depois do watchdog são ignorados para evitar ghost bubbles.
 
+### Modo Loop Autônomo
+
+O Loop é um terceiro modo de orquestração em Reunião (além de Auto e Manual). Os agentes conversam entre si sem intervenção do operador a cada turno.
+
+**Como ativar.** No segmented control do painel de Reunião, selecione "Loop". Dois campos aparecem na participants bar: **turnos** (máximo de iterações, padrão 5) e **cap $** (limite de custo em dólares, padrão $1.50). Configure e envie o objetivo como mensagem.
+
+**Critérios de parada.**
+
+| Motivo | O que acontece |
+|---|---|
+| `final` | Um agente escreveu `[ENTREGA FINAL]` no output — objetivo cumprido |
+| `ayuda` | Um agente escreveu `[PRECISO DE AYUDA OPERADOR]` — pausa pedindo intervenção |
+| `turnos_max` | Limite de turnos atingido sem entrega |
+| `stagnacao` | Mesmo agente respondeu 3 turnos consecutivos (sem mencionar outro) |
+| `operador` | Operador clicou "parar" durante o loop |
+| `custo_max` | Cap de custo atingido antes de `[ENTREGA FINAL]` |
+
+**Roteamento entre agentes.** Após cada resposta, o backend lê o output e extrai `@mentions`. O agente mencionado é o próximo. Sem menção: round-robin pelos agentes convocados.
+
+**Header de loop.** Enquanto o loop roda, o painel exibe "Turno N/M · $X.XXX/$Y.YY" e um botão vermelho "parar". Ao encerrar, aparece um banner com o motivo e o custo total.
+
+**Intervenção durante o loop.** Você pode enviar uma mensagem enquanto o loop está ativo (o input continua disponível). Ela é injetada no histórico e o loop a processa no próximo ciclo.
+
+**Quando usar.** Objetivos que exigem colaboração entre agentes sem direção humana a cada passo — ex.: "Otto analisa, passa pra Renata que monta editorial e entrega". Bom para fluxos já calibrados. Não usar em briefings ambíguos — o loop pode estorvar sem entregar.
+
 ## 3.3 Modo Manual (aprovação step-by-step)
 
 Toggle no header do chat panel. Em vez de o pipeline correr direto até o fim, o sistema pausa após cada agente e espera o operador clicar **Continuar**, **Pular**, **Tentar de novo** ou **Cancelar**.
@@ -718,6 +759,36 @@ Replicação do padrão T90 (§4.11) para o modo Reunião.
 **Prevenção de ghost bubbles.** Qualquer `agent_done` ou `token` chegado após o watchdog disparar é ignorado silenciosamente (guard em `timedOutAgentsRef`). O mesmo padrão foi retroativamente aplicado ao `useChat.ts` (Pipeline) para consistência.
 
 **MacroBar.** Não exibida em modo Reunião — agentes não têm ordem fixa.
+
+## 4.18 Loop Autônomo em Reunião (T94)
+
+Detalhes de implementação do Modo Loop (§3.2).
+
+**Backend (`api/ws_reuniao.py`).** Quando o payload chega com `modo=loop`, o backend entra em loop while. A cada iteração:
+1. Envia `turn_iteration {n, total, custo_total}` ao frontend.
+2. Chama o agente via `run_in_executor` (não-bloqueante).
+3. Verifica `[ENTREGA FINAL]` e `[PRECISO DE AYUDA OPERADOR]` no output (regex case-insensitive).
+4. Detecta `@mentions` no output para decidir o próximo agente. Sem menção: round-robin.
+5. Após `agent_done`, faz `asyncio.wait_for(ws.receive_json(), timeout=0.05)`: se houver mensagem do operador, injeta no histórico; se for `{type: loop_stop}`, encerra; se `WebSocketDisconnect`, sai limpo.
+6. Salva JSON com `skip_index=True`; índice atualizado uma vez no final (`adicionar_entrada`).
+
+**Estagnação.** `consecutive_count` incrementa quando o mesmo agente responde novamente. Em ≥ 3 turnos consecutivos, `loop_motivo = "stagnacao"`. Menções próprias (agente menciona a si mesmo) contam como consecutivo — o frontend filtra para não sugerir self-loops.
+
+**Cap de custo.** Verificado ANTES de cada chamada de agente. Se `loop_custo_total >= custo_cap`, para imediatamente com `custo_max`.
+
+**Sinalização nos prompts.** Bloco "QUANDO EM MODO LOOP" ao final de cada system prompt define o contrato: citar `@nome` para encaminhar, `[ENTREGA FINAL]` para concluir, `[PRECISO DE AYUDA OPERADOR]` para pausar. Em modos AUTO e MANUAL a regra é ignorada.
+
+**Frontend (`useReuniao.ts`).** Estado de loop: `loopMode`, `loopMaxTurnos`, `loopCustoCap`, `loopActive`, `loopTurn`, `loopCost`, `loopStatus`. Handler `turn_iteration` atualiza turno e custo em tempo real. Handler `loop_stopped` preenche `LoopStatus {motivo, nTurnos, custoTotal, agenteFinal?}` e redefine agentes para idle (com delay 1.5s).
+
+**Interface LoopStatus (exportada de `useReuniao.ts`):**
+```ts
+interface LoopStatus {
+  motivo: 'final' | 'ayuda' | 'turnos_max' | 'stagnacao' | 'operador' | 'custo_max'
+  nTurnos: number
+  custoTotal: number
+  agenteFinal?: string
+}
+```
 
 ---
 
