@@ -186,3 +186,22 @@ AYA_PDF_ENGINE = "weasyprint"
 
 # Tamanho máximo aceitável do PDF (alerta se passar)
 AYA_PDF_MAX_SIZE_MB = 10
+
+# ============================================================================
+# LIMITES DA RENATA (DISTRIBUIÇÃO MULTI-PLATAFORMA)
+# ============================================================================
+
+RENATA_PREVISAO_RANGE_USD = (0.10, 0.25)
+RENATA_AVISO_AMARELO_USD = 0.30
+RENATA_AVISO_VERMELHO_USD = 0.50
+RENATA_PEDIR_CONFIRMACAO_ACIMA_USD = None
+
+# Tamanho máximo do dossiê enviado para a Renata (proteção contra prompt gigante)
+RENATA_DOSSIE_MAX_CHARS = 80000
+
+# Output_humano máximo (spec: ≤ 5000 chars)
+RENATA_OUTPUT_MAX_CHARS = 5000
+
+# Duração padrão de campanha em dias
+RENATA_DURACAO_PADRAO_DIAS = 14
+RENATA_DURACAO_MAX_DIAS = 60
