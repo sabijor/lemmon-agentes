@@ -1,7 +1,7 @@
 # LEMMON AGENTES — Manual do Sistema
 
-**Versão atual:** v1.14
-**Última atualização:** 2026-05-06
+**Versão atual:** v1.15
+**Última atualização:** 2026-05-07
 **Mantido por:** Calebe Alves / Lemmon Produções
 
 > Este é o documento de referência viva do sistema Lemmon Agentes. Sempre que uma função nova for implementada ou um épico fechar, este manual deve ser atualizado e uma nova versão de PDF gerada em `docs/releases/`.
@@ -11,6 +11,18 @@
 ## Histórico de versões
 
 > **Convenção:** versões mais novas no topo. Cada release lista o que mudou em relação à anterior, mantendo histórico completo.
+
+### v1.15 — 2026-05-07
+
+**FASE 5 — BLOCO 3: tipagem, hooks TS e refatoração de agentes (T74 → T75 → T82 → T81 → T73).**
+
+- **T74 — api-client.ts centralizado:** `dashboard/lib/api-client.ts` criado com `apiFetch<T>` utilitário único e 7 funções tipadas exportadas (`fetchBriefingReverso`, `fetchCortesProntos`, `fetchHistorico`, `fetchCalibragemPedro`, `postCalibragemPedro`, `fetchShare`, `postComentario`). As 6 páginas do dashboard refatoradas para usar o client (eliminados ~80 `fetch()` inline repetidos).
+- **T75 — useApiQuery hook:** `dashboard/lib/use-api-query.ts` exporta `useApiQuery<T>(fn, deps)` genérico retornando `{ data, loading, error, reload }`. Padroniza o ciclo de loading/error em todas as páginas que consultam API.
+- **T82 — HistoryPanel splitado:** `dashboard/components/history/HistoryPanel.tsx` de 582 linhas dividido em 4 arquivos: `FilterBar.tsx` (filtros de período/origem), `SessionCard.tsx` (card de sessão), `SessionDetail.tsx` (painel de detalhes expandido), `HistoryPanel.tsx` reduzido para 146 linhas como orquestrador.
+- **T81 — Sônia migra para _chamar_api da base:** As 3 chamadas diretas a `self.client.messages.create()` em `agentes/sonia.py` migradas para `self._chamar_api()`. Imports de `APIError`, `AuthenticationError`, `RateLimitError` e `Custo` removidos do arquivo. Teste diferencial confirmou output idêntico ao baseline pré-refatoração.
+- **T73 — AgenteResultado TypedDict + annotations:** `core/tipos.py` criado com `AgenteResultado(TypedDict, total=False)` contendo 4 campos base garantidos (`output_humano`, `output_tecnico`, `custo_total_usd`, `duracao_segundos`) mais campos extras comuns opcionais. Todos os agentes e `EspelhoCliente` anotam `executar() -> AgenteResultado`. `AgenteBase` atualiza tipo de retorno abstract. Returns com campos extras usam `cast()`. `_chamar_api_chain` e `_somar_custo` documentados com distinção explícita: chain para chamadas independentes (mesma entrada), somar+_chamar_api individual para chamadas dependentes (output N-1 alimenta N).
+
+---
 
 ### v1.14 — 2026-05-06
 
