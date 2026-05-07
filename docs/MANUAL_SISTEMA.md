@@ -1,6 +1,6 @@
 # LEMMON AGENTES — Manual do Sistema
 
-**Versão atual:** v1.25
+**Versão atual:** v1.26
 **Última atualização:** 2026-05-07
 **Mantido por:** Calebe Alves / Lemmon Produções
 
@@ -11,6 +11,19 @@
 ## Histórico de versões
 
 > **Convenção:** versões mais novas no topo. Cada release lista o que mudou em relação à anterior, mantendo histórico completo.
+
+### v1.26 — 2026-05-07
+
+**T98 (hotfix) + T97: piso watchdog 60s→180s + Otto modo_visual 'auto'.**
+
+- **T98 — watchdog piso corrigido:** `max(60,…)` → `max(180,…)` em `useReuniao.ts` e `useChat.ts`. Com o piso anterior, Otto (fallback 20s) disparava em `max(60, 60) = 60s` — menos que 1 ciclo normal. Com piso 180s: mínimo 3 min garantidos para qualquer agente.
+- **T98 — mensagem correta:** `Math.round(timeoutMs / 60000)` já calculava o valor real; com o piso certo exibe "3min" para Otto e o tempo proporcional para os demais.
+- **T97 — Otto `modo_visual`:** tipo atualizado de `'completo' | 'resumido' | 'minimo'` para `'completo' | 'resumo' | 'auto'` — alinhado com `core/validador.py` (backend já usava esses valores). Default muda de `'completo'` para `'auto'` (Otto escolhe o nível de detalhe baseado na complexidade do briefing).
+- **T97 — ConfigSidebar:** botões "Completo / Resumo / Auto (IA decide)".
+- **T97 — bug silencioso corrigido:** `api/ws_chat.py` passava `"resumido"` em fast-track; `validar_modo_visual()` rejeitaria esse valor. Corrigido para `"resumo"`.
+- **Manual:** §2.1 (tabela modo_visual), §3.2 + §4.17 (piso watchdog).
+
+---
 
 ### v1.25 — 2026-05-07
 
@@ -362,7 +375,7 @@ A equipe atual tem 7 personagens. Cinco entram no pipeline padrão (Otto → Hei
 
 | Parâmetro | Valores | Descrição |
 |-----------|---------|-----------|
-| `modo_visual` | `completo`, `resumido`, `minimo` | Tamanho do output. Completo dá tudo; resumido só tese + conceito; mínimo é tese só |
+| `modo_visual` | `completo`, `resumo`, `auto` | Tamanho do output. `completo` dá análise integral; `resumo` só tese + conceito; `auto` (padrão) — Otto analisa a complexidade do briefing e escolhe o nível sozinho |
 
 **Exemplo de input.** "Cliente é uma clínica de medicina personalizada para mulheres 35-55. Quer um vídeo curto sobre tratamento de menopausa que não soe como propaganda."
 
@@ -556,7 +569,7 @@ Conversacional, multi-turno. Você manda mensagem, agentes respondem (em ordem).
 
 **Barra de progresso.** Igual ao Pipeline (§4.11), cada agente exibe micro barra de progresso abaixo do seu bubble durante o processamento. Usa a mesma mediana histórica e FALLBACK_MEDIANAS. MacroBar não aparece em Reunião (não há ordem fixa de agentes).
 
-**Watchdog.** Se um agente não responder em `max(60, min(mediana×3, 1200))` segundos (cap 20 min), o sistema cancela o timer, marca o agente como erro e exibe mensagem "Agente travou (timeout Xmin)". Eventos tardios (`agent_done`, `token`) chegados depois do watchdog são ignorados para evitar ghost bubbles.
+**Watchdog.** Se um agente não responder em `max(180, min(mediana×3, 1200))` segundos (mínimo 3 min, cap 20 min), o sistema cancela o timer, marca o agente como erro e exibe mensagem "Agente travou (timeout Xmin)". Eventos tardios (`agent_done`, `token`) chegados depois do watchdog são ignorados para evitar ghost bubbles.
 
 ## 3.3 Modo Manual (aprovação step-by-step)
 
@@ -696,7 +709,7 @@ Replicação do padrão T90 (§4.11) para o modo Reunião.
 
 **Barra de progresso.** Cada agente em modo Reunião exibe a mesma micro barra abaixo do bubble (ProgressBar.tsx), alimentada por `agentProgress`/`agentProgressMeta` do `useReuniao`. A barra sobe de 0% a 95% usando a mediana histórica (`GET /sessoes/medianas`) ou `FALLBACK_MEDIANAS` se a API falhar. Snap 100% em `agent_done`.
 
-**Watchdog.** Fórmula: `max(60, min(mediana × 3, 1200))` segundos (mínimo 1 min, máximo 20 min). Se `agent_done` não chegar nesse prazo, o watchdog:
+**Watchdog.** Fórmula: `max(180, min(mediana × 3, 1200))` segundos (mínimo 3 min, máximo 20 min). Se `agent_done` não chegar nesse prazo, o watchdog:
 1. Adiciona o agente ao `timedOutAgentsRef`
 2. Limpa o interval de progresso
 3. Marca o agente como `error`

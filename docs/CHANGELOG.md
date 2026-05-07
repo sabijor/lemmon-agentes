@@ -4,6 +4,18 @@ Convenção: novidades no topo. Datas em formato ISO. Cada entrada referencia o 
 
 ---
 
+## v1.26 — 2026-05-07
+
+**T98 (hotfix) + T97: piso watchdog 60s→180s + Otto 'auto'.**
+
+- `useReuniao.ts` + `useChat.ts`: `Math.max(60,` → `Math.max(180,` — piso de 3 min evita falso timeout em Otto com briefing complexo
+- `useChat.ts`: tipo `otto.modo_visual` = `'completo' | 'resumo' | 'auto'`; default `'auto'`
+- `ConfigSidebar.tsx`: botões "Completo / Resumo / Auto (IA decide)"
+- `api/ws_chat.py`: fast-track corrigido de `"resumido"` → `"resumo"` (validator rejeitaria o valor antigo)
+- Manual §2.1 + §3.2 + §4.17
+
+---
+
 ## v1.25 — 2026-05-07
 
 **FASE 6 — T95: watchdog + barra de progresso em modo Reunião.**

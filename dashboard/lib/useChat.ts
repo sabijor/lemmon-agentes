@@ -48,7 +48,7 @@ const FALLBACK_MEDIANAS: Record<AgentId, number> = {
 }
 
 export interface AgentConfig {
-  otto: { modo_visual: 'completo' | 'resumido' | 'minimo' }
+  otto: { modo_visual: 'completo' | 'resumo' | 'auto' }
   heitor: { max_buscas: number }
   salles: { formato: 'auto' | 'reels' | 'documental' | 'mini-doc' | 'tese' | 'aftermovie'; gate_espelho: 'off' | 'auto' | 'manual'; alternativas: 0 | 3 }
   sonia: { com_busca: boolean; usar_tendencias: boolean }
@@ -56,7 +56,7 @@ export interface AgentConfig {
 }
 
 const DEFAULT_CONFIG: AgentConfig = {
-  otto: { modo_visual: 'completo' },
+  otto: { modo_visual: 'auto' },
   heitor: { max_buscas: 3 },
   salles: { formato: 'auto', gate_espelho: 'off', alternativas: 0 },
   sonia: { com_busca: false, usar_tendencias: true },
@@ -203,7 +203,7 @@ export function useChat() {
               setAgentProgressMeta(prev => ({ ...prev, [agentId]: { mediana, elapsed, amostras } }))
             }, 200)
             progressIntervalsRef.current[agentId] = iv
-            const timeoutMs = Math.max(60, Math.min(mediana * 3, 1200)) * 1000
+            const timeoutMs = Math.max(180, Math.min(mediana * 3, 1200)) * 1000
             watchdogTimersRef.current[agentId] = setTimeout(() => {
               if (!activeAgentsRef.current.has(agentId)) return
               timedOutAgentsRef.current.add(agentId)
@@ -232,7 +232,7 @@ export function useChat() {
               setAgentProgressMeta(prev => ({ ...prev, [agentId]: { mediana, elapsed, amostras: 0 } }))
             }, 200)
             progressIntervalsRef.current[agentId] = iv
-            const timeoutMs2 = Math.max(60, Math.min(mediana * 3, 1200)) * 1000
+            const timeoutMs2 = Math.max(180, Math.min(mediana * 3, 1200)) * 1000
             watchdogTimersRef.current[agentId] = setTimeout(() => {
               if (!activeAgentsRef.current.has(agentId)) return
               timedOutAgentsRef.current.add(agentId)

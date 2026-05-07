@@ -25,13 +25,17 @@ export function ConfigSidebar({ agentConfig, onUpdateConfig, isRunning, custoCap
           </div>
           <p className="text-[8px] font-mono text-stone-400 mb-1.5">modo visual</p>
           <div className="flex flex-col gap-1">
-            {(['completo', 'resumido', 'minimo'] as const).map(v => (
+            {([
+              { v: 'completo', label: 'Completo' },
+              { v: 'resumo',   label: 'Resumo' },
+              { v: 'auto',     label: 'Auto (IA decide)' },
+            ] as const).map(({ v, label }) => (
               <button key={v} disabled={isRunning} onClick={() => onUpdateConfig('otto', { modo_visual: v })}
                 className={`px-2 py-1 rounded-md text-[9px] font-mono border transition-all text-left disabled:opacity-50 ${
                   agentConfig.otto.modo_visual === v
                     ? 'bg-stone-900 text-white border-stone-900'
                     : 'bg-white text-stone-500 border-stone-200 hover:border-stone-400'
-                }`}>{v}</button>
+                }`}>{label}</button>
             ))}
           </div>
         </div>

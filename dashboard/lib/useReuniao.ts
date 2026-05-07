@@ -61,7 +61,7 @@ export function useReuniao() {
     progressIntervalsRef.current[agentId] = iv
 
     // Watchdog: timeout = max(60s, min(mediana × 3, 1200s)) — cap at 20min
-    const timeoutMs = Math.max(60, Math.min(mediana * 3, 1200)) * 1000
+    const timeoutMs = Math.max(180, Math.min(mediana * 3, 1200)) * 1000
     watchdogTimersRef.current[agentId] = setTimeout(() => {
       if (!activeAgentsRef.current.has(agentId)) return
       timedOutAgentsRef.current.add(agentId)

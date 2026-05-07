@@ -105,7 +105,7 @@ async def chat(ws: WebSocket):
 
             # T26: Fast-track força Otto resumido
             if fast_track:
-                cfg_otto = {**cfg_otto, "modo_visual": "resumido"}
+                cfg_otto = {**cfg_otto, "modo_visual": "resumo"}
 
             async def _run_agent_step(name: str) -> tuple[str, float] | None:
                 """Executa um agente e retorna (text, cost) ou None se cancelado/pulado."""
