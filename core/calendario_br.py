@@ -1,5 +1,5 @@
 """Banco de datas comemorativas BR filtradas por nicho — uso exclusivo da Renata."""
-from datetime import date, timedelta
+from datetime import date
 from typing import Optional
 
 # Datas fixas: (MM-DD, nome, tags)

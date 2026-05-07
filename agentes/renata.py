@@ -11,7 +11,6 @@ Arquitetura: 1 chamada API (tool_use forçado) + validação pós + saves em dis
 import json as _json
 import time as _time
 from datetime import date, datetime, timedelta
-from pathlib import Path
 from typing import Optional, cast
 
 from core.agente_base import AgenteBase

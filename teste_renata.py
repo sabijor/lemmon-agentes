@@ -6,7 +6,6 @@ import pytest
 
 from core.calendario_br import datas_na_janela
 
-
 # ── calendario_br ─────────────────────────────────────────────────────────────
 
 def test_datas_na_janela_filtra_nichos():
