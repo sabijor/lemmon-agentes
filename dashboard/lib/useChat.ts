@@ -88,11 +88,15 @@ export function useChat() {
   const resumeContextRef = useRef<Record<string, unknown> | null>(null)
   const progressIntervalsRef = useRef<Record<string, ReturnType<typeof setInterval>>>({})
   const activeAgentsRef = useRef<Set<string>>(new Set())
+  const watchdogTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  const timedOutAgentsRef = useRef<Set<string>>(new Set())
 
   useEffect(() => {
     return () => {
       Object.values(progressIntervalsRef.current).forEach(clearInterval)
+      Object.values(watchdogTimersRef.current).forEach(clearTimeout)
       progressIntervalsRef.current = {}
+      watchdogTimersRef.current = {}
     }
   }, [])
 
@@ -199,6 +203,24 @@ export function useChat() {
               setAgentProgressMeta(prev => ({ ...prev, [agentId]: { mediana, elapsed, amostras } }))
             }, 200)
             progressIntervalsRef.current[agentId] = iv
+            const timeoutMs = Math.max(60, Math.min(mediana * 3, 1200)) * 1000
+            watchdogTimersRef.current[agentId] = setTimeout(() => {
+              if (!activeAgentsRef.current.has(agentId)) return
+              timedOutAgentsRef.current.add(agentId)
+              clearInterval(progressIntervalsRef.current[agentId])
+              delete progressIntervalsRef.current[agentId]
+              delete watchdogTimersRef.current[agentId]
+              activeAgentsRef.current.delete(agentId)
+              setAgentProgress(prev => { const n = { ...prev }; delete n[agentId]; return n })
+              setAgentProgressMeta(prev => { const n = { ...prev }; delete n[agentId]; return n })
+              setAgentStatus(prev => ({ ...prev, [agentId]: 'error' }))
+              const msgId = currentMsgId.current[agentId]
+              const mins = Math.round(timeoutMs / 60000)
+              if (msgId) setMessages(prev => prev.map(m => m.id === msgId
+                ? { ...m, done: true, error: `Agente travou (timeout ${mins}min). Provável overloaded da API. Tente reenviar.` }
+                : m
+              ))
+            }, timeoutMs)
           })
           .catch(() => {
             if (!activeAgentsRef.current.has(agentId)) return
@@ -210,16 +232,36 @@ export function useChat() {
               setAgentProgressMeta(prev => ({ ...prev, [agentId]: { mediana, elapsed, amostras: 0 } }))
             }, 200)
             progressIntervalsRef.current[agentId] = iv
+            const timeoutMs2 = Math.max(60, Math.min(mediana * 3, 1200)) * 1000
+            watchdogTimersRef.current[agentId] = setTimeout(() => {
+              if (!activeAgentsRef.current.has(agentId)) return
+              timedOutAgentsRef.current.add(agentId)
+              clearInterval(progressIntervalsRef.current[agentId])
+              delete progressIntervalsRef.current[agentId]
+              delete watchdogTimersRef.current[agentId]
+              activeAgentsRef.current.delete(agentId)
+              setAgentProgress(prev => { const n = { ...prev }; delete n[agentId]; return n })
+              setAgentProgressMeta(prev => { const n = { ...prev }; delete n[agentId]; return n })
+              setAgentStatus(prev => ({ ...prev, [agentId]: 'error' }))
+              const msgId = currentMsgId.current[agentId]
+              const mins = Math.round(timeoutMs2 / 60000)
+              if (msgId) setMessages(prev => prev.map(m => m.id === msgId
+                ? { ...m, done: true, error: `Agente travou (timeout ${mins}min). Provável overloaded da API. Tente reenviar.` }
+                : m
+              ))
+            }, timeoutMs2)
           })
       }
 
       if (data.type === 'token') {
+        if (timedOutAgentsRef.current.has(data.agent)) return
         const msgId = currentMsgId.current[data.agent]
         if (!msgId) return
         setMessages(prev => prev.map(m => m.id === msgId ? { ...m, content: m.content + data.content } : m))
       }
 
       if (data.type === 'agent_done') {
+        if (timedOutAgentsRef.current.has(data.agent)) return
         const msgId = currentMsgId.current[data.agent]
         if (msgId) setMessages(prev => prev.map(m => m.id === msgId ? { ...m, done: true, cost: data.cost } : m))
         setAgentStatus(prev => ({ ...prev, [data.agent]: 'done' }))
@@ -231,6 +273,10 @@ export function useChat() {
         if (progressIntervalsRef.current[agentId]) {
           clearInterval(progressIntervalsRef.current[agentId])
           delete progressIntervalsRef.current[agentId]
+        }
+        if (watchdogTimersRef.current[agentId]) {
+          clearTimeout(watchdogTimersRef.current[agentId])
+          delete watchdogTimersRef.current[agentId]
         }
         setAgentProgress(prev => ({ ...prev, [agentId]: 100 }))
       }
@@ -247,6 +293,10 @@ export function useChat() {
         if (progressIntervalsRef.current[agentId]) {
           clearInterval(progressIntervalsRef.current[agentId])
           delete progressIntervalsRef.current[agentId]
+        }
+        if (watchdogTimersRef.current[agentId]) {
+          clearTimeout(watchdogTimersRef.current[agentId])
+          delete watchdogTimersRef.current[agentId]
         }
         setAgentProgress(prev => { const n = { ...prev }; delete n[agentId]; return n })
       }
@@ -310,8 +360,11 @@ export function useChat() {
       setIsRunning(false)
       setAwaitingApproval(null)
       Object.values(progressIntervalsRef.current).forEach(clearInterval)
+      Object.values(watchdogTimersRef.current).forEach(clearTimeout)
       progressIntervalsRef.current = {}
+      watchdogTimersRef.current = {}
       activeAgentsRef.current.clear()
+      timedOutAgentsRef.current.clear()
     }
   }, [isRunning, manualMode, agentConfig])
 
@@ -369,8 +422,11 @@ export function useChat() {
     setIsRunning(false)
     setAwaitingApproval(null)
     Object.values(progressIntervalsRef.current).forEach(clearInterval)
+    Object.values(watchdogTimersRef.current).forEach(clearTimeout)
     progressIntervalsRef.current = {}
+    watchdogTimersRef.current = {}
     activeAgentsRef.current.clear()
+    timedOutAgentsRef.current.clear()
     setAgentStatus(prev => {
       const next = { ...prev }
       ;(Object.keys(next) as AgentId[]).forEach(k => {
@@ -395,8 +451,11 @@ export function useChat() {
     resumeContextRef.current = null
     currentMsgId.current = {}
     Object.values(progressIntervalsRef.current).forEach(clearInterval)
+    Object.values(watchdogTimersRef.current).forEach(clearTimeout)
     progressIntervalsRef.current = {}
+    watchdogTimersRef.current = {}
     activeAgentsRef.current.clear()
+    timedOutAgentsRef.current.clear()
     setAgentProgress({})
     setAgentProgressMeta({})
   }, [])

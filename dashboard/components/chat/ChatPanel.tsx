@@ -58,6 +58,8 @@ interface Props {
   onUpdateConfig: <K extends keyof AgentConfig>(agent: K, patch: Partial<AgentConfig[K]>) => void
   agentProgress: Record<string, number>
   agentProgressMeta: Record<string, ProgressMeta>
+  reunAgentProgress?: Record<string, number>
+  reunAgentProgressMeta?: Record<string, ProgressMeta>
   reunMessages: Message[]
   reunAgentStatus: Record<AgentId, AgentStatus>
   reunIsRunning: boolean
@@ -78,6 +80,7 @@ export default function ChatPanel({
   messages, agentStatus, inMeeting, isRunning, sessionId, avaliado, resumedFrom,
   manualMode, fastTrack, sandbox, custoCap, custoCapAtingido, custoAviso, awaitingApproval, agentConfig, dragControls,
   agentProgress, agentProgressMeta,
+  reunAgentProgress, reunAgentProgressMeta,
   onSend, onReset, onAvaliar, onApprove, onAbort, onToggleManualMode, onToggleFastTrack, onToggleSandbox,
   onSetCustoCap, onAutorizarCusto, onRecusarCustoExtra, onUpdateConfig,
   reunMessages, reunAgentStatus, reunIsRunning, onReunSend, onReunReset, onReunAbort,
@@ -699,11 +702,13 @@ export default function ChatPanel({
             {activeMessages.map(msg => {
               if (msg.role === 'user') return <UserMessage key={msg.id} msg={msg} />
               const agentId = msg.role as AgentId
-              const pct = agentProgress[agentId] ?? 0
-              const meta = agentProgressMeta[agentId]
+              const activeProgress = mode === 'reuniao' ? (reunAgentProgress ?? {}) : agentProgress
+              const activeProgressMeta = mode === 'reuniao' ? (reunAgentProgressMeta ?? {}) : agentProgressMeta
+              const pct = activeProgress[agentId] ?? 0
+              const meta = activeProgressMeta[agentId]
               const isManualLocked = msg.done && manualMode &&
                 awaitingApproval?.agent === agentId && awaitingApproval?.mode === 'approval'
-              const showBar = mode === 'pipeline' && meta !== undefined && (pct > 0)
+              const showBar = meta !== undefined && pct > 0
               return (
                 <div key={msg.id}>
                   <AgentMessage msg={msg} />

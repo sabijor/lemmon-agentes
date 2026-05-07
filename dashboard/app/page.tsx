@@ -51,7 +51,7 @@ export default function Home() {
   const [historyOpen, setHistoryOpen] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
   const { messages, agentStatus, isRunning, sessionId, avaliado, resumedFrom, manualMode, fastTrack, sandbox, custoCap, custoCapAtingido, custoAviso, awaitingApproval, agentConfig, tagsSugeridas, agentProgress, agentProgressMeta, send, approve, abort, toggleManualMode, toggleFastTrack, toggleSandbox, setCustoCap, autorizarCusto, recusarCustoExtra, updateConfig, avaliar, exportar, reset, loadSession } = useChat()
-  const { messages: reunMessages, agentStatus: reunAgentStatus, isRunning: reunIsRunning, send: reunSend, reset: reunReset, abort: reunAbort, mesaRedonda: reunMesaRedonda } = useReuniao()
+  const { messages: reunMessages, agentStatus: reunAgentStatus, isRunning: reunIsRunning, agentProgress: reunAgentProgress, agentProgressMeta: reunAgentProgressMeta, send: reunSend, reset: reunReset, abort: reunAbort, mesaRedonda: reunMesaRedonda } = useReuniao()
   const { sessions, selected, loading, loadingDetail, fetchSessions, fetchDetail, clearSelected } = useHistory()
 
   const dragControls = useDragControls()
@@ -257,6 +257,8 @@ export default function Home() {
             reunMessages={reunMessages}
             reunAgentStatus={reunAgentStatus}
             reunIsRunning={reunIsRunning}
+            reunAgentProgress={reunAgentProgress}
+            reunAgentProgressMeta={reunAgentProgressMeta}
             onReunSend={handleReunSend}
             onReunReset={reunReset}
             onReunAbort={reunAbort}
