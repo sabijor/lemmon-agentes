@@ -51,7 +51,7 @@ const FALLBACK_MEDIANAS: Record<AgentId, number> = {
 export interface AgentConfig {
   otto: { modo_visual: 'completo' | 'resumo' | 'auto' }
   heitor: { max_buscas: number }
-  salles: { formato: 'auto' | 'reels' | 'documental' | 'mini-doc' | 'tese' | 'aftermovie'; gate_espelho: 'off' | 'auto' | 'manual'; alternativas: 0 | 3 }
+  salles: { formatos_permitidos: string[]; gate_espelho: 'off' | 'auto' | 'manual'; alternativas: 0 | 3 }
   sonia: { com_busca: boolean; usar_tendencias: boolean }
   renata: { incluir: boolean; duracao_dias: number }
 }
@@ -59,7 +59,7 @@ export interface AgentConfig {
 const DEFAULT_CONFIG: AgentConfig = {
   otto: { modo_visual: 'auto' },
   heitor: { max_buscas: 3 },
-  salles: { formato: 'auto', gate_espelho: 'off', alternativas: 0 },
+  salles: { formatos_permitidos: [], gate_espelho: 'off', alternativas: 0 },
   sonia: { com_busca: false, usar_tendencias: true },
   renata: { incluir: false, duracao_dias: 14 },
 }

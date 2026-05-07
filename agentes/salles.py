@@ -182,7 +182,8 @@ class Salles(AgenteBase):
     def executar(self, briefing: Optional[str] = None, formato: str = "auto",
                  analise_otto_existente: Optional[dict] = None,
                  tags: Optional[list] = None,
-                 diretrizes_heitor: Optional[dict] = None) -> AgenteResultado:
+                 diretrizes_heitor: Optional[dict] = None,
+                 formatos_permitidos: Optional[list] = None) -> AgenteResultado:
         """
         Pipeline completo: chama Otto se necessário → discute → produz roteiro.
 
@@ -243,6 +244,7 @@ class Salles(AgenteBase):
             briefing, analise_otto, questionamentos,
             respostas_otto, formato, casos_similares,
             diretrizes_heitor=diretrizes_heitor,
+            formatos_permitidos=formatos_permitidos or [],
         )
         breakdown_custo["salles_producao_2chamadas_usd"] = custo_p
         custo_total += custo_p
@@ -429,7 +431,8 @@ class Salles(AgenteBase):
     def _produzir_roteiro(self, briefing: str, analise_otto: dict,
                           questionamentos: dict, respostas_otto: dict,
                           formato: str, casos_similares: list,
-                          diretrizes_heitor: Optional[dict] = None):
+                          diretrizes_heitor: Optional[dict] = None,
+                          formatos_permitidos: Optional[list] = None):
         """
         Produção em 2 etapas:
         Etapa A: Salles produz JSON técnico estruturado (raciocínio)
@@ -442,6 +445,14 @@ class Salles(AgenteBase):
         formato_pra_prompt = formato
         if formato == "auto":
             formato_pra_prompt = "auto (você decide baseado na análise do Otto)"
+
+        todos_formatos = ["reels", "documental", "mini-doc", "tese", "aftermovie"]
+        restricao_formato = ""
+        if formatos_permitidos:
+            excluidos = [f for f in todos_formatos if f not in formatos_permitidos]
+            restricao_formato = f"\nRESTRIÇÃO DE FORMATO: Escolha entre apenas: {', '.join(formatos_permitidos)}."
+            if excluidos:
+                restricao_formato += f" Não use os formatos: {', '.join(excluidos)}."
 
         # Monta bloco de compliance se Heitor foi consultado
         contexto_heitor = ""
@@ -489,7 +500,7 @@ Discussão Otto-Salles:
 - Foco narrativo final acordado: {respostas_otto['resposta_foco']}
 - Tese final: {respostas_otto['tese_ajustada']}
 
-FORMATO SOLICITADO PRO ROTEIRO: {formato_pra_prompt}
+FORMATO SOLICITADO PRO ROTEIRO: {formato_pra_prompt}{restricao_formato}
 {contexto_similares}{contexto_heitor}
 
 ETAPA 1 DE 2 — RACIOCÍNIO ESTRUTURADO

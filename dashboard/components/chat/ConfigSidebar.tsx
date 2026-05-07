@@ -63,16 +63,38 @@ export function ConfigSidebar({ agentConfig, onUpdateConfig, isRunning, custoCap
             <div className="w-1.5 h-1.5 rounded-full" style={{ background: AGENT_MAP.salles?.color ?? '#888' }} />
             <span className="text-[9px] font-mono uppercase tracking-widest text-stone-500 font-bold">Salles</span>
           </div>
-          <p className="text-[8px] font-mono text-stone-400 mb-1.5">formato</p>
-          <div className="flex flex-col gap-1 mb-3">
-            {(['auto', 'reels', 'documental', 'mini-doc', 'tese', 'aftermovie'] as const).map(v => (
-              <button key={v} disabled={isRunning} onClick={() => onUpdateConfig('salles', { formato: v })}
-                className={`px-2 py-1 rounded-md text-[9px] font-mono border transition-all text-left disabled:opacity-50 ${
-                  agentConfig.salles.formato === v
-                    ? 'bg-stone-900 text-white border-stone-900'
-                    : 'bg-white text-stone-500 border-stone-200 hover:border-stone-400'
-                }`}>{v}</button>
-            ))}
+          <p className="text-[8px] font-mono text-stone-400 mb-1.5">formatos permitidos</p>
+          <div className="flex flex-wrap gap-1 mb-1">
+            {(['reels', 'documental', 'mini-doc', 'tese', 'aftermovie'] as const).map(v => {
+              const selected = agentConfig.salles.formatos_permitidos.includes(v)
+              return (
+                <button key={v} disabled={isRunning}
+                  onClick={() => {
+                    const prev = agentConfig.salles.formatos_permitidos
+                    const next = selected ? prev.filter(x => x !== v) : [...prev, v]
+                    onUpdateConfig('salles', { formatos_permitidos: next })
+                  }}
+                  className={`px-2 py-1 rounded-md text-[9px] font-mono border transition-all disabled:opacity-50 ${
+                    selected
+                      ? 'bg-stone-900 text-white border-stone-900'
+                      : 'bg-white text-stone-500 border-stone-200 hover:border-stone-400'
+                  }`}>{v}</button>
+              )
+            })}
+          </div>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[8px] font-mono text-stone-400">
+              {agentConfig.salles.formatos_permitidos.length === 0
+                ? '✓ Salles decide entre 5 formatos'
+                : `✓ Restrito a: ${agentConfig.salles.formatos_permitidos.join(', ')}`}
+            </p>
+            {agentConfig.salles.formatos_permitidos.length > 0 && (
+              <button disabled={isRunning}
+                onClick={() => onUpdateConfig('salles', { formatos_permitidos: [] })}
+                className="text-[8px] font-mono text-stone-400 hover:text-stone-600 disabled:opacity-40 transition-colors">
+                limpar
+              </button>
+            )}
           </div>
           <p className="text-[8px] font-mono text-stone-400 mb-1.5">gate espelho pedro</p>
           <div className="flex flex-col gap-1 mb-3">

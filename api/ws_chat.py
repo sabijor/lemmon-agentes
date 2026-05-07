@@ -151,7 +151,7 @@ async def chat(ws: WebSocket):
 
                 elif name == "salles":
                     ag = Salles()
-                    formato = cfg_salles.get("formato", "auto")
+                    formatos_permitidos = cfg_salles.get("formatos_permitidos", [])
                     # T29: modo seguro se Heitor sinalizou risco vermelho
                     briefing_salles = briefing
                     if heitor_risco_vermelho:
@@ -165,9 +165,9 @@ async def chat(ws: WebSocket):
                         None,
                         lambda: ag.executar(
                             briefing=briefing_salles,
-                            formato=formato,
                             analise_otto_existente=analise_otto,
                             diretrizes_heitor=diretrizes_heitor,
+                            formatos_permitidos=formatos_permitidos,
                         ),
                     )
                     roteiro_salles = res.get("output_humano", "")
@@ -394,7 +394,7 @@ async def chat(ws: WebSocket):
                     ("impactante e direto", " [VARIAÇÃO: estilo mais impactante, hooks agressivos, ritmo acelerado, foco em conversão]"),
                     ("emocional e pessoal", " [VARIAÇÃO: estilo emocional e testemunhal, tom íntimo, foco em conexão humana]"),
                 ]
-                formato = cfg_salles.get("formato", "auto")
+                formatos_perm = cfg_salles.get("formatos_permitidos", [])
                 todos_textos: list[str] = []
                 for idx, (label, hint) in enumerate(variacoes):
                     variant_id = f"salles_v{idx+1}"
@@ -406,9 +406,9 @@ async def chat(ws: WebSocket):
                             None,
                             lambda bv=bv: ag_s.executar(
                                 briefing=bv,
-                                formato=formato,
                                 analise_otto_existente=analise_otto,
                                 diretrizes_heitor=diretrizes_heitor,
+                                formatos_permitidos=formatos_perm,
                             ),
                         )
                         texto_s = f"**Variante {idx+1} — {label}**\n\n" + res_s.get("output_humano", "")
