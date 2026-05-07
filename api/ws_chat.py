@@ -434,7 +434,7 @@ async def chat(ws: WebSocket):
                 return True
 
             for name in names:
-                if name == "aya":
+                if name in ("aya", "renata"):  # executadas fora do loop, em ordem garantida
                     continue
 
                 # T26: Fast-track — pula Heitor com aviso
