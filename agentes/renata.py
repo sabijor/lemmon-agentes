@@ -76,9 +76,20 @@ FERRAMENTA_LINHA_EDITORIAL = {
                             "type": "string",
                             "maxLength": 200,
                         },
+                        "legenda": {
+                            "type": "string",
+                            "maxLength": 800,
+                            "description": (
+                                "Legenda COMPLETA pronta para publicar, na voz do cliente. "
+                                "Estrutura: hook (1ª linha) + corpo (2-4 parágrafos curtos, "
+                                "linguagem simples, 1ª pessoa) + CTA. "
+                                "Sem hashtags. Máx 800 chars."
+                            ),
+                        },
                         "descricao_cliente": {
                             "type": "string",
                             "maxLength": 250,
+                            "description": "Orientação de produção para o cliente (o que filmar/criar, tom, visual).",
                         },
                         "cta": {"type": "string", "maxLength": 100},
                         "deriva_de": {
@@ -94,7 +105,7 @@ FERRAMENTA_LINHA_EDITORIAL = {
                     },
                     "required": [
                         "ordem", "data_sugerida", "formato",
-                        "hook", "descricao_cliente", "cta", "deriva_de",
+                        "hook", "legenda", "cta", "deriva_de",
                     ],
                 },
             },
@@ -384,11 +395,12 @@ class Renata(AgenteBase):
 1. Produza exatamente {duracao_dias} publicações (1 por dia).
 2. Mix sugerido: ~50% reels, ~30% carrossel, ~20% stories.
 3. Nenhum formato deve passar de 80% do total.
-4. output_humano deve ter no máximo {RENATA_OUTPUT_MAX_CHARS} chars.
-5. Toda publicação deve ter deriva_de preenchido.
-6. CTA específico por peça — sem hashtags.
-7. Se há datas comemorativas relevantes na janela, use contexto_sazonal.
-8. Se modo solo E contexto raso: retorne perguntas_clarificacao com as 3 perguntas padrão.
+4. Toda publicação deve ter `legenda` preenchida — copy completa pronta para publicar, na voz do cliente.
+5. output_humano deve incluir a legenda de cada peça e ter no máximo {RENATA_OUTPUT_MAX_CHARS} chars.
+6. Toda publicação deve ter deriva_de preenchido.
+7. CTA específico por peça — sem hashtags.
+8. Se há datas comemorativas relevantes na janela, use contexto_sazonal.
+9. Se modo solo E contexto raso: retorne perguntas_clarificacao com as 3 perguntas padrão.
 
 Use `registrar_linha_editorial`.
 """)
@@ -420,6 +432,16 @@ Use `registrar_linha_editorial`.
     def _validar_resultado(self, resultado: dict, duracao_dias: int) -> dict:
         """Validações pós-execução conforme spec."""
         pubs = resultado.get("publicacoes", [])
+        # Guard: model ocasionalmente serializa o array como string JSON
+        if isinstance(pubs, str):
+            try:
+                pubs = _json.loads(pubs)
+                resultado["publicacoes"] = pubs
+                self.logger.warning("Renata: publicacoes chegou como string — deserializado com sucesso.")
+            except Exception:
+                self.logger.error("Renata: publicacoes como string inválida — publicacoes zeradas.")
+                pubs = []
+                resultado["publicacoes"] = pubs
         total = len(pubs)
 
         if total != duracao_dias:

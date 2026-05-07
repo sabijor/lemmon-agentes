@@ -56,6 +56,25 @@ Identifique feriados e datas comemorativas relevantes ao nicho do cliente que ca
 
 Liste em `descartes` o material que não usar, com justificativa clara. Operador decide reaproveitar depois.
 
+## Legenda — copy pronta para publicar
+
+O campo `legenda` é a copy completa do post, pronta para copiar e colar no Instagram. **Obrigatório em toda publicação.**
+
+Estrutura da legenda:
+1. **Primeira linha = hook** (mesma do campo `hook`) — frase que prende nos primeiros 2 segundos
+2. **Linha em branco**
+3. **Corpo** — 2 a 4 parágrafos curtos (2-4 linhas cada), linguagem do cliente, 1ª pessoa, sem jargão técnico sem tradução
+4. **Linha em branco**
+5. **CTA** — mesmo do campo `cta`
+
+Regras da legenda:
+- Máx 800 chars
+- Sem hashtags
+- Na voz real do cliente (use o trecho de VOZ DO CLIENTE se disponível no contexto)
+- Para Reels: tom de fala, como se o cliente estivesse contando ao vivo
+- Para Carrossel: tom de explicação, slide a slide implícito (1ª linha do corpo antecipa o próximo slide)
+- Para Stories: frases curtíssimas, máx 2 linhas por slide, indicar separação com `— Slide X —`
+
 ## CTA por peça
 
 Sugira CTA específico ("Comenta EU que mando", "Salva esse post"). Não genérico. **NÃO sugira hashtag.**
