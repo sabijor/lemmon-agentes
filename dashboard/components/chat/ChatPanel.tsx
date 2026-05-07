@@ -14,6 +14,7 @@ declare const SpeechRecognition: { new(): ISpeechRecognition } | undefined
 declare const webkitSpeechRecognition: { new(): ISpeechRecognition } | undefined
 import { AGENT_MAP, AGENTS as AGENTS_LIST, type AgentId } from '@/lib/agents'
 import { type Message, type AgentStatus, type ImageData, type ApprovalRequest, type AgentConfig, type ExportResult, type ProgressMeta } from '@/lib/useChat'
+import { type LoopStatus } from '@/lib/useReuniao'
 import { API_URL } from '@/lib/api'
 import CharacterSprite from '../office/CharacterSprite'
 import { exportTxt, UserMessage, AgentMessage } from './MessageBubble'
@@ -67,6 +68,17 @@ interface Props {
   onReunReset: () => void
   onReunAbort: () => void
   onMesaRedonda?: (agents: AgentId[], tese: string, briefing: string) => void
+  loopMode: boolean
+  onSetLoopMode: (v: boolean) => void
+  loopMaxTurnos: number
+  onSetLoopMaxTurnos: (v: number) => void
+  loopCustoCap: number
+  onSetLoopCustoCap: (v: number) => void
+  loopActive: boolean
+  loopTurn: number
+  loopCost: number
+  loopStatus: LoopStatus | null
+  onLoopStop: () => void
   onExportar?: (sessionId: string, agente: string) => Promise<ExportResult>
   onClose?: () => void
   onSetInMeeting?: (agents: AgentId[]) => void
@@ -85,6 +97,8 @@ export default function ChatPanel({
   onSetCustoCap, onAutorizarCusto, onRecusarCustoExtra, onUpdateConfig,
   reunMessages, reunAgentStatus, reunIsRunning, onReunSend, onReunReset, onReunAbort,
   onMesaRedonda,
+  loopMode, onSetLoopMode, loopMaxTurnos, onSetLoopMaxTurnos, loopCustoCap, onSetLoopCustoCap,
+  loopActive, loopTurn, loopCost, loopStatus, onLoopStop,
   onExportar, onClose, onSetInMeeting,
   tagsSugeridas = [],
 }: Props) {
@@ -99,12 +113,14 @@ export default function ChatPanel({
   const [configOpen, setConfigOpen] = useState(false)
   const [reuniaoManual, setReuniaoManual] = useState(false)
   const [reuniaoRating, setReuniaoRating] = useState(0)
+  const [loopCustoDismissed, setLoopCustoDismissed] = useState(false)
   const [tagsAceitas, setTagsAceitas] = useState<string[]>([])
   const [sugestao, setSugestao] = useState<{ agentes: AgentId[]; razoes: Record<string, string> } | null>(null)
   const [loadingSugestao, setLoadingSugestao] = useState(false)
   const [sugestaoError, setSugestaoError] = useState('')
 
   useEffect(() => { setTagsAceitas(tagsSugeridas) }, [tagsSugeridas])
+  useEffect(() => { if (!loopStatus) setLoopCustoDismissed(false) }, [loopStatus])
 
   const sugerirPipeline = async () => {
     const q = input.trim()
@@ -407,6 +423,30 @@ export default function ChatPanel({
       transition={{ type: 'spring', stiffness: 200, damping: 30 }}
       className="flex flex-row glass border border-stone-200/60 overflow-hidden flex-shrink-0 rounded-2xl relative"
     >
+      {/* Loop custo_max — blocking overlay (reunião) */}
+      {mode === 'reuniao' && loopStatus?.motivo === 'custo_max' && !loopCustoDismissed && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm rounded-2xl">
+          <div className="bg-white dark:bg-stone-900 rounded-2xl p-6 mx-6 shadow-2xl border border-stone-200 dark:border-stone-700 flex flex-col gap-4 max-w-xs w-full">
+            <div className="text-center">
+              <div className="text-3xl mb-2">💸</div>
+              <p className="text-sm font-display font-semibold text-stone-900 dark:text-stone-100 mb-1">Cap de custo atingido</p>
+              <p className="text-[10px] font-mono text-stone-500 leading-relaxed">
+                Loop pausado — limite de{' '}
+                <span className="text-stone-700 dark:text-stone-300 font-bold tabular-nums">${loopCustoCap.toFixed(2)}</span> atingido.
+                Total:{' '}
+                <span className="text-stone-700 dark:text-stone-300 font-bold tabular-nums">${loopStatus.custoTotal.toFixed(3)}</span>
+                {' '}em{' '}<span className="font-bold">{loopStatus.nTurnos}</span> turnos.
+              </p>
+            </div>
+            <button
+              onClick={() => setLoopCustoDismissed(true)}
+              className="py-2 rounded-xl bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-900 text-[10px] font-mono uppercase tracking-widest hover:bg-stone-700 dark:hover:bg-stone-200 transition-colors">
+              Ok, entendi
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Custo-cap atingido — blocking overlay */}
       {custoCapAtingido && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm rounded-2xl">
@@ -517,18 +557,31 @@ export default function ChatPanel({
               </button>
             )}
 
-            {/* Reunião: auto/manual toggle */}
-            {mode === 'reuniao' && (
-              <button onClick={() => setReuniaoManual(v => !v)}
-                title={reuniaoManual ? 'Modo manual: só responde se @mencionado' : 'Modo auto: todos respondem'}
-                className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-mono uppercase tracking-widest border transition-all ${
-                  reuniaoManual
-                    ? 'bg-amber-50 border-amber-300 text-amber-700'
-                    : 'bg-white border-stone-200 text-stone-400 hover:border-stone-400'
-                }`}>
-                <span>{reuniaoManual ? '⏸ manual' : '▶▶ auto'}</span>
-              </button>
-            )}
+            {/* Reunião: segmented control Auto / Manual / Loop */}
+            {mode === 'reuniao' && (() => {
+              const cm = loopMode ? 'loop' : reuniaoManual ? 'manual' : 'auto'
+              return (
+                <div className="flex rounded-lg overflow-hidden border border-stone-200 dark:border-stone-700">
+                  {(['auto', 'manual', 'loop'] as const).map(m => (
+                    <button key={m} disabled={reunIsRunning || loopActive}
+                      onClick={() => {
+                        if (m === 'loop') { onSetLoopMode(true); setReuniaoManual(false) }
+                        else { onSetLoopMode(false); setReuniaoManual(m === 'manual') }
+                      }}
+                      title={m === 'auto' ? 'Todos respondem automaticamente' : m === 'manual' ? 'Só quem for @mencionado responde' : 'Loop autônomo entre agentes'}
+                      className={`px-2.5 py-0.5 text-[9px] font-mono uppercase tracking-widest transition-all disabled:opacity-40
+                        ${m === cm
+                          ? m === 'loop'
+                            ? 'bg-violet-700 text-white'
+                            : 'bg-stone-800 text-white dark:bg-stone-200 dark:text-stone-900'
+                          : 'bg-white dark:bg-stone-900 text-stone-400 hover:text-stone-700 dark:hover:text-stone-300'
+                        }`}>
+                      {m}
+                    </button>
+                  ))}
+                </div>
+              )
+            })()}
 
             {/* Mesa Redonda button — reunião only */}
             {mode === 'reuniao' && onMesaRedonda && !reunIsRunning && inMeeting.size > 0 && (
@@ -639,8 +692,31 @@ export default function ChatPanel({
                 </div>
               )
             })}
-            {reuniaoManual && (
+            {reuniaoManual && !loopMode && (
               <span className="text-[8px] font-mono text-amber-600 ml-auto">use @nome para mencionar</span>
+            )}
+            {loopMode && !loopActive && (
+              <div className="flex items-center gap-2 ml-auto">
+                <label className="text-[8px] font-mono text-stone-400 uppercase tracking-widest">turnos</label>
+                <input type="number" min={1} max={20} value={loopMaxTurnos}
+                  onChange={e => onSetLoopMaxTurnos(Math.max(1, Math.min(20, Number(e.target.value))))}
+                  className="w-10 text-center text-[9px] font-mono border border-stone-200 dark:border-stone-700 rounded px-1 py-0.5 bg-white dark:bg-stone-900" />
+                <label className="text-[8px] font-mono text-stone-400 uppercase tracking-widest">cap $</label>
+                <input type="number" min={0.10} max={10} step={0.10} value={loopCustoCap}
+                  onChange={e => onSetLoopCustoCap(Math.max(0.10, Math.min(10, Number(e.target.value))))}
+                  className="w-14 text-center text-[9px] font-mono border border-stone-200 dark:border-stone-700 rounded px-1 py-0.5 bg-white dark:bg-stone-900" />
+              </div>
+            )}
+            {loopActive && (
+              <div className="flex items-center gap-2 ml-auto">
+                <span className="text-[9px] font-mono text-violet-600 dark:text-violet-400 tabular-nums">
+                  Turno {loopTurn}/{loopMaxTurnos} · ${loopCost.toFixed(3)}/${loopCustoCap.toFixed(2)}
+                </span>
+                <button onClick={onLoopStop}
+                  className="px-2 py-0.5 rounded-md bg-red-500 text-white text-[8px] font-mono uppercase tracking-widest hover:bg-red-600 transition-colors">
+                  parar
+                </button>
+              </div>
             )}
           </div>
         )}
@@ -1055,6 +1131,43 @@ export default function ChatPanel({
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Loop status banners — reunião only (custo_max handled by overlay above) */}
+        {!minimized && mode === 'reuniao' && loopStatus && loopStatus.motivo !== 'custo_max' && (
+          <motion.div
+            initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
+            className={`mx-4 mb-1 rounded-xl border px-4 py-2.5 flex items-center justify-between gap-3 flex-shrink-0 ${
+              loopStatus.motivo === 'final'
+                ? 'bg-green-50 dark:bg-green-950/40 border-green-300 dark:border-green-800'
+                : loopStatus.motivo === 'ayuda'
+                ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-300 dark:border-blue-800'
+                : 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800'
+            }`}
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-sm flex-shrink-0">
+                {loopStatus.motivo === 'final' ? '✅' : loopStatus.motivo === 'ayuda' ? '🆘' : '⚠'}
+              </span>
+              <div className="min-w-0">
+                <p className={`text-[9px] font-mono font-bold uppercase tracking-widest ${
+                  loopStatus.motivo === 'final' ? 'text-green-700 dark:text-green-400'
+                  : loopStatus.motivo === 'ayuda' ? 'text-blue-700 dark:text-blue-400'
+                  : 'text-amber-700 dark:text-amber-400'
+                }`}>
+                  {loopStatus.motivo === 'final' ? 'Entrega concluída'
+                    : loopStatus.motivo === 'ayuda' ? 'Loop pausado — operador solicitado'
+                    : loopStatus.motivo === 'turnos_max' ? 'Limite de turnos atingido'
+                    : loopStatus.motivo === 'stagnacao' ? 'Loop encerrado por estagnação'
+                    : 'Loop encerrado pelo operador'}
+                </p>
+                <p className="text-[8px] font-mono text-stone-500 mt-0.5 tabular-nums">
+                  {loopStatus.nTurnos} {loopStatus.nTurnos === 1 ? 'turno' : 'turnos'} · ${loopStatus.custoTotal.toFixed(3)}
+                  {loopStatus.agenteFinal && ` · ${loopStatus.agenteFinal}`}
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        )}
 
         {/* Input */}
         {!minimized && <div className="p-4 border-t border-stone-200/50 dark:border-stone-700/50 flex-shrink-0">

@@ -51,7 +51,13 @@ export default function Home() {
   const [historyOpen, setHistoryOpen] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
   const { messages, agentStatus, isRunning, sessionId, avaliado, resumedFrom, manualMode, fastTrack, sandbox, custoCap, custoCapAtingido, custoAviso, awaitingApproval, agentConfig, tagsSugeridas, agentProgress, agentProgressMeta, send, approve, abort, toggleManualMode, toggleFastTrack, toggleSandbox, setCustoCap, autorizarCusto, recusarCustoExtra, updateConfig, avaliar, exportar, reset, loadSession } = useChat()
-  const { messages: reunMessages, agentStatus: reunAgentStatus, isRunning: reunIsRunning, agentProgress: reunAgentProgress, agentProgressMeta: reunAgentProgressMeta, send: reunSend, reset: reunReset, abort: reunAbort, mesaRedonda: reunMesaRedonda } = useReuniao()
+  const {
+    messages: reunMessages, agentStatus: reunAgentStatus, isRunning: reunIsRunning,
+    agentProgress: reunAgentProgress, agentProgressMeta: reunAgentProgressMeta,
+    loopMode, setLoopMode, loopMaxTurnos, setLoopMaxTurnos, loopCustoCap, setLoopCustoCap,
+    loopActive, loopTurn, loopCost, loopStatus, loopStop,
+    send: reunSend, reset: reunReset, abort: reunAbort, mesaRedonda: reunMesaRedonda,
+  } = useReuniao()
   const { sessions, selected, loading, loadingDetail, fetchSessions, fetchDetail, clearSelected } = useHistory()
 
   const dragControls = useDragControls()
@@ -263,6 +269,17 @@ export default function Home() {
             onReunReset={reunReset}
             onReunAbort={reunAbort}
             onMesaRedonda={reunMesaRedonda}
+            loopMode={loopMode}
+            onSetLoopMode={setLoopMode}
+            loopMaxTurnos={loopMaxTurnos}
+            onSetLoopMaxTurnos={setLoopMaxTurnos}
+            loopCustoCap={loopCustoCap}
+            onSetLoopCustoCap={setLoopCustoCap}
+            loopActive={loopActive}
+            loopTurn={loopTurn}
+            loopCost={loopCost}
+            loopStatus={loopStatus}
+            onLoopStop={loopStop}
             onExportar={exportar}
             tagsSugeridas={tagsSugeridas}
             onSetInMeeting={ids => setInMeeting(new Set(ids))}
