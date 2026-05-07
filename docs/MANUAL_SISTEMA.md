@@ -1,6 +1,6 @@
 # LEMMON AGENTES — Manual do Sistema
 
-**Versão atual:** v1.24
+**Versão atual:** v1.25
 **Última atualização:** 2026-05-07
 **Mantido por:** Calebe Alves / Lemmon Produções
 
@@ -11,6 +11,19 @@
 ## Histórico de versões
 
 > **Convenção:** versões mais novas no topo. Cada release lista o que mudou em relação à anterior, mantendo histórico completo.
+
+### v1.25 — 2026-05-07
+
+**FASE 6 — T95: watchdog + barra de progresso em modo Reunião.**
+
+- **Bug corrigido em uso real:** modo Reunião não tinha barra de progresso nem proteção contra travamento; placeholder "processando..." ficava preso indefinidamente se o backend travasse ou a API retornasse overloaded.
+- **`useReuniao.ts`** ganha `agentProgress`, `agentProgressMeta`, `progressIntervalsRef`, `watchdogTimersRef`, `activeAgentsRef`, `timedOutAgentsRef`. Padrão T90 replicado: `agent_start` → fetch mediana → `setInterval(200ms)` + watchdog; `agent_done` → snap 100% + clear. Watchdog = `max(60, min(mediana×3, 1200))` × 1000 ms (cap 20 min). `timedOutAgentsRef` evita ghost bubbles pós-watchdog.
+- **`useChat.ts` (Pipeline)** recebe o mesmo watchdog por consistência: `watchdogTimersRef` + `timedOutAgentsRef` + guards em `token`/`agent_done`. Limpo em `abort()`, `reset()`, `ws.onclose`.
+- **`ChatPanel.tsx`:** aceita `reunAgentProgress?` e `reunAgentProgressMeta?`; `showBar` usa a fonte correta por modo (pipeline vs reunião) — ProgressBar agora renderiza em ambos os modos. MacroBar não aparece em Reunião.
+- **`page.tsx`:** passa `reunAgentProgress`/`reunAgentProgressMeta` ao ChatPanel.
+- **Manual:** §3.2 atualizado (watchdog + barra de progresso), §4.17 adicionado.
+
+---
 
 ### v1.24 — 2026-05-07
 
@@ -541,6 +554,10 @@ Conversacional, multi-turno. Você manda mensagem, agentes respondem (em ordem).
 
 **Streaming.** Modo Reunião usa streaming nativo da Anthropic (token a token, real). Pipeline ainda usa stream simulado por questão de tool use forçado nos agentes.
 
+**Barra de progresso.** Igual ao Pipeline (§4.11), cada agente exibe micro barra de progresso abaixo do seu bubble durante o processamento. Usa a mesma mediana histórica e FALLBACK_MEDIANAS. MacroBar não aparece em Reunião (não há ordem fixa de agentes).
+
+**Watchdog.** Se um agente não responder em `max(60, min(mediana×3, 1200))` segundos (cap 20 min), o sistema cancela o timer, marca o agente como erro e exibe mensagem "Agente travou (timeout Xmin)". Eventos tardios (`agent_done`, `token`) chegados depois do watchdog são ignorados para evitar ghost bubbles.
+
 ## 3.3 Modo Manual (aprovação step-by-step)
 
 Toggle no header do chat panel. Em vez de o pipeline correr direto até o fim, o sistema pausa após cada agente e espera o operador clicar **Continuar**, **Pular**, **Tentar de novo** ou **Cancelar**.
@@ -672,6 +689,22 @@ Cada export gera HTML + PDF independente em `outputs/<agente>/<session_id>.{html
 **Backend:** `POST /exportar` aceita campo `agente: str = "aya"` (default mantém compatibilidade com clientes antigos). `GET /download/{session_id}/{tipo}?agente=X` serve o arquivo do subdiretório correto.
 
 **Nota visual:** ambos os formatos usam o CSS AURA (identidade Lemmon). O dossiê da Aya (90k chars) é o caso de uso central do AURA; o editorial da Renata (~4k chars) renderiza corretamente mas com mais espaço em branco que o ideal. Ajuste visual planejado como T96 se necessário.
+
+## 4.17 Watchdog + barra de progresso em Reunião (T95)
+
+Replicação do padrão T90 (§4.11) para o modo Reunião.
+
+**Barra de progresso.** Cada agente em modo Reunião exibe a mesma micro barra abaixo do bubble (ProgressBar.tsx), alimentada por `agentProgress`/`agentProgressMeta` do `useReuniao`. A barra sobe de 0% a 95% usando a mediana histórica (`GET /sessoes/medianas`) ou `FALLBACK_MEDIANAS` se a API falhar. Snap 100% em `agent_done`.
+
+**Watchdog.** Fórmula: `max(60, min(mediana × 3, 1200))` segundos (mínimo 1 min, máximo 20 min). Se `agent_done` não chegar nesse prazo, o watchdog:
+1. Adiciona o agente ao `timedOutAgentsRef`
+2. Limpa o interval de progresso
+3. Marca o agente como `error`
+4. Substitui o placeholder "pensando..." por "Agente travou (timeout Xmin)"
+
+**Prevenção de ghost bubbles.** Qualquer `agent_done` ou `token` chegado após o watchdog disparar é ignorado silenciosamente (guard em `timedOutAgentsRef`). O mesmo padrão foi retroativamente aplicado ao `useChat.ts` (Pipeline) para consistência.
+
+**MacroBar.** Não exibida em modo Reunião — agentes não têm ordem fixa.
 
 ---
 

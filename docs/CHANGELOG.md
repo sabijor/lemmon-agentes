@@ -4,6 +4,33 @@ Convenção: novidades no topo. Datas em formato ISO. Cada entrada referencia o 
 
 ---
 
+## v1.25 — 2026-05-07
+
+**FASE 6 — T95: watchdog + barra de progresso em modo Reunião.**
+
+- `useReuniao.ts`: `agentProgress`/`agentProgressMeta` + `progressIntervalsRef` + `watchdogTimersRef` + `activeAgentsRef` + `timedOutAgentsRef`
+- Watchdog por agente em Reunião: `max(60, min(mediana×3, 1200))` s, cap 20 min — substitui placeholder por erro se API travar
+- `timedOutAgentsRef` previne ghost bubbles quando `agent_done`/`token` chegam tarde
+- `useChat.ts` (Pipeline): mesmo watchdog adicionado por consistência
+- `ChatPanel.tsx`: props `reunAgentProgress?`/`reunAgentProgressMeta?`; `showBar` usa fonte correta por modo — ProgressBar em Pipeline e Reunião
+- `page.tsx`: passa `reunAgentProgress`/`reunAgentProgressMeta` ao ChatPanel
+- Manual §3.2 + §4.17
+
+---
+
+## v1.24 — 2026-05-07
+
+**FASE 6 — T93: export agente-agnóstico (Aya e Renata).**
+
+- Bug corrigido: `POST /exportar` era hardcoded para `respostas.aya`; output da Renata ficava órfão
+- `ExportarPayload.agente: str = "aya"` (default backward-compatible)
+- `out_dir = OUTPUTS_DIR / agente` com `mkdir`; `agentes_detectados=[]` para agentes != aya
+- `GET /download/{session_id}/{tipo}?agente=X` serve subdiretório correto
+- `ChatPanel`: dois botões independentes (Aya + Renata), estado `Record<string, ...>` por agente
+- Manual §4.16
+
+---
+
 ## v1.23 — 2026-05-07
 
 **BLOCO 5 — T80 + T86: gráfico de latência e toast global.**
