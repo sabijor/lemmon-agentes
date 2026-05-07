@@ -13,11 +13,13 @@ interface ISpeechRecognition extends EventTarget {
 declare const SpeechRecognition: { new(): ISpeechRecognition } | undefined
 declare const webkitSpeechRecognition: { new(): ISpeechRecognition } | undefined
 import { AGENT_MAP, AGENTS as AGENTS_LIST, type AgentId } from '@/lib/agents'
-import { type Message, type AgentStatus, type ImageData, type ApprovalRequest, type AgentConfig, type ExportResult } from '@/lib/useChat'
+import { type Message, type AgentStatus, type ImageData, type ApprovalRequest, type AgentConfig, type ExportResult, type ProgressMeta } from '@/lib/useChat'
 import { API_URL } from '@/lib/api'
 import CharacterSprite from '../office/CharacterSprite'
 import { exportTxt, UserMessage, AgentMessage } from './MessageBubble'
 import { ConfigSidebar } from './ConfigSidebar'
+import { ProgressBar } from '../ProgressBar'
+import { MacroBar } from '../MacroBar'
 
 interface AttachedImage extends ImageData {
   preview: string
@@ -54,6 +56,8 @@ interface Props {
   onAutorizarCusto: (valor: number) => void
   onRecusarCustoExtra: () => void
   onUpdateConfig: <K extends keyof AgentConfig>(agent: K, patch: Partial<AgentConfig[K]>) => void
+  agentProgress: Record<string, number>
+  agentProgressMeta: Record<string, ProgressMeta>
   reunMessages: Message[]
   reunAgentStatus: Record<AgentId, AgentStatus>
   reunIsRunning: boolean
@@ -73,6 +77,7 @@ export default function ChatPanel({
   mode, onToggleMode,
   messages, agentStatus, inMeeting, isRunning, sessionId, avaliado, resumedFrom,
   manualMode, fastTrack, sandbox, custoCap, custoCapAtingido, custoAviso, awaitingApproval, agentConfig, dragControls,
+  agentProgress, agentProgressMeta,
   onSend, onReset, onAvaliar, onApprove, onAbort, onToggleManualMode, onToggleFastTrack, onToggleSandbox,
   onSetCustoCap, onAutorizarCusto, onRecusarCustoExtra, onUpdateConfig,
   reunMessages, reunAgentStatus, reunIsRunning, onReunSend, onReunReset, onReunAbort,
@@ -637,6 +642,19 @@ export default function ChatPanel({
           </div>
         )}
 
+        {/* MacroBar — pipeline overview */}
+        {!minimized && mode === 'pipeline' && (
+          <MacroBar
+            activeAgentIds={activeMessages
+              .filter(m => m.role !== 'user')
+              .map(m => m.role as AgentId)
+              .filter((id, i, arr) => arr.indexOf(id) === i)}
+            agentStatus={agentStatus}
+            agentProgress={agentProgress}
+            isVisible={isRunning || activeMessages.some(m => m.role !== 'user' && !m.done)}
+          />
+        )}
+
         {/* Content — hidden when minimized */}
         {!minimized && <div className="flex-1 overflow-y-auto px-5 py-5 space-y-6 min-h-0">
           {/* Resumed session banner */}
@@ -678,11 +696,29 @@ export default function ChatPanel({
             </motion.div>
           )}
           <AnimatePresence mode="popLayout">
-            {activeMessages.map(msg =>
-              msg.role === 'user'
-                ? <UserMessage key={msg.id} msg={msg} />
-                : <AgentMessage key={msg.id} msg={msg} />
-            )}
+            {activeMessages.map(msg => {
+              if (msg.role === 'user') return <UserMessage key={msg.id} msg={msg} />
+              const agentId = msg.role as AgentId
+              const pct = agentProgress[agentId] ?? 0
+              const meta = agentProgressMeta[agentId]
+              const isManualLocked = msg.done && manualMode &&
+                awaitingApproval?.agent === agentId && awaitingApproval?.mode === 'approval'
+              const showBar = mode === 'pipeline' && meta !== undefined && (pct > 0)
+              return (
+                <div key={msg.id}>
+                  <AgentMessage msg={msg} />
+                  {showBar && (
+                    <ProgressBar
+                      agentId={agentId}
+                      progress={pct}
+                      meta={meta}
+                      isManualLocked={isManualLocked}
+                      isVisible={!msg.done || isManualLocked}
+                    />
+                  )}
+                </div>
+              )
+            })}
           </AnimatePresence>
           <div ref={bottomRef} />
         </div>}

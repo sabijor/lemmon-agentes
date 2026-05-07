@@ -1,5 +1,5 @@
 'use client'
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { AgentId } from './agents'
 import type { HistoryDetail } from './useHistory'
 import { API_URL, WS_URL } from './api'
@@ -37,6 +37,16 @@ export interface ApprovalRequest {
   mensagem?: string
 }
 
+export interface ProgressMeta {
+  mediana: number
+  elapsed: number
+  amostras: number
+}
+
+const FALLBACK_MEDIANAS: Record<AgentId, number> = {
+  otto: 20, heitor: 40, salles: 30, sonia: 30, aya: 15, pedro_abrahao: 25, renata: 30,
+}
+
 export interface AgentConfig {
   otto: { modo_visual: 'completo' | 'resumido' | 'minimo' }
   heitor: { max_buscas: number }
@@ -71,9 +81,20 @@ export function useChat() {
   const [custoCap, setCustoCap] = useState<number | null>(null)
   const [custoCapAtingido, setCustoCapAtingido] = useState<{ total: number; cap: number } | null>(null)
   const [custoAviso, setCustoAviso] = useState<{ total: number; cap: number; pct: number } | null>(null)
+  const [agentProgress, setAgentProgress] = useState<Record<string, number>>({})
+  const [agentProgressMeta, setAgentProgressMeta] = useState<Record<string, ProgressMeta>>({})
   const wsRef = useRef<WebSocket | null>(null)
   const currentMsgId = useRef<Record<string, string>>({})
   const resumeContextRef = useRef<Record<string, unknown> | null>(null)
+  const progressIntervalsRef = useRef<Record<string, ReturnType<typeof setInterval>>>({})
+  const activeAgentsRef = useRef<Set<string>>(new Set())
+
+  useEffect(() => {
+    return () => {
+      Object.values(progressIntervalsRef.current).forEach(clearInterval)
+      progressIntervalsRef.current = {}
+    }
+  }, [])
 
   const updateConfig = useCallback(<K extends keyof AgentConfig>(
     agent: K,
@@ -121,6 +142,8 @@ export function useChat() {
     setTagsSugeridas([])
     setCustoCapAtingido(null)
     setCustoAviso(null)
+    setAgentProgress({})
+    setAgentProgressMeta({})
 
     const userId = crypto.randomUUID()
     setMessages(prev => [...prev, { id: userId, role: 'user', content: userMessage, done: true, hasImage: !!image }])
@@ -158,6 +181,35 @@ export function useChat() {
         setMessages(prev => [...prev, { id: msgId, role: data.agent as AgentId, content: '', done: false }])
         setAgentStatus(prev => ({ ...prev, [data.agent]: 'speaking' }))
         setAwaitingApproval(null)
+
+        const agentId = data.agent as AgentId
+        const startTime = Date.now()
+        activeAgentsRef.current.add(agentId)
+
+        fetch(`${API_URL}/sessoes/medianas?agente=${agentId}`)
+          .then(r => r.json())
+          .then((res: { mediana_segundos: number | null; amostras: number }) => {
+            if (!activeAgentsRef.current.has(agentId)) return
+            let mediana = res.mediana_segundos ?? FALLBACK_MEDIANAS[agentId]
+            const amostras = res.amostras ?? 0
+            if (agentId === 'salles' && agentConfig.salles.alternativas === 3) mediana *= 3
+            const iv = setInterval(() => {
+              const elapsed = (Date.now() - startTime) / 1000
+              setAgentProgress(prev => ({ ...prev, [agentId]: Math.min(95, (elapsed / mediana) * 100) }))
+              setAgentProgressMeta(prev => ({ ...prev, [agentId]: { mediana, elapsed, amostras } }))
+            }, 200)
+            progressIntervalsRef.current[agentId] = iv
+          })
+          .catch(() => {
+            if (!activeAgentsRef.current.has(agentId)) return
+            const mediana = FALLBACK_MEDIANAS[agentId]
+            const iv = setInterval(() => {
+              const elapsed = (Date.now() - startTime) / 1000
+              setAgentProgress(prev => ({ ...prev, [agentId]: Math.min(95, (elapsed / mediana) * 100) }))
+              setAgentProgressMeta(prev => ({ ...prev, [agentId]: { mediana, elapsed, amostras: 0 } }))
+            }, 200)
+            progressIntervalsRef.current[agentId] = iv
+          })
       }
 
       if (data.type === 'token') {
@@ -173,6 +225,13 @@ export function useChat() {
         if (data.awaiting_approval) {
           setAwaitingApproval({ agent: data.agent, mode: 'approval' })
         }
+        const agentId = data.agent as AgentId
+        activeAgentsRef.current.delete(agentId)
+        if (progressIntervalsRef.current[agentId]) {
+          clearInterval(progressIntervalsRef.current[agentId])
+          delete progressIntervalsRef.current[agentId]
+        }
+        setAgentProgress(prev => ({ ...prev, [agentId]: 100 }))
       }
 
       if (data.type === 'agent_error') {
@@ -182,6 +241,13 @@ export function useChat() {
         if (data.awaiting_retry) {
           setAwaitingApproval({ agent: data.agent, mode: 'retry', error: data.error })
         }
+        const agentId = data.agent as AgentId
+        activeAgentsRef.current.delete(agentId)
+        if (progressIntervalsRef.current[agentId]) {
+          clearInterval(progressIntervalsRef.current[agentId])
+          delete progressIntervalsRef.current[agentId]
+        }
+        setAgentProgress(prev => { const n = { ...prev }; delete n[agentId]; return n })
       }
 
       if (data.type === 'gate_espelho_result') {
@@ -242,6 +308,9 @@ export function useChat() {
     ws.onclose = () => {
       setIsRunning(false)
       setAwaitingApproval(null)
+      Object.values(progressIntervalsRef.current).forEach(clearInterval)
+      progressIntervalsRef.current = {}
+      activeAgentsRef.current.clear()
     }
   }, [isRunning, manualMode, agentConfig])
 
@@ -298,6 +367,9 @@ export function useChat() {
     wsRef.current?.close()
     setIsRunning(false)
     setAwaitingApproval(null)
+    Object.values(progressIntervalsRef.current).forEach(clearInterval)
+    progressIntervalsRef.current = {}
+    activeAgentsRef.current.clear()
     setAgentStatus(prev => {
       const next = { ...prev }
       ;(Object.keys(next) as AgentId[]).forEach(k => {
@@ -321,12 +393,17 @@ export function useChat() {
     setCustoAviso(null)
     resumeContextRef.current = null
     currentMsgId.current = {}
+    Object.values(progressIntervalsRef.current).forEach(clearInterval)
+    progressIntervalsRef.current = {}
+    activeAgentsRef.current.clear()
+    setAgentProgress({})
+    setAgentProgressMeta({})
   }, [])
 
   return {
     messages, agentStatus, isRunning, sessionId, avaliado, resumedFrom,
     manualMode, fastTrack, sandbox, custoCap, custoCapAtingido, custoAviso,
-    awaitingApproval, agentConfig, tagsSugeridas,
+    awaitingApproval, agentConfig, tagsSugeridas, agentProgress, agentProgressMeta,
     send, approve, abort, toggleManualMode, toggleFastTrack, toggleSandbox,
     setCustoCap, autorizarCusto, recusarCustoExtra,
     updateConfig, avaliar, exportar, reset, loadSession,
