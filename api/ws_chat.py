@@ -9,6 +9,7 @@ from agentes.aya import Aya
 from agentes.heitor import Heitor
 from agentes.otto import Otto
 from agentes.pedro_abrahao import PedroAbrahao
+from agentes.renata import Renata
 from agentes.salles import Salles
 from agentes.sonia import Sonia
 from api.deps import _anthropic_client, _log
@@ -96,10 +97,11 @@ async def chat(ws: WebSocket):
                 briefing = resume_context["briefing"]
 
             # Config helpers
-            cfg_otto = config.get("otto", {})
+            cfg_otto   = config.get("otto", {})
             cfg_heitor = config.get("heitor", {})
             cfg_salles = config.get("salles", {})
-            cfg_sonia = config.get("sonia", {})
+            cfg_sonia  = config.get("sonia", {})
+            cfg_renata = config.get("renata", {})
 
             # T26: Fast-track força Otto resumido
             if fast_track:
@@ -221,6 +223,34 @@ async def chat(ws: WebSocket):
                         lambda: ag.executar(
                             nome_projeto=nome_projeto,
                             outputs_diretos=snap_outputs,
+                        ),
+                    )
+                    return res.get("output_humano", ""), res.get("custo_total_usd", 0)
+
+                elif name == "renata":
+                    ag = Renata()
+                    duracao_dias = int(cfg_renata.get("duracao_dias", 14))
+                    # cliente_id: detecta de resume_context ou config
+                    _cliente_id = (
+                        resume_context.get("cliente_id")
+                        or cfg_renata.get("cliente_id")
+                        or None
+                    )
+                    # Dossiê da Aya nesta sessão tem prioridade; fallback: auto-detect no historico
+                    _dossie_aya = respostas.get("aya") or None
+                    _rot_salles = roteiro_salles or None
+                    _an_sonia   = respostas.get("sonia") or None
+                    _dir_heitor = diretrizes_heitor or None
+                    res = await loop.run_in_executor(
+                        None,
+                        lambda: ag.executar(
+                            modo="pipeline",
+                            duracao_dias=duracao_dias,
+                            dossie_aya=_dossie_aya,
+                            roteiro_salles=_rot_salles,
+                            analise_sonia=_an_sonia,
+                            diretrizes_heitor=_dir_heitor,
+                            cliente_id=_cliente_id,
                         ),
                     )
                     return res.get("output_humano", ""), res.get("custo_total_usd", 0)
@@ -430,6 +460,11 @@ async def chat(ws: WebSocket):
             # Aya compila os outputs dos outros agentes (sempre por último)
             if "aya" in names and not pipeline_cancelled:
                 ok = await _execute_with_approval("aya")
+                _ = ok
+
+            # Renata produz linha editorial (após Aya, se incluída via config ou selecionada)
+            if ("renata" in names or cfg_renata.get("incluir", False)) and not pipeline_cancelled:
+                ok = await _execute_with_approval("renata")
                 _ = ok
 
             # Salva sessão completa e envia o ID para o frontend avaliar

@@ -37,6 +37,7 @@ class EspelhoCliente(AgenteBase):
         input_max_chars: int = 20000,
         contexto_max_chars: int = 15000,
         versao_prompt: str = "v1",
+        nichos_calendario: list[str] | None = None,
     ):
         self.nome = id  # AgenteBase usa self.nome para carregar prompt
         self.versao_prompt = versao_prompt
@@ -47,6 +48,7 @@ class EspelhoCliente(AgenteBase):
         self._aviso_vermelho = aviso_vermelho_usd
         self._input_max = input_max_chars
         self._contexto_max = contexto_max_chars
+        self.nichos_calendario: list[str] = nichos_calendario or []
 
         super().__init__()
 

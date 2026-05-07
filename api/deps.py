@@ -9,6 +9,7 @@ from agentes.aya import Aya
 from agentes.heitor import Heitor
 from agentes.otto import Otto
 from agentes.pedro_abrahao import PedroAbrahao
+from agentes.renata import Renata
 from agentes.salles import Salles
 from agentes.sonia import Sonia
 from core.agente_base import formatar_erro_anthropic
@@ -38,6 +39,7 @@ AGENTE_ALIAS: dict[str, str] = {
     "sonia": "sonia",
     "aya": "aya",
     "pedro": "pedro_abrahao",
+    "renata": "renata",
 }
 
 
@@ -49,6 +51,7 @@ def _make_agent(name: str):
         "sonia": Sonia,
         "aya": Aya,
         "pedro_abrahao": PedroAbrahao,
+        "renata": Renata,
     }
     cls = mapping.get(name)
     return cls() if cls else None
@@ -74,4 +77,5 @@ __all__ = [
     "APIError", "APIConnectionError", "AuthenticationError", "RateLimitError",
     "formatar_erro_anthropic",
     "AGENTE_ALIAS", "_make_agent", "_parse_mentions",
+    "Renata",
 ]

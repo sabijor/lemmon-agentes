@@ -1,5 +1,7 @@
 # Dossiê Dr. Pedro Abrahão — Hator Clinic
 
+nichos_calendario: nacional, saude, mulher, medico
+
 > Material aprovado pelo próprio Dr. Pedro Abrahão.
 > Use como BASE DE POSICIONAMENTO.
 
