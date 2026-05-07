@@ -4,6 +4,20 @@ Convenção: novidades no topo. Datas em formato ISO. Cada entrada referencia o 
 
 ---
 
+## v1.16 — 2026-05-07
+
+**Renata — Social Media (T20).**
+
+- 7º agente: linha editorial Instagram, 1 post/dia, apenas Reels/Carrossel/Stories
+- Storytelling condicional (tem_arco), banco de datas BR por nicho, descartes em estoque
+- Modo pipeline (após Aya) + modo solo em Reunião (3 perguntas se contexto raso)
+- Calendário BR: 54 datas fixas + datas móveis 2026/2027 + 7 campanhas de mês inteiro
+- ConfigSidebar: toggle + range duração; sprite SVG coral no escritório; TypeScript limpo
+- `nichos_calendario` no EspelhoCliente; pedro/dossie.md atualizado
+- §2.7 + §6.14 no manual; 8 smoke tests pytest
+
+---
+
 ## v1.0 — 2026-05-05
 
 **Primeira versão publicada do manual.**

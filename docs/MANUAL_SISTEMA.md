@@ -1,7 +1,7 @@
 # LEMMON AGENTES — Manual do Sistema
 
-**Versão atual:** v1.15
-**Última atualização:** 2026-05-07
+**Versão atual:** v1.16
+**Última atualização:** 2026-05-07 (v1.16)
 **Mantido por:** Calebe Alves / Lemmon Produções
 
 > Este é o documento de referência viva do sistema Lemmon Agentes. Sempre que uma função nova for implementada ou um épico fechar, este manual deve ser atualizado e uma nova versão de PDF gerada em `docs/releases/`.
@@ -11,6 +11,21 @@
 ## Histórico de versões
 
 > **Convenção:** versões mais novas no topo. Cada release lista o que mudou em relação à anterior, mantendo histórico completo.
+
+### v1.16 — 2026-05-07
+
+**Renata — Social Media (T20): linha editorial Instagram com narrativa conectada.**
+
+- **Renata:** Sétimo agente do sistema. Recebe o dossiê da Aya e produz linha editorial Instagram de _n_ dias (1 post/dia), com storytelling condicional, datas comemorativas do nicho do cliente e CTA por peça. Apenas 3 formatos: Reels, Carrossel, Stories. Output humano limitado a 5000 chars. Material técnico inclui `linha_narrativa`, `publicacoes`, `descartes`, `estatisticas_mix`.
+- **core/calendario_br.py:** Banco de datas comemorativas BR filtradas por nicho. Inclui `DATAS_FIXAS` (54 datas), `DATAS_MOVEIS` (2026–2027), `CAMPANHAS_MES_INTEIRO` (Outubro Rosa, Novembro Azul, etc.) e `datas_na_janela(inicio, fim, nichos)`.
+- **Modos de operação:** `pipeline` (recebe dossie_aya + roteiro_salles + analise_sonia + diretrizes_heitor) e `solo` (contexto livre — retorna 3 perguntas se contexto raso, gera direto se contexto rico).
+- **Descartes:** Material não aproveitado salvo em `outputs/renata/estoque/<ts>_descartes.txt` para reuso posterior.
+- **ConfigSidebar:** Toggle "editorial (~$0.20)" + range de duração 1–60 dias. Dispara via `config.renata.{incluir, duracao_dias}` no payload WS.
+- **Frontend completo:** sprite SVG (roupa coral #e11d48, prancheta com post-its coloridos), ROLES, IDLE_QUOTES, posições no escritório.
+- **nichos_calendario no EspelhoCliente:** campo opcional `list[str]` para filtrar datas BR relevantes ao nicho do cliente. Configurado como `nacional, saude, mulher, medico` no dossiê de Pedro.
+- **8 smoke tests pytest** (padrão T67) cobrindo: datas_na_janela, pipeline, modo solo raso, validações de input.
+
+---
 
 ### v1.15 — 2026-05-07
 
@@ -349,7 +364,7 @@ não vendedora de tratamento.
 | `--modo` | `validacao`, `consulta`, `resposta_hipotetica` |
 | `--contexto` | Caminho de arquivo com texto a avaliar (ex: roteiro pronto) |
 
-**Material primário.** Carregado via `EspelhoCliente._carregar_material_primario()` a partir de `inputs/clientes/pedro/dossie.md` + `inputs/clientes/pedro/transcricoes.md`. Injetado em `system_prompt_reuniao` — funciona corretamente em modo Reunião e CLI.
+**Material primário.** Carregado via `EspelhoCliente._carregar_material_primario()` a partir de `inputs/clientes/pedro/dossie.md` + `inputs/clientes/pedro/transcricoes.md`. Injetado em `system_prompt_reuniao` — funciona corretamente em modo Reunião e CLI. A cada execução, um hash SHA-256 (12 chars) do material é calculado e registrado no JSON de histórico como `material_hash` — rastreabilidade de qual versão do dossiê foi usada.
 
 **Como instanciar (Python):**
 ```python
@@ -359,6 +374,58 @@ resultado = pedro.executar(pergunta="...", modo="validacao")
 ```
 
 **Custo médio.** $0.05–0.20.
+
+---
+
+## 2.7 Renata — Social Media
+
+**Cor:** rosa-coral (`#e11d48`) · **Classe RPG:** Comunicadora
+
+**Papel.** Recebe o dossiê compilado pela Aya e produz **linha editorial Instagram** com narrativa conectada — em 1–2 páginas que o cliente entende em 2 minutos. Não substitui nenhum outro agente: respeita o roteiro do Salles, o risco do Heitor, a performance da Sônia e a tese do Otto. Costura, organiza e distribui em calendário.
+
+**Escopo.** Apenas Instagram: Reels, Carrossel, Stories. Cadência: 1 post por dia. Volume: igual à duração da campanha em dias.
+
+**Storytelling condicional.** Se `tem_arco=true` (campanhas de vendas ou lançamento): usa cliffhangers, callbacks e escalada emocional entre peças. Se `tem_arco=false` (campanhas avulsas ou institucionais): sem forçar narrativa.
+
+**Calendário BR.** Identifica feriados e datas comemorativas relevantes ao nicho do cliente na janela da campanha via `core/calendario_br.py`. Nichos do cliente Pedro: `nacional, saude, mulher, medico`.
+
+**Descartes.** Material que não coube no calendário é listado com justificativa e salvo em `outputs/renata/estoque/<timestamp>_descartes.txt`.
+
+**Modos de operação:**
+
+| Modo | Quando usar | Input |
+|---|---|---|
+| `pipeline` | Após Aya no pipeline completo | `dossie_aya` ou `roteiro_salles` |
+| `solo` | Em Reunião isolada | `contexto_solo` (pode ser raso) |
+
+> Modo solo com contexto raso: Renata retorna 3 perguntas DE UMA VEZ antes de gerar.
+
+**Quando usar.** Pipeline: toggle "editorial" no ConfigSidebar + duração (1–60 dias). Reunião: `@renata`.
+
+**Configurações CLI (`renata_cli.py`):**
+
+| Parâmetro | Valores |
+|-----------|---------|
+| `--modo` | `pipeline` (default), `solo` |
+| `--duracao` | 1–60 (default: 14) |
+| `--inicio` | `YYYY-MM-DD` (default: hoje + 7 dias) |
+| `--dossie` | Caminho do `.md` da Aya |
+| `--roteiro` | Caminho do roteiro do Salles |
+| `--cliente` | ID do cliente (ex: `pedro_abrahao`) |
+
+**Como instanciar (Python):**
+```python
+from agentes.renata import Renata
+renata = Renata()
+resultado = renata.executar(
+    modo="pipeline",
+    duracao_dias=14,
+    dossie_aya=texto_dossie,
+    cliente_id="pedro_abrahao",
+)
+```
+
+**Custo médio.** $0.10–0.25.
 
 ---
 
@@ -651,6 +718,100 @@ for briefing in inputs/lote/*.txt; do
 done
 ```
 
+## 6.7 Variar uma estratégia que funcionou (Modo Remix)
+
+1. Histórico → encontrar sessão 5⭐ com tese que funcionou
+2. Botão **Retomar** — dashboard envia `resume_context` com análise Otto herdada
+3. Convocar apenas Salles + Sônia + Aya (Otto não precisa rodar de novo)
+4. Mensagem: `novo formato: Reels 30s em vez de mini-doc, mesma tese`
+5. Salles regenera roteiro a partir da análise Otto herdada
+6. Aya compila com referência cruzada à sessão original
+
+## 6.8 Roteiro emergencial sob deadline (Fast-track)
+
+1. Dashboard → toggle **Fast-track** (ícone ⚡ no header do chat)
+2. Convocar Otto + Salles + Sônia + Aya
+3. Enviar briefing normalmente
+4. Fast-track força Otto em modo resumido e **pula Heitor** automaticamente
+5. Pipeline completo em ~50% do tempo normal
+6. Aviso aparece no chat: "Heitor pulado — valide compliance manualmente antes de publicar"
+
+## 6.9 Testar ideia maluca sem poluir histórico (Sandbox)
+
+1. Dashboard → toggle **Sandbox** (ícone 🧪 no header do chat)
+2. Montar pipeline normalmente, enviar briefing experimental
+3. Pipeline roda completo — sessão **não aparece** em `/historico` nem conta para métricas
+4. Explorar abordagens arriscadas, linguagem nova, formatos incomuns
+5. Para salvar de verdade: desativar sandbox e rodar a versão aprovada
+
+## 6.10 Comparar 3 abordagens de roteiro (A/B Salles)
+
+1. Convocar Otto + Salles + Sônia + Aya
+2. No painel de config do Salles, definir `alternativas: 3`
+3. Pipeline roda normalmente até Salles — Salles produz 3 versões (resumo, mini-doc, reel)
+4. Chat exibe três bolhas: **salles_v1**, **salles_v2**, **salles_v3**
+5. Escolher a versão preferida antes de passar para Sônia
+6. Sônia otimiza a versão selecionada; Aya compila só essa
+
+## 6.11 Reverse-engineer um vídeo concorrente (Briefing Reverso)
+
+1. Abrir página `/briefing-reverso` no dashboard
+2. Colar a transcrição do vídeo que você quer analisar
+3. Clicar **Gerar briefing** — API inferem o briefing original via LLM
+4. Resultado aparece: estratégia usada, conflito central, tese implícita
+5. Usar o briefing gerado como ponto de partida de nova sessão ou repositório de referência
+
+## 6.12 Preparar reels a partir de vídeo longo (Cortes-prontos)
+
+1. Abrir página `/cortes` no dashboard
+2. Colar a transcrição completa do vídeo longo
+3. Selecionar as durações desejadas (ex: 30s, 60s, 90s)
+4. Clicar **Gerar cortes** — Sônia retorna tabela com cortes prontos para edição
+5. Cada corte tem: gancho, desenvolvimento, CTA e minutagem sugerida
+6. Copiar ou exportar para o editor de vídeo
+
+## 6.13 Gate de espelho antes de entregar ao cliente (Gate Espelho)
+
+1. Ter roteiro final aprovado pela equipe interna (pipeline completo rodado)
+2. Modo Reunião → convocar Pedro (ou cliente espelho correspondente)
+3. Colar roteiro: `@pedro valida esse roteiro antes de eu enviar pro cliente: [roteiro]`
+4. Pedro responde com nível de confiança (🟢 alta / 🟡 média / 🔴 recusa) e observações de voz
+5. Ajustar pontos 🔴 ou 🟡 críticos antes de entregar
+6. Sessão fica registrada como evidência de validação pelo espelho do cliente
+
+## 6.14 Editorial de publicação (Renata)
+
+**Cenário A — Via pipeline completo:**
+
+1. Montar briefing normalmente e selecionar agentes: Otto → Heitor → Salles → Sônia → Aya
+2. No ConfigSidebar, ativar o toggle **editorial (~$0.20)** sob "Renata"
+3. Definir duração (ex: 14 dias) — padrão é 14
+4. Clicar **Enviar** — Renata roda automaticamente após Aya
+5. Output: calendário editorial de 14 peças com hook, formato, CTA e horário sugerido
+6. Descartes salvos em `outputs/renata/estoque/`
+
+**Cenário B — Standalone via Reunião:**
+
+1. Modo Reunião → `@renata quero um calendário de 21 dias para o Pedro`
+2. Se contexto raso: Renata faz 3 perguntas de uma vez (material disponível, cliente/duração, objetivo)
+3. Responder com as informações — Renata gera o editorial na próxima mensagem
+4. Output ≤ 5000 chars com linha narrativa e publicações listadas
+
+**Cenário C — CLI direto:**
+
+```bash
+python renata_cli.py \
+  --modo pipeline \
+  --dossie outputs/aya/20260507_143000_dossie_hator.md \
+  --duracao 30 \
+  --cliente pedro_abrahao \
+  --inicio 2026-10-01
+```
+
+Output: `outputs/renata/<ts>_humano_pedro_abrahao.md` + JSON técnico + descartes.
+
+> **Atenção:** Renata não faz compliance. Se rodar em modo solo, o output humano inclui aviso _"passe pelo Heitor antes de publicar"_. Em pipeline, Heitor já rodou antes.
+
 ---
 
 # 7. Roadmap
@@ -802,6 +963,158 @@ Cada PDF gerado em `docs/releases/` permanece para sempre como snapshot históri
 - Comparação de evolução
 - Onboarding de pessoa nova ("o sistema em v1.0 era assim, agora está em v1.5")
 - Documentação para cliente externo (Hator pode receber v atual sem ver a próxima ainda em desenvolvimento)
+
+---
+
+# 10. Como adicionar um cliente espelho novo
+
+Siga estas 8 etapas para colocar um novo cliente espelho em produção. Após concluir, o cliente aparece no escritório virtual e pode ser convocado em modo Reunião com `@<alias>`.
+
+## 10.1 Rodar o wizard de onboarding
+
+```bash
+python onboard_cliente.py
+# Ou passando argumentos diretamente:
+python onboard_cliente.py --id marina --nome "Marina Costa" --nicho "nutricionista"
+```
+
+O wizard cria automaticamente:
+- `inputs/clientes/<id>/dossie.md` — dossiê de posicionamento (template)
+- `inputs/clientes/<id>/transcricoes.md` — arquivo para transcrições reais
+- `prompts/<id>_system_v1.md` — system prompt do espelho (template)
+- `outputs/<id>/` — pasta de outputs
+
+## 10.2 Preencher o dossiê
+
+Editar `inputs/clientes/<id>/dossie.md` e preencher todas as seções:
+- Quem é o cliente (formação, trajetória, o que faz hoje)
+- Nicho e público-alvo (dor principal)
+- Posicionamento (diferencial, tom de voz, palavras frequentes, o que nunca diz)
+- Zonas de recusa do espelho IA
+- Projetos e contexto atual
+- Níveis de confiança (🟢/🟡/🔴 por tema)
+
+**Regra:** quanto mais rico o dossiê, mais fiel o espelho.
+
+## 10.3 Colar transcrições reais
+
+Editar `inputs/clientes/<id>/transcricoes.md` e colar material de voz real do cliente:
+- Transcrições de vídeos publicados
+- Trechos de entrevistas ou podcasts
+- Posts longos aprovados pelo cliente
+
+Formato sugerido: `## [Data] [Fonte]` + transcrição.
+
+## 10.4 Ajustar o system prompt
+
+Editar `prompts/<id>_system_v1.md` e substituir todos os `(preencher após dossiê)` com as informações reais do dossiê.
+
+Seções a completar: QUEM VOCÊ É, tom de voz, vocabulário, zonas de recusa completas.
+
+## 10.5 Instanciar o agente Python
+
+Criar `agentes/<id>.py` ou usar diretamente:
+
+```python
+from core.espelho import EspelhoCliente
+from core.config import ESPELHO_CLIENTES_DIR
+
+marina = EspelhoCliente(
+    id="marina",
+    nome="Marina Costa",
+    material_dir=ESPELHO_CLIENTES_DIR / "marina",
+    max_tokens=4096,
+)
+```
+
+Se o cliente precisar de configuração específica (limites, aviso vermelho), criar subclasse em `agentes/marina.py` seguindo o padrão de `agentes/pedro_abrahao.py`.
+
+## 10.6 Adicionar ao dashboard (snippet TypeScript)
+
+O wizard imprime um snippet TS. Colar em `dashboard/lib/agents.ts` dentro do array `AGENTS`:
+
+```typescript
+{
+  id: 'marina',
+  name: 'Marina',         // primeiro nome
+  title: 'nutricionista',
+  rpgClass: 'Cliente',
+  color: '#0f766e',
+  colorDim: '#0f766e20',
+  colorText: '#fff',
+  deskPosition: { x: 400, y: 140 },    // ajustar conforme layout
+  meetingPosition: { x: 440, y: 260 },
+  idleQuote: 'TODO: frase de fundo da Marina',
+  reuniaoOnly: true,
+},
+```
+
+Ajustar `deskPosition` e `meetingPosition` para não colidir com agentes existentes. Definir `idleQuote` com frase característica real do cliente.
+
+## 10.7 Registrar alias de menção
+
+Editar `api/deps.py` e adicionar no dict `AGENTE_ALIAS`:
+
+```python
+AGENTE_ALIAS: dict[str, str] = {
+    ...
+    "marina": "marina",   # @marina → agente marina
+}
+```
+
+E no dict `_make_agent`, adicionar o mapeamento:
+
+```python
+"marina": Marina,   # importar de agentes.marina
+```
+
+Após isso, `@marina` funciona em modo Reunião.
+
+## 10.8 Testar e ativar
+
+```bash
+# Teste CLI antes de subir no dashboard
+python -c "
+from agentes.marina import Marina
+m = Marina()
+r = m.executar('Como você aborda a relação entre dieta e energia?', modo='consulta')
+print(r['output_humano'][:300])
+print('Custo:', r['custo_total_usd'])
+"
+```
+
+Se a resposta soar como o cliente real: ✅ espelho ativo.
+Se soar genérico: revisar dossiê e transcrições (mais material = espelho mais fiel).
+
+## 10.9 Como atualizar o dossiê preservando histórico (T85)
+
+Quando o cliente evoluir o posicionamento (novo projeto, novo público, tom mudou), não sobrescreva diretamente — archive a versão antiga primeiro:
+
+```bash
+# 1. Arquivar versão atual antes de editar
+cp inputs/clientes/pedro/dossie.md inputs/clientes/pedro/historico/dossie_v1.md
+cp inputs/clientes/pedro/transcricoes.md inputs/clientes/pedro/historico/transcricoes_v1.md
+
+# 2. Editar os arquivos atuais com o material novo
+# 3. Rodar pedro_cli.py para confirmar que o espelho soa correto
+
+# 4. Verificar qual hash está sendo usado nas execuções recentes
+grep "material_hash" historico/pedro_abrahao/*.json | tail -5
+```
+
+**Estrutura esperada:**
+```
+inputs/clientes/pedro/
+├── dossie.md              # versão atual (sempre editável)
+├── transcricoes.md        # versão atual
+└── historico/
+    ├── dossie_v1.md       # versão anterior arquivada
+    └── transcricoes_v1.md
+```
+
+**Como rastrear:** o JSON de cada execução contém `"material_hash": "abc123def456"`. Se algo soar estranho numa resposta passada, compare o hash com os arquivos em `historico/` para saber qual dossiê estava ativo.
+
+**Compatibilidade:** sessões antigas (antes de T85) não têm o campo `material_hash`. Qualquer display deve tratar com `session.material_hash ?? "?"`.
 
 ---
 
