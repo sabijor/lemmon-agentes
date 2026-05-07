@@ -1,6 +1,6 @@
 # LEMMON AGENTES — Manual do Sistema
 
-**Versão atual:** v1.19
+**Versão atual:** v1.20
 **Última atualização:** 2026-05-07
 **Mantido por:** Calebe Alves / Lemmon Produções
 
@@ -11,6 +11,22 @@
 ## Histórico de versões
 
 > **Convenção:** versões mais novas no topo. Cada release lista o que mudou em relação à anterior, mantendo histórico completo.
+
+### v1.20 — 2026-05-07
+
+**BLOCO HIGIENE — T91: auditoria completa §2–§8.**
+
+- **§2 "A equipe":** corrigido para 7 agentes (Renata era o 7º mas o título/intro ainda dizia 6). Parágrafo de introdução atualizado para mencionar Renata como opcional no pipeline.
+- **§3.1 Pipeline:** sequência atualizada para "Otto → Heitor → Salles → Sônia → Aya (→ Renata, opcional)" — reflete toggle editorial do ConfigSidebar.
+- **§4 numeração:** §4.10 Escritório virtual renumerado para §4.13 (aparecia fora de ordem depois de §4.11 e §4.12 adicionados mais tarde).
+- **§4.13 Escritório virtual:** descrição expandida para incluir whiteboard ao vivo (v1.7) e mic destacado em reunião (v1.7) — estava incompleto e sem mencionar features já entregues.
+- **§5:** nova seção §5.7 Renata CLI. Seções §5.7–§5.9 renumeradas para §5.8–§5.10.
+- **§7 Roadmap:** reescrita completa. Tabelas de concluídos por épico (FASE 1–4) e por bloco (FASE 5). Pendentes: BLOCO HIGIENE + BLOCO 5. Substituiu texto completamente fora de data ("v1.7, 37 tarefas, todos épicos entregues").
+- **§8.1 Custos:** adicionada linha Renata ($0.10–0.25). Custo total pipeline com/sem Renata documentado.
+- **§8.4 Estrutura de pastas:** expandida para refletir estrutura atual: `api/` modularizado, `core/tipos.py`, `core/calendario_br.py`, `core/templates/`, `outputs/renata/estoque/`, `historico/dashboard/`, estrutura completa do `dashboard/`. Comentário `agentes/` corrigido para 7 agentes.
+- **§9.2 Como atualizar:** passo "Atualizar CHANGELOG.md" removido como obrigatório — T92 torna o manual a fonte primária; nota explicativa adicionada.
+
+---
 
 ### v1.19 — 2026-05-07
 
@@ -260,7 +276,7 @@ Depois preencher `inputs/clientes/<id>/dossie.md`, colar transcrições reais, e
 ## Sumário
 
 1. Visão geral
-2. A equipe — 6 agentes
+2. A equipe — 7 agentes
 3. Como o sistema funciona — modos de operação
 4. Funcionalidades do dashboard
 5. CLI direto (terminal)
@@ -283,9 +299,9 @@ Tecnicamente o sistema é composto por: backend Python (FastAPI + WebSocket) que
 
 ---
 
-# 2. A equipe — 6 agentes
+# 2. A equipe — 7 agentes
 
-A equipe atual tem 6 personagens. Cinco entram no pipeline padrão (Otto → Heitor → Salles → Sônia → Aya); o sexto, Pedro, é convocado sob demanda em modo Reunião.
+A equipe atual tem 7 personagens. Cinco entram no pipeline padrão (Otto → Heitor → Salles → Sônia → Aya); Renata entra opcionalmente ao final do pipeline via toggle no ConfigSidebar; Pedro, o espelho de cliente, é convocado sob demanda em modo Reunião.
 
 ## 2.1 Otto — Estrategista
 
@@ -471,7 +487,7 @@ resultado = renata.executar(
 
 ## 3.1 Modo Pipeline
 
-Sequência fixa: Otto → Heitor → Salles → Sônia → Aya. Sem volta, sem ramificação. Cada agente recebe o output do anterior, produz o seu, passa adiante. Aya é sempre a última e compila tudo.
+Sequência padrão: Otto → Heitor → Salles → Sônia → Aya (→ Renata, opcional). Sem volta, sem ramificação. Cada agente recebe o output do anterior, produz o seu, passa adiante. Aya compila tudo; Renata, se ativada pelo toggle "editorial" no ConfigSidebar, gera a linha editorial após Aya.
 
 **Quando usar.** Briefing novo, deliverable claro, deadline. Quando você sabe o que quer e só precisa que o sistema entregue.
 
@@ -597,11 +613,9 @@ Toggle no header da aplicação (ícone ☀/🌙). Alterna entre modo claro e es
 
 **Exportações não afetadas.** O HTML/PDF gerado pela Aya é documento de impressão/cliente e permanece em modo claro independente do tema da interface.
 
-## 4.10 Escritório virtual
+## 4.13 Escritório virtual
 
-Cena RPG com sprites dos agentes em mesas. Quando você convoca um agente, ele caminha da mesa para a sala de reunião. Status físico (idle, thinking, speaking, done, error) reflete em cor e animação. Idle quotes aparecem em bolas de fala periodicamente.
-
-> **Roadmap:** os Épicos G do plano aprofundam a camada visual — whiteboards que se preenchem em tempo real, mic destacado em quem fala, salas customizadas por cliente.
+Cena RPG isométrica com sprites dos agentes em mesas. Quando você convoca um agente, ele caminha da mesa para a sala de reunião. Status físico (idle, thinking, speaking, done, error) reflete em cor e animação. Idle quotes aparecem em bolas de fala periodicamente. Whiteboards na sala respondem ao pipeline em tempo real (barras horizontais na cor do agente ativo). Mic destacado em reunião (anéis pulsantes ao redor do sprite quando `speaking`).
 
 ---
 
@@ -651,7 +665,17 @@ python pedro_cli.py "como você responderia se uma paciente perguntasse X"
 python pedro_cli.py inputs/pergunta.txt --modo validacao --contexto outputs/salles/roteiro.md
 ```
 
-## 5.7 Pulse semanal
+## 5.7 Renata
+
+```bash
+python renata_cli.py --modo pipeline --dossie outputs/aya/<dossie>.md --duracao 14 --cliente pedro_abrahao
+python renata_cli.py --modo solo --duracao 21 --inicio 2026-10-01
+python renata_cli.py --modo pipeline --dossie outputs/aya/<dossie>.md --duracao 30 --roteiro outputs/salles/<roteiro>.md
+```
+
+Flags: `--modo` (pipeline/solo), `--duracao` (1–60, default 14), `--inicio` (YYYY-MM-DD), `--dossie`, `--roteiro`, `--cliente`.
+
+## 5.8 Pulse semanal
 
 ```bash
 python scripts/pulse_semanal.py                     # semana atual
@@ -705,7 +729,7 @@ Carregar:
 launchctl load ~/Library/LaunchAgents/com.lemmon.pulse.plist
 ```
 
-## 5.8 Pipeline completo
+## 5.9 Pipeline completo
 
 ```
 python pipeline_completo.py inputs/briefing.txt
@@ -715,7 +739,7 @@ python pipeline_completo.py inputs/briefing.txt --profundo --busca-sonia --com-a
 
 Flags úteis: `--sem-heitor`, `--sem-sonia`, `--no-confirm`, `--profundo`, `--sonia-profundo`, `--nome-projeto "X"`.
 
-## 5.9 Exemplares (few-shot curado)
+## 5.10 Exemplares (few-shot curado)
 
 Gerenciado pelo endpoint `/exemplares`, mas também pode ser inspecionado direto em `core/exemplares/<agente>.json`. Para remover um exemplar problemático: `DELETE /exemplares/{agente}/{id}` via curl ou via código. O limite é 10 exemplares por agente; os 3 mais recentes são injetados no system_prompt.
 
@@ -882,15 +906,44 @@ Output: `outputs/renata/<ts>_humano_pedro_abrahao.md` + JSON técnico + descarte
 
 # 7. Roadmap
 
-O `PLANO_ACAO_2026-05-05.md` na raiz do projeto contém o plano completo com 9 épicos e 39 tarefas. Resumo do que está no horizonte:
+O `PLANO_ACAO_2026-05-05.md` na raiz do projeto documenta o plano completo. O sistema está em **v1.19** com FASE 5 em andamento.
 
-**Concluídos.** ~~Família de espelhos de cliente~~ ✅ (v1.1), ~~Pedro como gate de qualidade~~ ✅ (v1.2), ~~Memória institucional e saúde~~ ✅ (v1.3), ~~Workflows avançados~~ ✅ (v1.4), ~~Inteligência operacional / custo-cap~~ ✅ (v1.5), ~~Multimodal e aprovação de cliente~~ ✅ (v1.6), ~~Camada visual~~ ✅ (v1.7).
+## 7.1 Concluído — FASE 1 a 4 (v1.0–v1.13)
 
-**Todos os épicos do plano de ação 2026-05-05 foram implementados.** O sistema está em v1.7 com 37 tarefas concluídas em 7 épicos. Para próximos ciclos, revisar o backlog e criar novo plano de ação baseado em feedback de uso real.
+| Épico | Versão | Status |
+|---|---|---|
+| Família de espelhos de cliente (T6–T8) | v1.1 | ✅ |
+| Pedro como gate de qualidade (T9–T10) | v1.2 | ✅ |
+| Memória institucional e saúde (T11–T17) | v1.3 | ✅ |
+| Workflows avançados (T22–T27) | v1.4 | ✅ |
+| Inteligência operacional / custo-cap (T28–T30) | v1.5 | ✅ |
+| Multimodal e aprovação de cliente (T34–T37) | v1.6 | ✅ |
+| Camada visual — sprites, whiteboard, mic (T31–T33) | v1.7 | ✅ |
+| QA, segurança XSS, versionamento PDF (T40–T42) | v1.8 | ✅ |
+| Erros Anthropic legíveis (T52–T53) | v1.10 | ✅ |
+| Menções @pedro, share URL, tags (T51, T54, T55) | v1.11 | ✅ |
+| QA/TTS/share/telemetria (T56–T59) | v1.12 | ✅ |
 
-**Camada visual (Épico G).** Whiteboards que se preenchem em tempo real, sprites com status físico mais expressivo, mesa de reunião com mic destacado quando alguém fala.
+## 7.2 Concluído — FASE 5 (v1.14–v1.19)
 
-> Cada épico fechado deve atualizar este manual e gerar nova versão de PDF em `docs/releases/`.
+| Bloco | Versão | Status |
+|---|---|---|
+| BLOCO 1 — Refatoração interna (T61–T65, T78) | v1.14 | ✅ |
+| BLOCO 2 — DX/qualidade | v1.14 | ✅ |
+| BLOCO 3 — Arquitetura + tipagem (T73–T75, T81, T82) | v1.15 | ✅ |
+| Renata — Social Media (T20) | v1.16 | ✅ |
+| BLOCO 4 — Documentação (T76, T77, T85) | v1.17 | ✅ |
+| BLOCO 6 — Barra de progresso + ETA (T90) | v1.18 | ✅ |
+| BLOCO 6 — Tema claro/escuro (T89) | v1.19 | ✅ |
+
+## 7.3 Pendente — FASE 5
+
+| Bloco | Tarefas | Prioridade |
+|---|---|---|
+| BLOCO HIGIENE — T91 | Auditoria completa do manual (em andamento) | Alta |
+| BLOCO 5 — Infra latente | T79 índice cacheado, T80 gráfico latência, T83 chmod, T84 backup, T86 toast global, T87 limpeza outputs | Média |
+
+> **Filosofia de roadmap:** BLOCO 5 é dívida silenciosa — não dói hoje, mas vai doer em escala. BLOCO HIGIENE é pré-requisito para fechar FASE 5 com documentação consistente.
 
 ---
 
@@ -910,8 +963,9 @@ Configurado em `core/config.py`:
 | Sônia (com busca) | $0.30–0.50 |
 | Aya | $0.05–0.20 |
 | Pedro | $0.05–0.20 |
+| Renata | $0.10–0.25 |
 
-**Custo total típico de pipeline completo:** $0.50–1.50.
+**Custo total típico de pipeline completo (sem Renata):** $0.50–1.50. **Com Renata:** +$0.10–0.25.
 
 **Threshold de alerta de pipeline caro:** $1.00 (`PIPELINE_AVISO_CUSTO_TOTAL_USD`).
 
@@ -934,19 +988,35 @@ Visão (descrição de imagem upload): `claude-haiku-4-5-20251001`.
 
 ```
 lemmon-agentes/
-├── agentes/              # implementações dos 6 agentes
+├── agentes/              # implementações dos 7 agentes (otto, heitor, salles, sonia, aya, pedro_abrahao, renata)
+├── api/                  # FastAPI modularizado
+│   ├── main.py           # app + routers
+│   ├── deps.py           # globals, HISTORICO_DIR, AGENTE_ALIAS
+│   ├── schemas.py        # modelos Pydantic
+│   ├── storage.py        # persistência de sessões
+│   ├── ws_chat.py        # WebSocket pipeline
+│   ├── ws_reuniao.py     # WebSocket reunião
+│   └── routes/           # routers REST (historico, exportar, sessoes, etc.)
 ├── core/                 # base, custos, validador, espelho genérico
 │   ├── espelho.py        # EspelhoCliente — classe genérica de espelho de cliente
-│   └── limites_espelho.py# avisos de custo pré/pós execução para espelhos
+│   ├── tipos.py          # AgenteResultado TypedDict
+│   ├── calendario_br.py  # datas comemorativas BR por nicho
+│   └── templates/        # aura.css — CSS do AURA Design System (dossiê Aya)
 ├── prompts/              # system prompts versionados (v1, v2, v3)
 ├── inputs/               # briefings, dossiês, transcrições
 │   └── clientes/         # material primário por cliente espelho
 │       └── pedro/        # dossie.md + transcricoes.md do Dr. Pedro Abrahão
 ├── outputs/              # outputs de execuções (por agente e por cliente)
+│   └── renata/estoque/   # descartes do editorial Renata
 ├── historico/            # sessões salvas (JSON)
-├── dashboard/            # frontend Next.js
-├── docs/                 # este manual e releases
-├── onboard_cliente.py    # wizard CLI para novo cliente espelho
+│   └── dashboard/        # sessões do pipeline e reunião
+├── dashboard/            # frontend Next.js (React + Tailwind + Framer Motion)
+│   ├── app/              # rotas Next.js (page.tsx, layout.tsx, subpáginas)
+│   ├── components/       # componentes React (chat, office, history, etc.)
+│   └── lib/              # hooks e utils (useChat, useHistory, agents, api-client)
+├── docs/                 # este manual e releases PDF
+│   └── releases/         # PDFs imutáveis por versão
+├── scripts/              # pulse_semanal.py, onboard_cliente.py
 └── PLANO_ACAO_*.md       # plano de implementação
 ```
 
@@ -1004,14 +1074,14 @@ npm run dev  # http://localhost:3000
    - Modo remix documentado em §6
    ```
 
-4. **Atualizar `CHANGELOG.md`** com entrada equivalente.
-
-5. **Gerar PDF:**
+4. **Gerar PDF:**
    ```bash
    cd /Users/calebe/Documents/lemmon-agentes
    python docs/gerar_pdf.py
    ```
    Saída: `docs/releases/MANUAL_v<versao>_<YYYY-MM-DD>.pdf`
+
+> **Nota:** `CHANGELOG.md` existe como diário complementar mas não é mais pré-requisito de bump. A regra T92 (§9.5) exige apenas que as seções §2 a §8 do manual estejam atualizadas antes do bump.
 
 ## 9.3 Convenção de versionamento
 
