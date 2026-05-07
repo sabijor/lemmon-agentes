@@ -47,9 +47,9 @@ export function ProgressBar({ agentId, progress, meta, isManualLocked, isVisible
               Mais lento que o normal
             </motion.span>
           )}
-          {isManualLocked && !isOverloaded && (
+          {isManualLocked && (
             <span className="block text-[9px] font-mono text-stone-400 mt-0.5">
-              Aguardando aprovação...
+              🔒 Aguardando aprovação...
             </span>
           )}
         </motion.div>

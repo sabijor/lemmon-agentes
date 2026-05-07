@@ -202,7 +202,8 @@ export function useChat() {
           })
           .catch(() => {
             if (!activeAgentsRef.current.has(agentId)) return
-            const mediana = FALLBACK_MEDIANAS[agentId]
+            let mediana = FALLBACK_MEDIANAS[agentId]
+            if (agentId === 'salles' && agentConfig.salles.alternativas === 3) mediana *= 3
             const iv = setInterval(() => {
               const elapsed = (Date.now() - startTime) / 1000
               setAgentProgress(prev => ({ ...prev, [agentId]: Math.min(95, (elapsed / mediana) * 100) }))
