@@ -200,7 +200,7 @@ export function useChat() {
             if (agentId === 'salles' && agentConfig.salles.alternativas === 3) mediana *= 3
             const iv = setInterval(() => {
               const elapsed = (Date.now() - startTime) / 1000
-              setAgentProgress(prev => ({ ...prev, [agentId]: Math.min(95, (elapsed / mediana) * 100) }))
+              setAgentProgress(prev => ({ ...prev, [agentId]: Math.min(95, Math.pow(Math.min(elapsed / mediana, 1), PROGRESS_CURVE_POWER) * 100) }))
               setAgentProgressMeta(prev => ({ ...prev, [agentId]: { mediana, elapsed, amostras } }))
             }, 200)
             progressIntervalsRef.current[agentId] = iv
@@ -228,7 +228,7 @@ export function useChat() {
             if (agentId === 'salles' && agentConfig.salles.alternativas === 3) mediana *= 3
             const iv = setInterval(() => {
               const elapsed = (Date.now() - startTime) / 1000
-              setAgentProgress(prev => ({ ...prev, [agentId]: Math.min(95, (elapsed / mediana) * 100) }))
+              setAgentProgress(prev => ({ ...prev, [agentId]: Math.min(95, Math.pow(Math.min(elapsed / mediana, 1), PROGRESS_CURVE_POWER) * 100) }))
               setAgentProgressMeta(prev => ({ ...prev, [agentId]: { mediana, elapsed, amostras: 0 } }))
             }, 200)
             progressIntervalsRef.current[agentId] = iv

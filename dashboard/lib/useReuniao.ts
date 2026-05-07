@@ -71,7 +71,7 @@ export function useReuniao() {
   const _startProgress = useCallback((agentId: AgentId, startTime: number, mediana: number, amostras: number) => {
     const iv = setInterval(() => {
       const elapsed = (Date.now() - startTime) / 1000
-      setAgentProgress(prev => ({ ...prev, [agentId]: Math.min(95, (elapsed / mediana) * 100) }))
+      setAgentProgress(prev => ({ ...prev, [agentId]: Math.min(95, Math.pow(Math.min(elapsed / mediana, 1), PROGRESS_CURVE_POWER) * 100) }))
       setAgentProgressMeta(prev => ({ ...prev, [agentId]: { mediana, elapsed, amostras } }))
     }, 200)
     progressIntervalsRef.current[agentId] = iv
