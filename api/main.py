@@ -1,4 +1,6 @@
 """Aplicação FastAPI do Lemmon Dashboard."""
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -6,8 +8,16 @@ from api.routes import auxiliares, calibragem, exemplares, exportar, historico, 
 from api.ws_chat import chat
 from api.ws_mesa import mesa_redonda
 from api.ws_reuniao import reuniao
+from core.historico_index import sanity_check
 
-app = FastAPI(title="Lemmon Dashboard API")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    sanity_check()
+    yield
+
+
+app = FastAPI(title="Lemmon Dashboard API", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

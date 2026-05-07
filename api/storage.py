@@ -4,6 +4,7 @@ from datetime import datetime
 from pathlib import Path
 
 from core.config import HISTORICO_DIR
+from core.historico_index import adicionar_entrada
 
 
 def _salvar_sessao_reuniao(
@@ -27,6 +28,7 @@ def _salvar_sessao_reuniao(
         registro["custo_total_usd"] = sum(custos.values())
         registro["historico"] = historico
         session_path.write_text(json.dumps(registro, ensure_ascii=False, indent=2), encoding="utf-8")
+        adicionar_entrada(session_path)
         return session_id, session_path
 
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -45,6 +47,7 @@ def _salvar_sessao_reuniao(
     }
     path = session_dir / f"{ts}_reuniao.json"
     path.write_text(json.dumps(registro, ensure_ascii=False, indent=2), encoding="utf-8")
+    adicionar_entrada(path)
     return path.stem, path
 
 
@@ -78,4 +81,5 @@ def _salvar_sessao(
 
     path = session_dir / f"{ts}_sessao.json"
     path.write_text(json.dumps(registro, ensure_ascii=False, indent=2), encoding="utf-8")
+    adicionar_entrada(path)
     return path

@@ -1,0 +1,162 @@
+"""Índice incremental de sessões em historico/dashboard/.
+
+Mantém historico/_index.json sincronizado com os arquivos JSON do dashboard.
+- adicionar_entrada() é chamado por _salvar_sessao() / _salvar_sessao_reuniao()
+  imediatamente após gravar o JSON de sessão.
+- sanity_check() é executado no startup do FastAPI; divergência > 5% dispara
+  reconstrução automática.
+- reconstruir() faz rebuild completo relendo todos os arquivos JSON.
+"""
+import json
+import logging
+import time
+from pathlib import Path
+
+from core.config import HISTORICO_DIR
+
+_log = logging.getLogger("lemmon.index")
+
+INDEX_PATH = HISTORICO_DIR / "_index.json"
+DASHBOARD_DIR = HISTORICO_DIR / "dashboard"
+_VERSAO = 1
+
+
+# --------------------------------------------------------------------------- #
+# Helpers internos                                                             #
+# --------------------------------------------------------------------------- #
+
+def _ler_indice() -> list[dict]:
+    """Carrega entradas do índice; retorna lista vazia se arquivo não existe."""
+    if not INDEX_PATH.exists():
+        return []
+    try:
+        raw = json.loads(INDEX_PATH.read_text(encoding="utf-8"))
+        return raw.get("entradas", [])
+    except Exception as exc:
+        _log.warning("Índice corrompido, será reconstruído: %s", exc)
+        return []
+
+
+def _gravar_indice(entradas: list[dict]) -> None:
+    HISTORICO_DIR.mkdir(parents=True, exist_ok=True)
+    INDEX_PATH.write_text(
+        json.dumps({"versao": _VERSAO, "entradas": entradas}, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+
+def _resumo_de_arquivo(path: Path) -> dict | None:
+    """Lê um JSON de sessão e retorna a entrada de índice correspondente."""
+    try:
+        dados = json.loads(path.read_text(encoding="utf-8"))
+        return {
+            "session_id": path.stem,
+            "timestamp": dados.get("timestamp"),
+            "briefing": (dados.get("briefing") or "")[:120],
+            "agentes_usados": dados.get("agentes_usados", []),
+            "custo_total_usd": dados.get("custo_total_usd", 0),
+            "avaliacao": dados.get("avaliacao"),
+            "origem": dados.get("origem", "dashboard"),
+        }
+    except Exception as exc:
+        _log.warning("Ignorando arquivo %s: %s", path.name, exc)
+        return None
+
+
+# --------------------------------------------------------------------------- #
+# API pública                                                                  #
+# --------------------------------------------------------------------------- #
+
+def adicionar_entrada(path: Path) -> None:
+    """Adiciona (ou atualiza) a entrada do índice para o arquivo de sessão dado.
+
+    Chamado imediatamente após _salvar_sessao() ou _salvar_sessao_reuniao()
+    gravarem o JSON. Operação de append — não regrava todas as entradas.
+    Se a sessão já existir no índice (atualização de reunião), substitui.
+    """
+    resumo = _resumo_de_arquivo(path)
+    if resumo is None:
+        return
+
+    entradas = _ler_indice()
+    # Remove entrada existente com mesmo session_id (atualização)
+    entradas = [e for e in entradas if e.get("session_id") != resumo["session_id"]]
+    entradas.append(resumo)
+    _gravar_indice(entradas)
+
+
+def atualizar_entrada(session_id: str, campos: dict) -> None:
+    """Atualiza campos específicos de uma entrada existente (ex: avaliacao, tags).
+
+    Chamado pelas rotas /avaliar e /tags após persistirem no JSON principal.
+    """
+    entradas = _ler_indice()
+    for entrada in entradas:
+        if entrada.get("session_id") == session_id:
+            entrada.update({k: v for k, v in campos.items() if k in ("avaliacao",)})
+            break
+    _gravar_indice(entradas)
+
+
+def reconstruir() -> int:
+    """Reconstrói o índice do zero lendo todos os JSONs em historico/dashboard/.
+
+    Retorna o número de entradas indexadas.
+    """
+    _log.info("Reconstruindo índice de sessões...")
+    t0 = time.monotonic()
+
+    if not DASHBOARD_DIR.exists():
+        _gravar_indice([])
+        return 0
+
+    arquivos = sorted(
+        list(DASHBOARD_DIR.glob("*_sessao.json")) + list(DASHBOARD_DIR.glob("*_reuniao.json")),
+        key=lambda p: p.stem,
+    )
+    entradas = []
+    for path in arquivos:
+        resumo = _resumo_de_arquivo(path)
+        if resumo:
+            entradas.append(resumo)
+
+    _gravar_indice(entradas)
+    elapsed = time.monotonic() - t0
+    _log.info("Índice reconstruído: %d entradas em %.2fs", len(entradas), elapsed)
+    return len(entradas)
+
+
+def sanity_check() -> None:
+    """Verifica consistência do índice no startup.
+
+    Compara contagem de arquivos JSON vs entradas no índice.
+    Se divergência > 5% (ou índice ausente), reconstrói automaticamente.
+    """
+    if not DASHBOARD_DIR.exists():
+        return
+
+    arquivos = list(DASHBOARD_DIR.glob("*_sessao.json")) + list(DASHBOARD_DIR.glob("*_reuniao.json"))
+    n_arquivos = len(arquivos)
+
+    if not INDEX_PATH.exists():
+        _log.warning("_index.json não encontrado — reconstruindo.")
+        reconstruir()
+        return
+
+    entradas = _ler_indice()
+    n_entradas = len(entradas)
+
+    if n_arquivos == 0:
+        return
+
+    divergencia = abs(n_arquivos - n_entradas) / n_arquivos
+    if divergencia > 0.05:
+        _log.warning(
+            "Índice inconsistente: %d arquivos vs %d entradas (divergência %.0f%%) — reconstruindo.",
+            n_arquivos,
+            n_entradas,
+            divergencia * 100,
+        )
+        reconstruir()
+    else:
+        _log.info("Índice OK: %d entradas (arquivos=%d)", n_entradas, n_arquivos)

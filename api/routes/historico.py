@@ -7,6 +7,7 @@ from api.deps import (
     HISTORICO_DIR,
 )
 from api.schemas import AvaliacaoPayload, TagsPayload
+from core.historico_index import atualizar_entrada, reconstruir
 from core.similaridade import buscar_historico_similar
 
 router = APIRouter()
@@ -14,6 +15,18 @@ router = APIRouter()
 
 @router.get("/historico")
 async def listar_historico():
+    """Lista sessões a partir do índice incremental (_index.json).
+
+    Fallback para glob se o índice não existir (compatibilidade).
+    """
+    from core.historico_index import _ler_indice, INDEX_PATH
+
+    if INDEX_PATH.exists():
+        entradas = _ler_indice()
+        # Índice está em ordem de inserção; retornar mais recentes primeiro
+        return list(reversed(entradas))[:200]
+
+    # Fallback: glob direto (índice ainda não criado)
     session_dir = HISTORICO_DIR / "dashboard"
     if not session_dir.exists():
         return []
@@ -71,6 +84,7 @@ async def avaliar(payload: AvaliacaoPayload):
     dados["observacoes_operador"] = payload.observacoes
     dados["tags"] = payload.tags
     path.write_text(json.dumps(dados, ensure_ascii=False, indent=2), encoding="utf-8")
+    atualizar_entrada(payload.session_id, {"avaliacao": dados["avaliacao"]})
     return {"ok": True}
 
 
@@ -85,3 +99,15 @@ async def salvar_tags(payload: TagsPayload):
     dados["tags"] = payload.tags
     path.write_text(json.dumps(dados, ensure_ascii=False, indent=2), encoding="utf-8")
     return {"ok": True}
+
+
+@router.post("/admin/reconstruir_indice")
+async def reconstruir_indice():
+    """Reconstrói o _index.json do zero relendo todos os JSONs de sessão.
+
+    Use quando suspeitar de inconsistência ou após mover/restaurar arquivos
+    manualmente. Operação síncrona — pode levar alguns segundos em historicos
+    grandes.
+    """
+    n = reconstruir()
+    return {"ok": True, "entradas": n}
