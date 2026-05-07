@@ -14,6 +14,11 @@ class ExportarPayload(BaseModel):
     agente: str = "aya"
 
 
+class FavoritarPayload(BaseModel):
+    session_id: str
+    favorito: bool
+
+
 class ExemplarPayload(BaseModel):
     agente: str
     trecho: str

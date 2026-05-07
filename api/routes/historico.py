@@ -6,8 +6,9 @@ from fastapi import APIRouter, HTTPException
 from api.deps import (
     HISTORICO_DIR,
 )
-from api.schemas import AvaliacaoPayload, TagsPayload
-from core.historico_index import atualizar_entrada, reconstruir
+from fastapi.responses import JSONResponse
+from api.schemas import AvaliacaoPayload, FavoritarPayload, TagsPayload
+from core.historico_index import atualizar_entrada, marcar_favorito, reconstruir
 from core.similaridade import buscar_historico_similar
 
 router = APIRouter()
@@ -71,21 +72,24 @@ async def detalhe_historico(session_id: str):
     return dados
 
 
-@router.post("/avaliar")
-async def avaliar(payload: AvaliacaoPayload):
-    """Recebe avaliação da sessão e persiste no JSON já salvo."""
+@router.post("/favoritar")
+async def favoritar(payload: FavoritarPayload):
+    """Define o status favorito de uma sessão (idempotente)."""
     session_dir = HISTORICO_DIR / "dashboard"
     path = session_dir / f"{payload.session_id}.json"
     if not path.exists():
         raise HTTPException(status_code=404, detail="Sessão não encontrada")
+    marcar_favorito(payload.session_id, payload.favorito)
+    return {"ok": True, "favorito": payload.favorito}
 
-    dados = json.loads(path.read_text(encoding="utf-8"))
-    dados["avaliacao"] = max(1, min(5, payload.nota))
-    dados["observacoes_operador"] = payload.observacoes
-    dados["tags"] = payload.tags
-    path.write_text(json.dumps(dados, ensure_ascii=False, indent=2), encoding="utf-8")
-    atualizar_entrada(payload.session_id, {"avaliacao": dados["avaliacao"]})
-    return {"ok": True}
+
+@router.post("/avaliar")
+async def avaliar(payload: AvaliacaoPayload):
+    """Deprecated em v1.30 — use POST /favoritar."""
+    return JSONResponse(
+        status_code=410,
+        content={"detail": "Sistema de avaliação 1-5⭐ removido em v1.30. Use POST /favoritar."},
+    )
 
 
 @router.post("/tags")

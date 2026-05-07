@@ -44,6 +44,7 @@ def _salvar_sessao_reuniao(
         "custo_total_usd": sum(custos.values()),
         "historico": historico,
         "avaliacao": None,
+        "favorito": False,
         "observacoes_operador": "",
         "tags": [],
     }
@@ -78,6 +79,7 @@ def _salvar_sessao(
         "duracoes_segundos": duracoes or {},
         "contexto_tecnico": contexto_tecnico or {},
         "avaliacao": None,
+        "favorito": False,
         "observacoes_operador": "",
         "tags": [],
     }

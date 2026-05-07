@@ -56,6 +56,7 @@ def _resumo_de_arquivo(path: Path) -> dict | None:
             "agentes_usados": dados.get("agentes_usados", []),
             "custo_total_usd": dados.get("custo_total_usd", 0),
             "avaliacao": dados.get("avaliacao"),
+            "favorito": bool(dados.get("favorito", False)),
             "origem": dados.get("origem", "dashboard"),
         }
     except Exception as exc:
@@ -86,16 +87,35 @@ def adicionar_entrada(path: Path) -> None:
 
 
 def atualizar_entrada(session_id: str, campos: dict) -> None:
-    """Atualiza campos específicos de uma entrada existente (ex: avaliacao, tags).
+    """Atualiza campos específicos de uma entrada existente (ex: avaliacao, favorito, tags).
 
-    Chamado pelas rotas /avaliar e /tags após persistirem no JSON principal.
+    Chamado por /avaliar (legado) e /favoritar após persistirem no JSON principal.
     """
     entradas = _ler_indice()
     for entrada in entradas:
         if entrada.get("session_id") == session_id:
-            entrada.update({k: v for k, v in campos.items() if k in ("avaliacao",)})
+            entrada.update({k: v for k, v in campos.items() if k in ("avaliacao", "favorito")})
             break
     _gravar_indice(entradas)
+
+
+def marcar_favorito(session_id: str, favorito: bool) -> None:
+    """Define o status favorito de uma sessão no índice e no JSON de sessão.
+
+    Idempotente: pode ser chamada múltiplas vezes com o mesmo valor.
+    """
+    session_dir = HISTORICO_DIR / "dashboard"
+    path = session_dir / f"{session_id}.json"
+    if not path.exists():
+        _log.warning("marcar_favorito: sessão não encontrada %s", session_id)
+        return
+    try:
+        dados = json.loads(path.read_text(encoding="utf-8"))
+        dados["favorito"] = favorito
+        path.write_text(json.dumps(dados, ensure_ascii=False, indent=2), encoding="utf-8")
+        atualizar_entrada(session_id, {"favorito": favorito})
+    except Exception as exc:
+        _log.error("Erro ao marcar_favorito %s: %s", session_id, exc)
 
 
 def reconstruir() -> int:
