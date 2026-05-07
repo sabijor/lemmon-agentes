@@ -65,7 +65,7 @@ interface Props {
   onReunReset: () => void
   onReunAbort: () => void
   onMesaRedonda?: (agents: AgentId[], tese: string, briefing: string) => void
-  onExportar?: (sessionId: string) => Promise<ExportResult>
+  onExportar?: (sessionId: string, agente: string) => Promise<ExportResult>
   onClose?: () => void
   onSetInMeeting?: (agents: AgentId[]) => void
   dragControls?: DragControls
@@ -164,32 +164,32 @@ export default function ChatPanel({
     window.addEventListener('pointermove', resizeHandlers.current.move)
     window.addEventListener('pointerup', resizeHandlers.current.end)
   }
-  const [exportState, setExportState] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
-  const [exportResult, setExportResult] = useState<ExportResult | null>(null)
+  const [exportStates, setExportStates] = useState<Record<string, 'idle' | 'loading' | 'done' | 'error'>>({})
+  const [exportResults, setExportResults] = useState<Record<string, ExportResult | null>>({})
 
   useEffect(() => {
-    setExportState('idle')
-    setExportResult(null)
+    setExportStates({})
+    setExportResults({})
     setSharingState('idle')
     setShareToken(null)
   }, [sessionId])
 
-  const handleExportar = async () => {
+  const handleExportar = async (agente: string) => {
     if (!sessionId || !onExportar) return
-    setExportState('loading')
+    setExportStates(prev => ({ ...prev, [agente]: 'loading' }))
     try {
-      const r = await onExportar(sessionId)
-      setExportResult(r)
-      setExportState(r.erros.length > 0 && !r.html_gerado && !r.pdf_gerado ? 'error' : 'done')
+      const r = await onExportar(sessionId, agente)
+      setExportResults(prev => ({ ...prev, [agente]: r }))
+      setExportStates(prev => ({ ...prev, [agente]: r.erros.length > 0 && !r.html_gerado && !r.pdf_gerado ? 'error' : 'done' }))
     } catch {
-      setExportState('error')
-      setExportResult(null)
+      setExportStates(prev => ({ ...prev, [agente]: 'error' }))
+      setExportResults(prev => ({ ...prev, [agente]: null }))
     }
   }
 
-  const handleDownload = async (tipo: 'html' | 'pdf', filename: string) => {
+  const handleDownload = async (tipo: 'html' | 'pdf', filename: string, agente = 'aya') => {
     if (!sessionId) return
-    const url = `${API_URL}/download/${sessionId}/${tipo}`
+    const url = `${API_URL}/download/${sessionId}/${tipo}?agente=${agente}`
     const w = window as Window & typeof globalThis & { showSaveFilePicker?: (opts: unknown) => Promise<FileSystemFileHandle> }
     if (w.showSaveFilePicker) {
       try {
@@ -857,82 +857,91 @@ export default function ChatPanel({
                 </div>
               )}
 
-              {/* Export Dossiê — só aparece se Aya rodou */}
-              {onExportar && messages.some(m => m.role === 'aya' && m.done) && (
-                <div className="border-t border-stone-200/60 pt-2">
-                  {exportState === 'idle' && (
-                    <button onClick={handleExportar}
-                      className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl
-                        bg-stone-900 text-white text-[10px] font-mono uppercase tracking-widest
-                        hover:bg-stone-700 active:scale-[0.98] transition-all">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
-                        <polyline points="14 2 14 8 20 8"/>
-                        <line x1="12" y1="18" x2="12" y2="12"/>
-                        <line x1="9" y1="15" x2="15" y2="15"/>
-                      </svg>
-                      Exportar Dossiê (HTML + PDF)
-                    </button>
-                  )}
-                  {exportState === 'loading' && (
-                    <div className="flex items-center justify-center gap-2 py-2">
-                      <div className="flex gap-0.5">
-                        {[0, 1, 2].map(i => (
-                          <div key={i} className="w-1 h-1 rounded-full bg-stone-400 animate-bounce"
-                            style={{ animationDelay: `${i * 0.15}s` }} />
-                        ))}
-                      </div>
-                      <span className="text-[9px] font-mono text-stone-400 uppercase tracking-widest">Gerando HTML + PDF...</span>
-                    </div>
-                  )}
-                  {exportState === 'done' && exportResult && (
-                    <div className="flex flex-col gap-1.5">
-                      {exportResult.html_gerado && (
-                        <button
-                          onClick={() => handleDownload('html', exportResult.caminho_html?.split('/').pop() ?? 'dossie.html')}
-                          className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-green-50 border border-green-200 hover:bg-green-100 active:scale-[0.98] transition-all w-full text-left">
-                          <span className="text-green-600 text-[10px]">🌐</span>
-                          <span className="text-[9px] font-mono text-green-700 truncate flex-1">
-                            {exportResult.caminho_html?.split('/').pop()}
-                          </span>
-                          <span className="text-[8px] font-mono text-green-500 uppercase tracking-widest flex-shrink-0">HTML ↓</span>
-                        </button>
-                      )}
-                      {exportResult.pdf_gerado && (
-                        <button
-                          onClick={() => handleDownload('pdf', exportResult.caminho_pdf?.split('/').pop() ?? 'dossie.pdf')}
-                          className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-green-50 border border-green-200 hover:bg-green-100 active:scale-[0.98] transition-all w-full text-left">
-                          <span className="text-green-600 text-[10px]">📕</span>
-                          <span className="text-[9px] font-mono text-green-700 truncate flex-1">
-                            {exportResult.caminho_pdf?.split('/').pop()}
-                          </span>
-                          <span className="text-[8px] font-mono text-green-500 uppercase tracking-widest flex-shrink-0">PDF ↓</span>
-                        </button>
-                      )}
-                      {exportResult.erros.length > 0 && (
-                        <div className="px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200">
-                          {exportResult.erros.map((e, i) => (
-                            <p key={i} className="text-[9px] font-mono text-amber-700">{e}</p>
-                          ))}
+              {/* Export por agente — Aya (dossiê) e/ou Renata (editorial) */}
+              {onExportar && (() => {
+                const exportAgentes = [
+                  { id: 'aya', label: 'Exportar Dossiê (Aya)', fallbackHtml: 'dossie.html', fallbackPdf: 'dossie.pdf' },
+                  { id: 'renata', label: 'Exportar Editorial (Renata)', fallbackHtml: 'editorial.html', fallbackPdf: 'editorial.pdf' },
+                ].filter(({ id }) => messages.some(m => m.role === id && m.done))
+
+                if (exportAgentes.length === 0) return null
+
+                return (
+                  <div className="border-t border-stone-200/60 pt-2 flex flex-col gap-2">
+                    {exportAgentes.map(({ id, label, fallbackHtml, fallbackPdf }) => {
+                      const st = exportStates[id] ?? 'idle'
+                      const result = exportResults[id] ?? null
+                      return (
+                        <div key={id}>
+                          {st === 'idle' && (
+                            <button onClick={() => handleExportar(id)}
+                              className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl
+                                bg-stone-900 text-white text-[10px] font-mono uppercase tracking-widest
+                                hover:bg-stone-700 active:scale-[0.98] transition-all">
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                                <polyline points="14 2 14 8 20 8"/>
+                                <line x1="12" y1="18" x2="12" y2="12"/>
+                                <line x1="9" y1="15" x2="15" y2="15"/>
+                              </svg>
+                              {label}
+                            </button>
+                          )}
+                          {st === 'loading' && (
+                            <div className="flex items-center justify-center gap-2 py-2">
+                              <div className="flex gap-0.5">
+                                {[0, 1, 2].map(i => (
+                                  <div key={i} className="w-1 h-1 rounded-full bg-stone-400 animate-bounce"
+                                    style={{ animationDelay: `${i * 0.15}s` }} />
+                                ))}
+                              </div>
+                              <span className="text-[9px] font-mono text-stone-400 uppercase tracking-widest">Gerando HTML + PDF...</span>
+                            </div>
+                          )}
+                          {st === 'done' && result && (
+                            <div className="flex flex-col gap-1.5">
+                              {result.html_gerado && (
+                                <button onClick={() => handleDownload('html', result.caminho_html?.split('/').pop() ?? fallbackHtml, id)}
+                                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-green-50 border border-green-200 hover:bg-green-100 active:scale-[0.98] transition-all w-full text-left">
+                                  <span className="text-green-600 text-[10px]">🌐</span>
+                                  <span className="text-[9px] font-mono text-green-700 truncate flex-1">{result.caminho_html?.split('/').pop()}</span>
+                                  <span className="text-[8px] font-mono text-green-500 uppercase tracking-widest flex-shrink-0">HTML ↓</span>
+                                </button>
+                              )}
+                              {result.pdf_gerado && (
+                                <button onClick={() => handleDownload('pdf', result.caminho_pdf?.split('/').pop() ?? fallbackPdf, id)}
+                                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-green-50 border border-green-200 hover:bg-green-100 active:scale-[0.98] transition-all w-full text-left">
+                                  <span className="text-green-600 text-[10px]">📕</span>
+                                  <span className="text-[9px] font-mono text-green-700 truncate flex-1">{result.caminho_pdf?.split('/').pop()}</span>
+                                  <span className="text-[8px] font-mono text-green-500 uppercase tracking-widest flex-shrink-0">PDF ↓</span>
+                                </button>
+                              )}
+                              {result.erros.length > 0 && (
+                                <div className="px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200">
+                                  {result.erros.map((e, i) => <p key={i} className="text-[9px] font-mono text-amber-700">{e}</p>)}
+                                </div>
+                              )}
+                              <button onClick={() => setExportStates(prev => ({ ...prev, [id]: 'idle' }))}
+                                className="text-[8px] font-mono text-stone-400 hover:text-stone-600 transition-colors text-center uppercase tracking-widest mt-0.5">
+                                exportar novamente
+                              </button>
+                            </div>
+                          )}
+                          {st === 'error' && (
+                            <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-red-50 border border-red-200">
+                              <span className="text-[9px] font-mono text-red-600">Falha ao exportar</span>
+                              <button onClick={() => setExportStates(prev => ({ ...prev, [id]: 'idle' }))}
+                                className="text-[9px] font-mono text-stone-500 hover:text-stone-700 transition-colors uppercase tracking-widest">
+                                tentar novamente
+                              </button>
+                            </div>
+                          )}
                         </div>
-                      )}
-                      <button onClick={() => setExportState('idle')}
-                        className="text-[8px] font-mono text-stone-400 hover:text-stone-600 transition-colors text-center uppercase tracking-widest mt-0.5">
-                        exportar novamente
-                      </button>
-                    </div>
-                  )}
-                  {exportState === 'error' && (
-                    <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-red-50 border border-red-200">
-                      <span className="text-[9px] font-mono text-red-600">Falha ao exportar</span>
-                      <button onClick={() => setExportState('idle')}
-                        className="text-[9px] font-mono text-stone-500 hover:text-stone-700 transition-colors uppercase tracking-widest">
-                        tentar novamente
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
+                      )
+                    })}
+                  </div>
+                )
+              })()}
 
               {/* T35 — TTS: narrar Aya */}
               {messages.some(m => m.role === 'aya' && m.done && m.content) && (

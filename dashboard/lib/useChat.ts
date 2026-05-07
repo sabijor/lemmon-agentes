@@ -351,11 +351,11 @@ export function useChat() {
     }
   }, [sessionId, avaliado])
 
-  const exportar = useCallback(async (sid: string): Promise<ExportResult> => {
+  const exportar = useCallback(async (sid: string, agente = 'aya'): Promise<ExportResult> => {
     const res = await fetch(`${API_URL}/exportar`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ session_id: sid }),
+      body: JSON.stringify({ session_id: sid, agente }),
     })
     if (!res.ok) {
       const err = await res.json().catch(() => ({ detail: 'Erro desconhecido' }))
