@@ -1,6 +1,6 @@
 # LEMMON AGENTES — Manual do Sistema
 
-**Versão atual:** v1.20
+**Versão atual:** v1.21
 **Última atualização:** 2026-05-07
 **Mantido por:** Calebe Alves / Lemmon Produções
 
@@ -11,6 +11,16 @@
 ## Histórico de versões
 
 > **Convenção:** versões mais novas no topo. Cada release lista o que mudou em relação à anterior, mantendo histórico completo.
+
+### v1.21 — 2026-05-07
+
+**BLOCO 5 — T83 + T87 + T84: segurança de arquivo e scripts de manutenção.**
+
+- **T83 — `chmod 600 .env`:** permissão do arquivo `.env` restrita ao dono (`-rw-------`). Script `scripts/setup_seguro.sh` aplica `600` no `.env` e `700` em `backups/` — executar após clonar o repositório. Documentado em §8.5.
+- **T87 — `scripts/limpar_outputs.py`:** limpeza de outputs por idade (--dias, padrão 30). Lê `historico/dashboard/*.json` diretamente para identificar sessões 5⭐ e preservá-las. Flag `--dry-run` obrigatória para simulação. Mínimo de 7 dias recusado automaticamente. Documentado em §5.11.
+- **T84 — `scripts/backup_historico.py`:** backup compactado (ZIP deflate) de `historico/`, `outputs/`, `inputs/clientes/` e `core/exemplares/`. Destino padrão `backups/lemmon-YYYYMMDD_HHMMSS.zip`. Aceita `--destino` para HD externo. Documentado em §5.12.
+
+---
 
 ### v1.20 — 2026-05-07
 
@@ -743,6 +753,34 @@ Flags úteis: `--sem-heitor`, `--sem-sonia`, `--no-confirm`, `--profundo`, `--so
 
 Gerenciado pelo endpoint `/exemplares`, mas também pode ser inspecionado direto em `core/exemplares/<agente>.json`. Para remover um exemplar problemático: `DELETE /exemplares/{agente}/{id}` via curl ou via código. O limite é 10 exemplares por agente; os 3 mais recentes são injetados no system_prompt.
 
+## 5.11 Limpeza de outputs antigos
+
+Remove arquivos em `outputs/` com mais de N dias, preservando automaticamente qualquer output associado a sessões avaliadas com 5 estrelas (lê `historico/dashboard/*.json` diretamente).
+
+```bash
+# Simular sem remover
+python scripts/limpar_outputs.py --dias 30 --dry-run
+
+# Remover de fato
+python scripts/limpar_outputs.py --dias 30
+```
+
+Mínimo de 7 dias — o script recusa valores menores para evitar remoção acidental. Recomendado rodar mensalmente. Sessões ⭐⭐⭐⭐⭐ nunca são removidas independente da idade.
+
+## 5.12 Backup do histórico
+
+Cria um `.zip` com `historico/`, `outputs/`, `inputs/clientes/` e `core/exemplares/` no diretório `backups/` (criado automaticamente). O arquivo leva timestamp no nome (`lemmon-YYYYMMDD_HHMMSS.zip`).
+
+```bash
+# Backup padrão → backups/
+python scripts/backup_historico.py
+
+# Backup em diretório externo (ex: HD externo)
+python scripts/backup_historico.py --destino /Volumes/Backup/lemmon
+```
+
+Recomendado rodar antes de atualizações e semanalmente. O diretório `backups/` tem permissão 700 (apenas o dono acessa) após `scripts/setup_seguro.sh`.
+
 ---
 
 # 6. Receitas — workflows recomendados
@@ -1028,6 +1066,16 @@ lemmon-agentes/
 | `LEMMON_MODELO_PADRAO` | `claude-sonnet-4-6` | Modelo dos agentes |
 | `LEMMON_LOG_LEVEL` | `INFO` | Nível de log |
 | `NEXT_PUBLIC_API_URL` | `http://localhost:8000` | URL backend (frontend) |
+
+**Permissão do `.env`:** O arquivo deve ter permissão `600` (somente dono lê/escreve). Após clonar ou resetar o repositório, execute:
+
+```bash
+chmod 600 .env
+# ou via script de setup:
+bash scripts/setup_seguro.sh
+```
+
+O script `setup_seguro.sh` também garante `700` no diretório `backups/` se existir. Verificar com `ls -la .env` — deve exibir `-rw-------`.
 
 ## 8.6 Como subir o sistema localmente
 
