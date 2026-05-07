@@ -73,7 +73,7 @@ Regras da legenda:
 - Na voz real do cliente (use o trecho de VOZ DO CLIENTE se disponível no contexto)
 - Para Reels: tom de fala, como se o cliente estivesse contando ao vivo
 - Para Carrossel: tom de explicação, slide a slide implícito (1ª linha do corpo antecipa o próximo slide)
-- Para Stories: frases curtíssimas, máx 2 linhas por slide, indicar separação com `— Slide X —`
+- Para Stories: frases curtíssimas, máx 2 linhas por slide, indicar separação com `[Slide X]` (nunca usar traço —)
 
 ## CTA por peça
 
