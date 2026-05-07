@@ -1,6 +1,6 @@
 # LEMMON AGENTES — Manual do Sistema
 
-**Versão atual:** v1.27
+**Versão atual:** v1.28
 **Última atualização:** 2026-05-07
 **Mantido por:** Calebe Alves / Lemmon Produções
 
@@ -11,6 +11,18 @@
 ## Histórico de versões
 
 > **Convenção:** versões mais novas no topo. Cada release lista o que mudou em relação à anterior, mantendo histórico completo.
+
+### v1.28 — 2026-05-07
+
+**FASE 6 — T103 + T105 + T102: watchdog uniforme, ease-in e verificação do gráfico de latência.**
+
+- `dashboard/lib/config.ts` criado: `WATCHDOG_TIMEOUT_MIN = 40` e `PROGRESS_CURVE_POWER = 2.5` — constantes únicas para calibração futura
+- T103: watchdog substituído por 40min fixos nos 3 pontos (`useChat.ts` ×2, `useReuniao.ts` ×1); elimina falsos timeouts de agentes com mediana baixa (Otto 20s → piso antigo 60s)
+- T105: barra de progresso com curva ease-in `t^2.5` nos 3 `setInterval`; barra avança devagar no início e acelera ao se aproximar da mediana histórica
+- T102: gráfico de latência `/saude` confirmado como semanal ponta a ponta (`dataKey="semana"`, `data.semanas`); §4.14 atualizado com nota explícita de granularidade
+- Manual §4.14 + §4.17 atualizados
+
+---
 
 ### v1.27 — 2026-05-07
 

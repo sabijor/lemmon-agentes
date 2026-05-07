@@ -4,6 +4,18 @@ Convenção: novidades no topo. Datas em formato ISO. Cada entrada referencia o 
 
 ---
 
+## v1.28 — 2026-05-07
+
+**FASE 6 — T103 + T105 + T102: watchdog uniforme, ease-in e latência semanal.**
+
+- `dashboard/lib/config.ts`: `WATCHDOG_TIMEOUT_MIN = 40` e `PROGRESS_CURVE_POWER = 2.5`
+- `useChat.ts` + `useReuniao.ts`: watchdog fixo em 40min (T103) — quebra paliativo T98 (piso 180s); mensagem de erro usa constante diretamente
+- `useChat.ts` + `useReuniao.ts`: 3 `setInterval` de progresso trocados para `t^2.5` ease-in (T105)
+- `/saude` `LatenciaChart`: confirmado semanal (`dataKey="semana"`, `data.semanas`) — sem correção de código, só manual (T102)
+- Manual §4.14 (granularidade semanal explícita) + §4.17 (watchdog 40min + ease-in descritos)
+
+---
+
 ## v1.27 — 2026-05-07
 
 **FASE 6 — T94: Modo Loop Autônomo em Reunião.**
