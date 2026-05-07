@@ -12,6 +12,13 @@ const FALLBACK_MEDIANAS: Record<AgentId, number> = {
   otto: 20, heitor: 40, salles: 30, sonia: 30, aya: 15, pedro_abrahao: 25, renata: 30,
 }
 
+export interface LoopStatus {
+  motivo: 'final' | 'ayuda' | 'turnos_max' | 'stagnacao' | 'operador' | 'custo_max'
+  nTurnos: number
+  custoTotal: number
+  agenteFinal?: string
+}
+
 export function useReuniao() {
   const [messages, setMessages] = useState<Message[]>([])
   const [agentStatus, setAgentStatus] = useState<Record<AgentId, AgentStatus>>(DEFAULT_STATUS())
@@ -19,13 +26,21 @@ export function useReuniao() {
   const [agentProgress, setAgentProgress] = useState<Record<string, number>>({})
   const [agentProgressMeta, setAgentProgressMeta] = useState<Record<string, ProgressMeta>>({})
 
+  // Loop state
+  const [loopMode, setLoopMode] = useState(false)
+  const [loopMaxTurnos, setLoopMaxTurnos] = useState(5)
+  const [loopCustoCap, setLoopCustoCap] = useState(1.50)
+  const [loopActive, setLoopActive] = useState(false)
+  const [loopTurn, setLoopTurn] = useState(0)
+  const [loopCost, setLoopCost] = useState(0)
+  const [loopStatus, setLoopStatus] = useState<LoopStatus | null>(null)
+
   const wsRef = useRef<WebSocket | null>(null)
   const streamBufRef = useRef<Record<string, string>>({})
   const histRef = useRef<Array<{ role: string; content: string }>>([])
   const progressIntervalsRef = useRef<Record<string, ReturnType<typeof setInterval>>>({})
   const watchdogTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const activeAgentsRef = useRef<Set<string>>(new Set())
-  // Agents that timed out — ignore late agent_done/token for these
   const timedOutAgentsRef = useRef<Set<string>>(new Set())
 
   useEffect(() => {
@@ -60,7 +75,6 @@ export function useReuniao() {
     }, 200)
     progressIntervalsRef.current[agentId] = iv
 
-    // Watchdog: timeout = max(60s, min(mediana × 3, 1200s)) — cap at 20min
     const timeoutMs = Math.max(180, Math.min(mediana * 3, 1200)) * 1000
     watchdogTimersRef.current[agentId] = setTimeout(() => {
       if (!activeAgentsRef.current.has(agentId)) return
@@ -183,6 +197,30 @@ export function useReuniao() {
             }]
           })
 
+        } else if (msg.type === 'turn_iteration') {
+          setLoopTurn(msg.n)
+          setLoopCost(msg.custo_total ?? 0)
+          setLoopActive(true)
+
+        } else if (msg.type === 'loop_stopped') {
+          setLoopActive(false)
+          setIsRunning(false)
+          setLoopStatus({
+            motivo: msg.motivo,
+            nTurnos: msg.n_turnos,
+            custoTotal: msg.custo_total,
+            agenteFinal: msg.agente_final,
+          })
+          setTimeout(() => {
+            setAgentStatus(s => {
+              const next = { ...s }
+              for (const k of Object.keys(next) as AgentId[]) {
+                if (next[k] === 'done') next[k] = 'idle'
+              }
+              return next
+            })
+          }, 1500)
+
         } else if (msg.type === 'turn_done') {
           setIsRunning(false)
           setTimeout(() => {
@@ -199,6 +237,7 @@ export function useReuniao() {
 
       ws.onclose = () => {
         setIsRunning(false)
+        setLoopActive(false)
         _clearAllProgress()
       }
       ws.onerror = () => {
@@ -212,6 +251,9 @@ export function useReuniao() {
 
   const send = useCallback(async (agents: AgentId[], message: string, manual = false) => {
     setIsRunning(true)
+    setLoopStatus(null)
+    setLoopTurn(0)
+    setLoopCost(0)
     setMessages(prev => [...prev, {
       id: `user-${Date.now()}`,
       role: 'user',
@@ -223,8 +265,22 @@ export function useReuniao() {
     histRef.current = [...histRef.current, { role: 'user', content: message }]
 
     const ws = await getOrCreateWs()
-    ws.send(JSON.stringify({ agents, message, historico_anterior, manual }))
-  }, [getOrCreateWs])
+    const payload: Record<string, unknown> = { agents, message, historico_anterior }
+
+    if (loopMode) {
+      payload.modo = 'loop'
+      payload.loop_config = { max_turnos: loopMaxTurnos, custo_cap: loopCustoCap }
+    } else {
+      payload.modo = manual ? 'manual' : 'auto'
+      payload.manual = manual
+    }
+
+    ws.send(JSON.stringify(payload))
+  }, [getOrCreateWs, loopMode, loopMaxTurnos, loopCustoCap])
+
+  const loopStop = useCallback(() => {
+    wsRef.current?.send(JSON.stringify({ type: 'loop_stop' }))
+  }, [])
 
   const reset = useCallback(() => {
     const ws = wsRef.current
@@ -238,6 +294,10 @@ export function useReuniao() {
     setAgentProgress({})
     setAgentProgressMeta({})
     setIsRunning(false)
+    setLoopActive(false)
+    setLoopTurn(0)
+    setLoopCost(0)
+    setLoopStatus(null)
   }, [_clearAllProgress])
 
   const abort = useCallback(() => {
@@ -247,6 +307,8 @@ export function useReuniao() {
     setAgentProgress({})
     setAgentProgressMeta({})
     setIsRunning(false)
+    setLoopActive(false)
+    setLoopStatus(null)
     setAgentStatus(s => {
       const next = { ...s }
       for (const k of Object.keys(next) as AgentId[]) {
@@ -306,5 +368,10 @@ export function useReuniao() {
     ws.send(JSON.stringify({ tese, briefing, agents }))
   }, [])
 
-  return { messages, agentStatus, isRunning, agentProgress, agentProgressMeta, send, reset, abort, mesaRedonda }
+  return {
+    messages, agentStatus, isRunning, agentProgress, agentProgressMeta,
+    loopMode, setLoopMode, loopMaxTurnos, setLoopMaxTurnos,
+    loopCustoCap, setLoopCustoCap, loopActive, loopTurn, loopCost, loopStatus,
+    send, reset, abort, loopStop, mesaRedonda,
+  }
 }
