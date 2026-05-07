@@ -236,8 +236,9 @@ class Renata(AgenteBase):
 
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         descartes_path = self._salvar_descartes(resultado_validado, ts)
+        output_path = self._salvar_output(resultado_validado, ts, cliente_id)
 
-        self.logger.info(f"Renata concluída | ${custo:.6f}")
+        self.logger.info(f"Renata concluída | ${custo:.6f} | {output_path}")
 
         saida = {
             "output_humano":            resultado_validado["output_humano"],
@@ -254,6 +255,7 @@ class Renata(AgenteBase):
             "modelo_usado":             self.modelo,
             "versao_prompt":            self.versao_prompt,
             "descartes_path":           descartes_path,
+            "output_path":              output_path,
             "data_inicio":              data_inicio.isoformat(),
             "data_fim":                 data_fim.isoformat(),
         }
@@ -510,3 +512,28 @@ Use `registrar_linha_editorial`.
         arquivo.write_text("".join(linhas), encoding="utf-8")
         self.logger.info(f"Descartes salvos: {arquivo}")
         return str(arquivo)
+
+    def _salvar_output(
+        self, resultado: dict, ts: str, cliente_id: Optional[str]
+    ) -> str:
+        """Salva output_humano e output_tecnico em outputs/renata/.
+
+        Chamado automaticamente pelo executar() — tanto CLI quanto dashboard
+        produzem arquivos em disco.
+        """
+        import json as _json_mod
+        out_dir = OUTPUTS_DIR / "renata"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        sufixo = "".join(
+            c if c.isalnum() or c == "_" else "_"
+            for c in (cliente_id or "campanha")
+        )
+        arq_md   = out_dir / f"{ts}_humano_{sufixo}.md"
+        arq_json = out_dir / f"{ts}_tecnico_{sufixo}.json"
+        arq_md.write_text(resultado.get("output_humano", ""), encoding="utf-8")
+        arq_json.write_text(
+            _json_mod.dumps(resultado, ensure_ascii=False, indent=2, default=str),
+            encoding="utf-8",
+        )
+        self.logger.info(f"Output salvo: {arq_md}")
+        return str(arq_md)

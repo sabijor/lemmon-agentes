@@ -1,12 +1,11 @@
 """CLI direto da Renata — linha editorial Instagram."""
 import argparse
-import json
 import sys
-from datetime import date, datetime
+from datetime import date
 from pathlib import Path
 
 from agentes.renata import Renata
-from core.config import OUTPUTS_DIR, RENATA_DURACAO_PADRAO_DIAS
+from core.config import RENATA_DURACAO_PADRAO_DIAS
 
 
 def main():
@@ -88,21 +87,8 @@ def main():
         print(f"❌ Erro: {e}", file=sys.stderr)
         sys.exit(1)
 
-    out_dir = OUTPUTS_DIR / "renata"
-    out_dir.mkdir(parents=True, exist_ok=True)
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-
-    sufixo = args.nome or args.cliente or "campanha"
-    sufixo_limpo = "".join(c if c.isalnum() or c == "_" else "_" for c in sufixo)
-
-    arquivo_md   = out_dir / f"{ts}_humano_{sufixo_limpo}.md"
-    arquivo_json = out_dir / f"{ts}_tecnico_{sufixo_limpo}.json"
-
-    arquivo_md.write_text(resultado["output_humano"], encoding="utf-8")
-    arquivo_json.write_text(
-        json.dumps(resultado["output_tecnico"], ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
+    # Output já foi salvo automaticamente pelo executar()
+    output_path = resultado.get("output_path", "")
 
     perguntas = resultado["output_tecnico"].get("perguntas_clarificacao", [])
     if perguntas:
@@ -111,9 +97,10 @@ def main():
             print(f"  {i}. {p}")
         print()
     else:
-        print(f"📅 Editorial salvo: {arquivo_md}")
+        print(f"📅 Editorial salvo: {output_path}")
 
-    print(f"📋 JSON técnico:  {arquivo_json}")
+    tecnico = output_path.replace("_humano_", "_tecnico_").replace(".md", ".json")
+    print(f"📋 JSON técnico:  {tecnico}")
     print(f"💰 Custo:         ${resultado['custo_total_usd']:.6f}")
 
     pubs = resultado["output_tecnico"].get("publicacoes", [])
