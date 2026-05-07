@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { AgentId } from './agents'
 import type { HistoryDetail } from './useHistory'
 import { API_URL, WS_URL } from './api'
+import { WATCHDOG_TIMEOUT_MIN, PROGRESS_CURVE_POWER } from './config'
 
 export type MessageRole = 'user' | AgentId
 export interface Message {
@@ -203,7 +204,7 @@ export function useChat() {
               setAgentProgressMeta(prev => ({ ...prev, [agentId]: { mediana, elapsed, amostras } }))
             }, 200)
             progressIntervalsRef.current[agentId] = iv
-            const timeoutMs = Math.max(180, Math.min(mediana * 3, 1200)) * 1000
+            const timeoutMs = WATCHDOG_TIMEOUT_MIN * 60 * 1000
             watchdogTimersRef.current[agentId] = setTimeout(() => {
               if (!activeAgentsRef.current.has(agentId)) return
               timedOutAgentsRef.current.add(agentId)
@@ -215,9 +216,8 @@ export function useChat() {
               setAgentProgressMeta(prev => { const n = { ...prev }; delete n[agentId]; return n })
               setAgentStatus(prev => ({ ...prev, [agentId]: 'error' }))
               const msgId = currentMsgId.current[agentId]
-              const mins = Math.round(timeoutMs / 60000)
               if (msgId) setMessages(prev => prev.map(m => m.id === msgId
-                ? { ...m, done: true, error: `Agente travou (timeout ${mins}min). Provável overloaded da API. Tente reenviar.` }
+                ? { ...m, done: true, error: `Agente travou (timeout ${WATCHDOG_TIMEOUT_MIN}min). Provável overloaded da API. Tente reenviar.` }
                 : m
               ))
             }, timeoutMs)
@@ -232,7 +232,7 @@ export function useChat() {
               setAgentProgressMeta(prev => ({ ...prev, [agentId]: { mediana, elapsed, amostras: 0 } }))
             }, 200)
             progressIntervalsRef.current[agentId] = iv
-            const timeoutMs2 = Math.max(180, Math.min(mediana * 3, 1200)) * 1000
+            const timeoutMs2 = WATCHDOG_TIMEOUT_MIN * 60 * 1000
             watchdogTimersRef.current[agentId] = setTimeout(() => {
               if (!activeAgentsRef.current.has(agentId)) return
               timedOutAgentsRef.current.add(agentId)
@@ -244,9 +244,8 @@ export function useChat() {
               setAgentProgressMeta(prev => { const n = { ...prev }; delete n[agentId]; return n })
               setAgentStatus(prev => ({ ...prev, [agentId]: 'error' }))
               const msgId = currentMsgId.current[agentId]
-              const mins = Math.round(timeoutMs2 / 60000)
               if (msgId) setMessages(prev => prev.map(m => m.id === msgId
-                ? { ...m, done: true, error: `Agente travou (timeout ${mins}min). Provável overloaded da API. Tente reenviar.` }
+                ? { ...m, done: true, error: `Agente travou (timeout ${WATCHDOG_TIMEOUT_MIN}min). Provável overloaded da API. Tente reenviar.` }
                 : m
               ))
             }, timeoutMs2)

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { type AgentId } from './agents'
 import { type Message, type AgentStatus, type ProgressMeta } from './useChat'
 import { API_URL, WS_URL } from './api'
+import { WATCHDOG_TIMEOUT_MIN, PROGRESS_CURVE_POWER } from './config'
 
 const DEFAULT_STATUS = (): Record<AgentId, AgentStatus> => ({
   otto: 'idle', heitor: 'idle', salles: 'idle', sonia: 'idle', aya: 'idle', pedro_abrahao: 'idle', renata: 'idle',
@@ -75,7 +76,7 @@ export function useReuniao() {
     }, 200)
     progressIntervalsRef.current[agentId] = iv
 
-    const timeoutMs = Math.max(180, Math.min(mediana * 3, 1200)) * 1000
+    const timeoutMs = WATCHDOG_TIMEOUT_MIN * 60 * 1000
     watchdogTimersRef.current[agentId] = setTimeout(() => {
       if (!activeAgentsRef.current.has(agentId)) return
       timedOutAgentsRef.current.add(agentId)
@@ -85,13 +86,12 @@ export function useReuniao() {
       setAgentStatus(s => ({ ...s, [agentId]: 'error' }))
       setMessages(prev => {
         const filtered = prev.filter(m => m.id !== `thinking-${agentId}`)
-        const mins = Math.round(timeoutMs / 60000)
         return [...filtered, {
           id: `timeout-${agentId}-${Date.now()}`,
           role: agentId,
           content: '',
           done: true,
-          error: `Agente travou (timeout ${mins}min). Provável overloaded da API. Tente reenviar.`,
+          error: `Agente travou (timeout ${WATCHDOG_TIMEOUT_MIN}min). Provável overloaded da API. Tente reenviar.`,
         }]
       })
     }, timeoutMs)
