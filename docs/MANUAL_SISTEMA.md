@@ -1,6 +1,6 @@
 # LEMMON AGENTES — Manual do Sistema
 
-**Versão atual:** v1.17
+**Versão atual:** v1.18
 **Última atualização:** 2026-05-07
 **Mantido por:** Calebe Alves / Lemmon Produções
 
@@ -11,6 +11,22 @@
 ## Histórico de versões
 
 > **Convenção:** versões mais novas no topo. Cada release lista o que mudou em relação à anterior, mantendo histórico completo.
+
+### v1.18 — 2026-05-07
+
+**BLOCO 6 — T90 V2: barra de progresso + ETA por agente.**
+
+- **Backend `GET /sessoes/medianas?agente=X`:** lê últimas 20 sessões de `historico/dashboard/`, calcula mediana de `duracoes_segundos[agente]`. Cache in-memory TTL 60s. Retorna `{mediana_segundos, amostras}` ou `null` se < 3 amostras.
+- **`useChat.ts` — progress state:** `agentProgress` (0–100) e `agentProgressMeta` (mediana/elapsed/amostras) por agente. `setInterval(200ms)` em `agent_start`, snap 100% em `agent_done`. Cleanup em `abort()`, `ws.onclose`, e `useEffect` unmount — sem memory leak.
+- **`FALLBACK_MEDIANAS`:** `{otto:20, heitor:40, salles:30, sonia:30, aya:15, pedro_abrahao:25, renata:30}` em segundos, usado quando endpoint retorna null.
+- **Salles A/B:** quando `agentConfig.salles.alternativas === 3`, mediana × 3 antes de calcular progresso (frontend, ambos os caminhos fetch e catch).
+- **`ProgressBar.tsx`:** micro barra abaixo de cada bubble. Cor do agente, animação 200ms. Tooltip: "Tempo médio: Xs · decorrido: Ys · n=Z amostras". Cap 95% antes de `agent_done`; snap 100% em `agent_done`.
+- **Overloaded:** `elapsed > mediana * 1.5` + ainda não concluído → barra âmbar + texto "Mais lento que o normal".
+- **Manual lock:** após `agent_done` em modo manual, barra trava em 100% com "🔒 Aguardando aprovação..." até operador decidir.
+- **`MacroBar.tsx`:** visão geral do pipeline no header. Ícones ⏱/▶/✓/✕ por agente + mini barra para agentes ativos.
+- **Documentação:** §3.3 e §4.11 atualizados.
+
+---
 
 ### v1.17 — 2026-05-07
 
