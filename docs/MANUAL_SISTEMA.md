@@ -722,11 +722,13 @@ Toggle no header da aplicação (ícone ☀/🌙). Alterna entre modo claro e es
 
 Cena RPG isométrica com sprites dos agentes em mesas. Quando você convoca um agente, ele caminha da mesa para a sala de reunião. Status físico (idle, thinking, speaking, done, error) reflete em cor e animação. Idle quotes aparecem em bolas de fala periodicamente. Whiteboards na sala respondem ao pipeline em tempo real (barras horizontais na cor do agente ativo). Mic destacado em reunião (anéis pulsantes ao redor do sprite quando `speaking`).
 
-## 4.14 Gráfico de latência semanal (T80)
+## 4.14 Gráfico de latência semanal (T80 + T102)
 
-Na página `/saude`, nova seção "Latência Semanal". Mostra a média de duração (segundos) de cada agente por semana ISO, nos últimos 30/60/90 dias (selecionável). Semanas com média > 120s ficam marcadas em vermelho.
+Na página `/saude`, nova seção "Latência Semanal". Mostra a média de duração (segundos) de cada agente por **semana ISO**, nos últimos 30/60/90 dias (selecionável). Semanas com média > 120s ficam marcadas em vermelho.
 
 **Controles:** selector de agente + selector de período. O gráfico é atualizado a cada troca de filtro.
+
+**Granularidade:** o eixo X exibe rótulos de semana ISO (ex.: `2026-W19`). O frontend usa `dataKey="semana"` sobre o array `semanas[]` retornado pelo backend — granularidade semanal ponta a ponta.
 
 **Backend:** `GET /saude/latencias?agente=X&dias=30` — lê `duracoes_segundos` de `*_sessao.json`, agrupa por semana ISO, retorna médias com flag `lenta`. Sem cache (endpoint de diagnóstico — chamado com baixa frequência).
 
@@ -748,15 +750,15 @@ Cada export gera HTML + PDF independente em `outputs/<agente>/<session_id>.{html
 
 Replicação do padrão T90 (§4.11) para o modo Reunião.
 
-**Barra de progresso.** Cada agente em modo Reunião exibe a mesma micro barra abaixo do bubble (ProgressBar.tsx), alimentada por `agentProgress`/`agentProgressMeta` do `useReuniao`. A barra sobe de 0% a 95% usando a mediana histórica (`GET /sessoes/medianas`) ou `FALLBACK_MEDIANAS` se a API falhar. Snap 100% em `agent_done`.
+**Barra de progresso.** Cada agente em modo Reunião exibe a mesma micro barra abaixo do bubble (`ProgressBar.tsx`), alimentada por `agentProgress`/`agentProgressMeta` do `useReuniao`. A barra segue uma curva **ease-in** (`t^PROGRESS_CURVE_POWER`, expoente 2.5): avança devagar no início e acelera ao se aproximar da mediana, chegando até 95%. Snap 100% em `agent_done`. A mediana vem de `GET /sessoes/medianas` ou `FALLBACK_MEDIANAS` se a API falhar.
 
-**Watchdog.** Fórmula: `max(180, min(mediana × 3, 1200))` segundos (mínimo 3 min, máximo 20 min). Se `agent_done` não chegar nesse prazo, o watchdog:
+**Watchdog.** Timeout uniforme: `WATCHDOG_TIMEOUT_MIN = 40 min` para todos os agentes (constante em `dashboard/lib/config.ts`). Independe da mediana histórica — elimina falsos timeouts em agentes com fallback baixo (ex.: Otto 20s → antigo piso de 60s disparava durante briefings legítimos). Se `agent_done` não chegar em 40 min, o watchdog:
 1. Adiciona o agente ao `timedOutAgentsRef`
 2. Limpa o interval de progresso
 3. Marca o agente como `error`
-4. Substitui o placeholder "pensando..." por "Agente travou (timeout Xmin)"
+4. Substitui o placeholder "pensando..." por "Agente travou (timeout 40min)"
 
-**Prevenção de ghost bubbles.** Qualquer `agent_done` ou `token` chegado após o watchdog disparar é ignorado silenciosamente (guard em `timedOutAgentsRef`). O mesmo padrão foi retroativamente aplicado ao `useChat.ts` (Pipeline) para consistência.
+**Prevenção de ghost bubbles.** Qualquer `agent_done` ou `token` chegado após o watchdog disparar é ignorado silenciosamente (guard em `timedOutAgentsRef`). O mesmo padrão e a mesma constante são usados em `useChat.ts` (Pipeline).
 
 **MacroBar.** Não exibida em modo Reunião — agentes não têm ordem fixa.
 
