@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import { ThemeProvider } from '@/lib/theme-provider'
 
 export const metadata: Metadata = {
   title: 'Lemmon | Agentes',
@@ -8,8 +9,12 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="pt-BR">
-      <body className="noise">{children}</body>
+    <html lang="pt-BR" suppressHydrationWarning>
+      <body className="noise">
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem storageKey="lemmon-theme">
+          {children}
+        </ThemeProvider>
+      </body>
     </html>
   )
 }

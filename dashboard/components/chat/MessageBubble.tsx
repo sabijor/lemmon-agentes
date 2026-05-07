@@ -82,8 +82,8 @@ export function AgentMessage({ msg }: { msg: Message }) {
           {msg.error ? (
             <p className="text-red-600 text-xs font-mono">{msg.error}</p>
           ) : (
-            <p className={`text-sm font-mono leading-relaxed whitespace-pre-wrap text-stone-800 ${!msg.done ? 'typing-cursor' : ''}`}>
-              {msg.content || <span className="text-stone-400 animate-pulse">processando...</span>}
+            <p className={`text-sm font-mono leading-relaxed whitespace-pre-wrap text-stone-800 dark:text-stone-900 ${!msg.done ? 'typing-cursor' : ''}`}>
+              {msg.content || <span className="text-stone-400 dark:text-stone-500 animate-pulse">processando...</span>}
             </p>
           )}
         </div>

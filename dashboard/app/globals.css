@@ -10,6 +10,7 @@
 
 * { box-sizing: border-box; }
 body { background: #fafaf9; color: #1c1917; overflow: hidden; font-family: 'Inter', sans-serif; }
+.dark body { background: #0c0a09; color: #fafaf9; }
 
 /* Isometric office floor */
 .iso-tile {
@@ -20,12 +21,17 @@ body { background: #fafaf9; color: #1c1917; overflow: hidden; font-family: 'Inte
   transform: skew(-30deg, 15deg);
   transition: background 0.2s;
 }
+.dark .iso-tile { background: #1c1917; border-color: #292524; }
 
 /* Glass panel */
 .glass {
   background: rgba(255,255,255,0.7);
   backdrop-filter: blur(20px);
   border: 1px solid rgba(255,255,255,0.9);
+}
+.dark .glass {
+  background: rgba(28,25,23,0.85);
+  border: 1px solid rgba(255,255,255,0.08);
 }
 
 .glass-dark {
@@ -62,6 +68,7 @@ body { background: #fafaf9; color: #1c1917; overflow: hidden; font-family: 'Inte
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #d6d3d1; border-radius: 2px; }
+.dark ::-webkit-scrollbar-thumb { background: #44403c; }
 
 /* Pixel art rendering */
 .pixel { image-rendering: pixelated; image-rendering: crisp-edges; }

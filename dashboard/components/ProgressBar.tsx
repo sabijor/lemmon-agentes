@@ -30,7 +30,7 @@ export function ProgressBar({ agentId, progress, meta, isManualLocked, isVisible
           className="ml-13 pl-[52px] mt-1 pb-1"
           title={tooltipText}
         >
-          <div className="h-1 bg-stone-100 rounded-full overflow-hidden">
+          <div className="h-1 bg-stone-100 dark:bg-stone-800 rounded-full overflow-hidden">
             <motion.div
               className="h-full rounded-full"
               style={{ background: barColor }}

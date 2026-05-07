@@ -1,5 +1,26 @@
 'use client'
 import { useState, useRef, useEffect } from 'react'
+import { useTheme } from 'next-themes'
+
+function ThemeToggle() {
+  const { resolvedTheme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+  if (!mounted) return <div className="w-8 h-8" />
+  const isDark = resolvedTheme === 'dark'
+  return (
+    <button
+      onClick={() => setTheme(isDark ? 'light' : 'dark')}
+      title={isDark ? 'Modo claro' : 'Modo escuro'}
+      className="w-8 h-8 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 flex items-center justify-center hover:bg-stone-50 dark:hover:bg-stone-800 hover:border-stone-400 dark:hover:border-stone-500 transition-all text-stone-500 dark:text-stone-400"
+    >
+      {isDark
+        ? <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      }
+    </button>
+  )
+}
 
 function Clock() {
   const [time, setTime] = useState('')
@@ -95,15 +116,15 @@ export default function Home() {
   const handleReunSend = (agents: AgentId[], msg: string, manual?: boolean) => reunSend(agents, msg, manual)
 
   return (
-    <div className="h-screen w-screen flex flex-col overflow-hidden bg-stone-50">
+    <div className="h-screen w-screen flex flex-col overflow-hidden bg-stone-50 dark:bg-stone-950">
       {/* Top nav */}
-      <header className="flex-shrink-0 h-12 flex items-center justify-between px-6 glass border-b border-stone-200/60 z-50">
+      <header className="flex-shrink-0 h-12 flex items-center justify-between px-6 glass border-b border-stone-200/60 dark:border-stone-800/60 z-50">
         <div className="flex items-center gap-3">
-          <div className="w-6 h-6 bg-stone-900 rounded-md flex items-center justify-center">
-            <span className="text-white text-[10px] font-display font-bold">L</span>
+          <div className="w-6 h-6 bg-stone-900 dark:bg-stone-100 rounded-md flex items-center justify-center">
+            <span className="text-white dark:text-stone-900 text-[10px] font-display font-bold">L</span>
           </div>
-          <span className="font-display font-semibold text-sm tracking-tight">
-            Lemmon<span className="font-light text-stone-500"> Agentes</span>
+          <span className="font-display font-semibold text-sm tracking-tight text-stone-900 dark:text-stone-100">
+            Lemmon<span className="font-light text-stone-500 dark:text-stone-400"> Agentes</span>
           </span>
         </div>
 
@@ -122,7 +143,7 @@ export default function Home() {
                   title={isGuest ? `${agent.name} — convidado (só reunião)` : agent.name}
                   className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-mono uppercase tracking-widest
                     transition-all duration-200 border
-                    ${isIn ? 'text-white border-transparent shadow-sm' : 'bg-white text-stone-500 border-stone-200 hover:border-stone-400'}
+                    ${isIn ? 'text-white border-transparent shadow-sm' : 'bg-white dark:bg-stone-900 text-stone-500 dark:text-stone-400 border-stone-200 dark:border-stone-700 hover:border-stone-400 dark:hover:border-stone-500'}
                     ${isGuest && !isIn ? 'border-dashed' : ''}`}
                   style={isIn ? { background: agent.color, borderColor: agent.color } : {}}
                 >
@@ -141,31 +162,32 @@ export default function Home() {
           </div>
           <Clock />
           <Link href="/saude" title="Dashboard de Saúde"
-            className="w-8 h-8 rounded-lg border border-stone-200 bg-white flex items-center justify-center hover:bg-stone-50 hover:border-stone-400 transition-all text-stone-500">
+            className="w-8 h-8 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 flex items-center justify-center hover:bg-stone-50 dark:hover:bg-stone-800 hover:border-stone-400 dark:hover:border-stone-500 transition-all text-stone-500 dark:text-stone-400">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
             </svg>
           </Link>
           <Link href="/hall-of-fame" title="Hall of Fame"
-            className="w-8 h-8 rounded-lg border border-stone-200 bg-white flex items-center justify-center hover:bg-stone-50 hover:border-stone-400 transition-all text-stone-500 text-sm">
+            className="w-8 h-8 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 flex items-center justify-center hover:bg-stone-50 dark:hover:bg-stone-800 hover:border-stone-400 dark:hover:border-stone-500 transition-all text-stone-500 dark:text-stone-400 text-sm">
             🏆
           </Link>
           <Link href="/briefing-reverso" title="Briefing Reverso"
-            className="w-8 h-8 rounded-lg border border-stone-200 bg-white flex items-center justify-center hover:bg-stone-50 hover:border-stone-400 transition-all text-stone-500 text-sm">
+            className="w-8 h-8 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 flex items-center justify-center hover:bg-stone-50 dark:hover:bg-stone-800 hover:border-stone-400 dark:hover:border-stone-500 transition-all text-stone-500 dark:text-stone-400 text-sm">
             🔍
           </Link>
           <Link href="/cortes" title="Cortes-Prontos"
-            className="w-8 h-8 rounded-lg border border-stone-200 bg-white flex items-center justify-center hover:bg-stone-50 hover:border-stone-400 transition-all text-stone-500 text-sm">
+            className="w-8 h-8 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 flex items-center justify-center hover:bg-stone-50 dark:hover:bg-stone-800 hover:border-stone-400 dark:hover:border-stone-500 transition-all text-stone-500 dark:text-stone-400 text-sm">
             ✂️
           </Link>
           <Link href="/calibragem" title="Calibragem Pedro"
-            className="w-8 h-8 rounded-lg border border-stone-200 bg-white flex items-center justify-center hover:bg-stone-50 hover:border-stone-400 transition-all text-stone-500 text-sm">
+            className="w-8 h-8 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 flex items-center justify-center hover:bg-stone-50 dark:hover:bg-stone-800 hover:border-stone-400 dark:hover:border-stone-500 transition-all text-stone-500 dark:text-stone-400 text-sm">
             🎯
           </Link>
+          <ThemeToggle />
           <button
             onClick={() => setHistoryOpen(v => !v)}
             className={`w-8 h-8 rounded-lg border flex items-center justify-center transition-all
-              ${historyOpen ? 'bg-stone-900 border-stone-900 text-white' : 'bg-white border-stone-200 text-stone-500 hover:border-stone-400'}`}
+              ${historyOpen ? 'bg-stone-900 dark:bg-stone-100 border-stone-900 dark:border-stone-100 text-white dark:text-stone-900' : 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-700 text-stone-500 dark:text-stone-400 hover:border-stone-400 dark:hover:border-stone-500'}`}
             title="Histórico"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

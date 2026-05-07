@@ -27,7 +27,7 @@ export function MacroBar({ activeAgentIds, agentStatus, agentProgress, isVisible
           animate={{ opacity: 1, height: 'auto' }}
           exit={{ opacity: 0, height: 0 }}
           transition={{ duration: 0.2 }}
-          className="px-4 py-2 border-b border-stone-100 bg-stone-50/60 flex items-center gap-3 flex-wrap flex-shrink-0"
+          className="px-4 py-2 border-b border-stone-100 dark:border-stone-800 bg-stone-50/60 dark:bg-stone-900/60 flex items-center gap-3 flex-wrap flex-shrink-0"
         >
           {activeAgentIds.map(id => {
             const agent = AGENT_MAP[id]
@@ -49,7 +49,7 @@ export function MacroBar({ activeAgentIds, agentStatus, agentProgress, isVisible
                   {STATUS_ICON[status]}
                 </span>
                 {isActive && (
-                  <div className="w-8 h-0.5 bg-stone-200 rounded-full overflow-hidden">
+                  <div className="w-8 h-0.5 bg-stone-200 dark:bg-stone-700 rounded-full overflow-hidden">
                     <motion.div
                       className="h-full rounded-full"
                       style={{ background: agent.color }}

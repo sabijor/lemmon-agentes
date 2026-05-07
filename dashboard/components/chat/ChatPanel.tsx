@@ -475,12 +475,12 @@ export default function ChatPanel({
 
         {/* Header — drag handle */}
         <div
-          className="flex items-center justify-between px-4 py-3 border-b border-stone-200/50 flex-shrink-0 cursor-grab active:cursor-grabbing select-none"
+          className="flex items-center justify-between px-4 py-3 border-b border-stone-200/50 dark:border-stone-700/50 flex-shrink-0 cursor-grab active:cursor-grabbing select-none"
           onPointerDown={e => dragControls?.start(e)}
         >
           <div className="flex items-center gap-2">
-            <div className="w-1.5 h-1.5 rounded-full bg-stone-900" />
-            <span className="font-display font-semibold text-sm tracking-tight">
+            <div className="w-1.5 h-1.5 rounded-full bg-stone-900 dark:bg-stone-100" />
+            <span className="font-display font-semibold text-sm tracking-tight text-stone-900 dark:text-stone-100">
               {mode === 'reuniao' ? 'Reunião' : 'Pipeline'}
             </span>
             <button onClick={onToggleMode}
@@ -656,7 +656,7 @@ export default function ChatPanel({
         )}
 
         {/* Content — hidden when minimized */}
-        {!minimized && <div className="flex-1 overflow-y-auto px-5 py-5 space-y-6 min-h-0">
+        {!minimized && <div className="flex-1 overflow-y-auto px-5 py-5 space-y-6 min-h-0 dark:bg-stone-950/30">
           {/* Resumed session banner */}
           {resumedFrom && mode === 'pipeline' && (
             <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
@@ -1043,7 +1043,7 @@ export default function ChatPanel({
         </AnimatePresence>
 
         {/* Input */}
-        {!minimized && <div className="p-4 border-t border-stone-200/50 flex-shrink-0">
+        {!minimized && <div className="p-4 border-t border-stone-200/50 dark:border-stone-700/50 flex-shrink-0">
           {inMeeting.size === 0 ? (
             <div className="text-center text-[10px] font-mono text-stone-400 uppercase tracking-widest py-3">
               Nenhum agente na sala
@@ -1117,10 +1117,11 @@ export default function ChatPanel({
                     : 'Descreva o projeto... (↵ envia · ⇧↵ nova linha)'
                   }
                   rows={3}
-                  className={`w-full resize-none rounded-xl border bg-white/90
-                    px-4 py-3 pl-20 pr-24 text-sm font-mono text-stone-800 placeholder:text-stone-400
+                  className={`w-full resize-none rounded-xl border bg-white/90 dark:bg-stone-900/90
+                    px-4 py-3 pl-20 pr-24 text-sm font-mono text-stone-800 dark:text-stone-200
+                    placeholder:text-stone-400 dark:placeholder:text-stone-600
                     focus:outline-none transition-all duration-200 leading-relaxed
-                    ${isRecording ? 'border-red-300 focus:border-red-400' : 'border-stone-200 focus:border-stone-400'}`}
+                    ${isRecording ? 'border-red-300 focus:border-red-400' : 'border-stone-200 dark:border-stone-700 focus:border-stone-400 dark:focus:border-stone-500'}`}
                 />
                 {/* Clipe (imagem) */}
                 <button type="button" onClick={() => fileInputRef.current?.click()} disabled={isRunning}
