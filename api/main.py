@@ -2,7 +2,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.routes import auxiliares, calibragem, exemplares, exportar, historico, share, transcrever
+from api.routes import auxiliares, calibragem, exemplares, exportar, historico, sessoes, share, transcrever
 from api.ws_chat import chat
 from api.ws_mesa import mesa_redonda
 from api.ws_reuniao import reuniao
@@ -23,6 +23,7 @@ app.include_router(auxiliares.router)
 app.include_router(transcrever.router)
 app.include_router(share.router)
 app.include_router(calibragem.router)
+app.include_router(sessoes.router)
 
 app.websocket("/ws/chat")(chat)
 app.websocket("/ws/reuniao")(reuniao)
