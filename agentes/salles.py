@@ -1,7 +1,7 @@
 """Salles | Roteirista — Agente 2 do sistema Lemmon."""
 import json as _json
 import time
-from typing import Optional
+from typing import Optional, cast
 
 from agentes.otto import Otto
 from core.agente_base import AgenteBase
@@ -12,6 +12,7 @@ from core.discussao import (
     construir_prompt_rodada_extra,
 )
 from core.similaridade import buscar_casos_similares
+from core.tipos import AgenteResultado
 from core.validador import validar_briefing
 
 FORMATOS_VALIDOS = {
@@ -181,7 +182,7 @@ class Salles(AgenteBase):
     def executar(self, briefing: Optional[str] = None, formato: str = "auto",
                  analise_otto_existente: Optional[dict] = None,
                  tags: Optional[list] = None,
-                 diretrizes_heitor: Optional[dict] = None) -> dict:
+                 diretrizes_heitor: Optional[dict] = None) -> AgenteResultado:
         """
         Pipeline completo: chama Otto se necessário → discute → produz roteiro.
 
@@ -197,6 +198,7 @@ class Salles(AgenteBase):
         if formato not in FORMATOS_VALIDOS:
             raise ValueError(f"Formato inválido: {formato}. Use: {FORMATOS_VALIDOS}")
 
+        _inicio_execucao = time.time()
         custo_total = 0.0
         breakdown_custo = {}
         analise_otto = None
@@ -259,6 +261,7 @@ class Salles(AgenteBase):
             "custo_total_usd": round(custo_total, 6),
             "custo_total_brl_estimado": round(custo_total * 5.20, 4),
             "breakdown_custo": breakdown_custo,
+            "duracao_segundos": round(time.time() - _inicio_execucao, 2),
             "modelo_usado": self.modelo,
             "versao_prompt": self.versao_prompt,
             "briefing_original": briefing,
@@ -268,7 +271,7 @@ class Salles(AgenteBase):
         self.historico.registrar(resultado_final)
         self.logger.info(f"Salles concluído | custo total: ${custo_total:.6f}")
 
-        return resultado_final
+        return cast(AgenteResultado, resultado_final)
 
     def executar_isolado(self, analise_otto: dict, formato: str = "auto",
                          tags: Optional[list] = None,

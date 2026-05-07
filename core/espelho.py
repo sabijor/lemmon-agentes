@@ -13,11 +13,12 @@ Uso:
     )
 """
 from pathlib import Path
-from typing import Optional
+from typing import Optional, cast
 
 from core.agente_base import AgenteBase
 from core.config import PROMPTS_DIR
 from core.limites_espelho import aviso_pos_execucao, aviso_pre_execucao
+from core.tipos import AgenteResultado
 
 
 class EspelhoCliente(AgenteBase):
@@ -87,7 +88,7 @@ class EspelhoCliente(AgenteBase):
         contexto_opcional: Optional[str] = None,
         modo: str = "consulta",
         tags: Optional[list] = None,
-    ) -> dict:
+    ) -> AgenteResultado:
         if modo not in self.MODOS_VALIDOS:
             raise ValueError(f"Modo inválido: {modo}. Use: {self.MODOS_VALIDOS}")
         if not pergunta or len(pergunta.strip()) < 10:
@@ -127,11 +128,12 @@ class EspelhoCliente(AgenteBase):
             "custo_total_usd": round(custo_total, 6),
             "custo_total_brl_estimado": round(custo_total * 5.20, 4),
             "breakdown_custo": {"consulta_usd": round(custo_total, 6)},
+            "duracao_segundos": duracao,
             "modelo_usado": self.modelo,
             "versao_prompt": self.versao_prompt,
         }
         self.historico.registrar(resultado)
-        return resultado
+        return cast(AgenteResultado, resultado)
 
     def _construir_user_message(
         self, pergunta: str, contexto: Optional[str], modo: str

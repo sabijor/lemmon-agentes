@@ -10,6 +10,7 @@ from .custo import Custo
 from .exemplares import formatar_exemplares_para_prompt
 from .historico import Historico
 from .logger import get_logger
+from .tipos import AgenteResultado
 
 
 def formatar_erro_anthropic(e: Exception) -> str:
@@ -179,5 +180,5 @@ class AgenteBase(ABC):
         return {"output_humano": texto, "custo_total_usd": custo.custo_usd, "duracao": duracao}
 
     @abstractmethod
-    def executar(self, *args, **kwargs) -> dict:
+    def executar(self, *args, **kwargs) -> AgenteResultado:
         ...

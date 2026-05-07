@@ -8,7 +8,8 @@ Arquitetura: 3 chamadas separadas à API
 Sistema de avisos em 3 camadas (pré, durante, pós-execução).
 """
 import json as _json
-from typing import Optional
+import time
+from typing import Optional, cast
 
 from core.agente_base import AgenteBase
 from core.config import HEITOR_MAX_BUSCAS_DEFAULT
@@ -17,6 +18,7 @@ from core.limites_heitor import (
     aviso_pos_execucao,
     aviso_pre_execucao,
 )
+from core.tipos import AgenteResultado
 from core.web_search_helper import (
     construir_tool_web_search_amplo,
     construir_tool_web_search_oficial,
@@ -161,7 +163,7 @@ class Heitor(AgenteBase):
         contexto_otto: Optional[dict] = None,
         contexto_salles: Optional[dict] = None,
         tags: Optional[list] = None,
-    ) -> dict:
+    ) -> AgenteResultado:
         """
         Executa análise de compliance.
 
@@ -181,6 +183,8 @@ class Heitor(AgenteBase):
             raise ValueError(f"Modo inválido: {modo}. Use: {MODOS_VALIDOS}")
         if modo_saida not in MODOS_SAIDA:
             raise ValueError(f"Modo de saída inválido: {modo_saida}")
+
+        _inicio_execucao = time.time()
 
         if modo_saida == "auto":
             modo_saida = "log" if modo == "cadeia" else "analise"
@@ -256,6 +260,7 @@ class Heitor(AgenteBase):
             "custo_total_usd": round(custo_total, 6),
             "custo_total_brl_estimado": round(custo_total * 5.20, 4),
             "breakdown_custo": breakdown,
+            "duracao_segundos": round(time.time() - _inicio_execucao, 2),
             "modelo_usado": self.modelo,
             "versao_prompt": self.versao_prompt,
             "conteudo_analisado_preview": (
@@ -265,7 +270,7 @@ class Heitor(AgenteBase):
 
         self.historico.registrar(resultado)
 
-        return resultado
+        return cast(AgenteResultado, resultado)
 
     def _chamada_1_analise(
         self, conteudo, modo, nicho_hint, max_buscas, buscar_secundarias,

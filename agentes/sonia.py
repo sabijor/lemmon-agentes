@@ -8,7 +8,8 @@ Arquitetura: 3 chamadas separadas.
 Sistema de avisos em 3 camadas.
 """
 import json as _json
-from typing import Optional
+import time
+from typing import Optional, cast
 
 from core.agente_base import AgenteBase
 from core.config import (
@@ -26,6 +27,7 @@ from core.limites_sonia import (
     aviso_pos_execucao_sonia,
     aviso_pre_execucao_sonia,
 )
+from core.tipos import AgenteResultado
 from core.web_search_helper import (
     contar_buscas_realizadas,
     extrair_fontes_consultadas,
@@ -272,7 +274,9 @@ class Sonia(AgenteBase):
         contexto_salles_ressalvas: Optional[list] = None,
         confirmacao_callback=None,
         tags: Optional[list] = None,
-    ) -> dict:
+    ) -> AgenteResultado:
+        _inicio_execucao = time.time()
+
         if modo not in MODOS_VALIDOS:
             raise ValueError(f"Modo inválido: {modo}. Use: {MODOS_VALIDOS}")
 
@@ -371,13 +375,14 @@ class Sonia(AgenteBase):
             "custo_total_usd": round(custo_total, 6),
             "custo_total_brl_estimado": round(custo_total * 5.20, 4),
             "breakdown_custo": breakdown,
+            "duracao_segundos": round(time.time() - _inicio_execucao, 2),
             "modelo_usado": self.modelo,
             "versao_prompt": self.versao_prompt,
             "roteiro_preview": roteiro[:500] + ("..." if len(roteiro) > 500 else ""),
         }
 
         self.historico.registrar(resultado)
-        return resultado
+        return cast(AgenteResultado, resultado)
 
     def _chamada_1(self, roteiro, modo, tendencias_texto, com_busca,
                    max_buscas, contexto_otto, contexto_salles, heitor_safe,

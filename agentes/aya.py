@@ -8,9 +8,7 @@ Arquitetura: 1 chamada API (cards) + montagem Python pura do markdown final.
 import json as _json
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Optional
-
-from anthropic import APIError, AuthenticationError, RateLimitError
+from typing import Dict, Optional, cast
 
 from core.agente_base import AgenteBase
 from core.config import (
@@ -19,12 +17,12 @@ from core.config import (
     AYA_OUTPUT_AGENTE_MAX_CHARS,
     AYA_RESUMO_AGENTE_MAX_CHARS,
 )
-from core.custo import Custo
 from core.historico import Historico
 from core.limites_aya import (
     aviso_pos_execucao_aya,
     aviso_pre_execucao_aya,
 )
+from core.tipos import AgenteResultado
 
 # Schema da chamada única — apenas cards de resumo, sem síntese narrativa
 FERRAMENTA_DOSSIE_AYA = {
@@ -136,7 +134,7 @@ class Aya(AgenteBase):
         arquivos_especificos: Optional[Dict[str, str]] = None,
         tags: Optional[list] = None,
         outputs_diretos: Optional[Dict[str, dict]] = None,
-    ) -> dict:
+    ) -> AgenteResultado:
         """
         Compila dossiê dos últimos outputs dos agentes Lemmon.
 
@@ -148,6 +146,8 @@ class Aya(AgenteBase):
             outputs_diretos: dict {agente: {"output_humano": str, "output_tecnico": dict}}
                 passado pelo pipeline para evitar leitura de disco e garantir contexto correto
         """
+        import time as _time
+        _inicio_execucao = _time.time()
         outputs_detectados = self._detectar_outputs(arquivos_especificos, outputs_diretos)
 
         num_presentes = sum(1 for v in outputs_detectados.values() if v is not None)
@@ -193,13 +193,14 @@ class Aya(AgenteBase):
             "custo_total_usd": round(custo, 6),
             "custo_total_brl_estimado": round(custo * 5.20, 4),
             "breakdown_custo": {"compilacao_usd": round(custo, 6)},
+            "duracao_segundos": round(_time.time() - _inicio_execucao, 2),
             "modelo_usado": self.modelo,
             "versao_prompt": self.versao_prompt,
             "tamanho_dossie_chars": len(markdown_final),
         }
 
         self.historico.registrar(resultado)
-        return resultado
+        return cast(AgenteResultado, resultado)
 
     def _detectar_outputs(
         self,
@@ -293,21 +294,11 @@ INSTRUÇÕES (LEIA COM ATENÇÃO):
 Use `compilar_resumos_lemmon`.
 """
 
-        try:
-            response = self.client.messages.create(
-                model=self.modelo,
-                max_tokens=self.max_tokens,
-                system=self.system_prompt,
-                messages=[{"role": "user", "content": prompt}],
-                tools=[FERRAMENTA_DOSSIE_AYA],
-                tool_choice={"type": "tool", "name": "compilar_resumos_lemmon"}
-            )
-        except AuthenticationError:
-            raise RuntimeError("Chave API inválida.")
-        except RateLimitError as e:
-            raise RuntimeError(f"Rate limit Aya: {e}\nAguarde e tente de novo.")
-        except APIError as e:
-            raise RuntimeError(f"Erro API Aya: {e}")
+        response, custo_obj, _ = self._chamar_api(
+            mensagens=[{"role": "user", "content": prompt}],
+            tools=[FERRAMENTA_DOSSIE_AYA],
+            tool_choice={"type": "tool", "name": "compilar_resumos_lemmon"},
+        )
 
         cards = None
         for bloco in response.content:
@@ -318,12 +309,9 @@ Use `compilar_resumos_lemmon`.
         if cards is None:
             raise RuntimeError("Aya: tool_use não retornado.")
 
-        custo = Custo.calcular(
-            response.usage.input_tokens, response.usage.output_tokens
-        )
-        self.logger.info(f"Chamada Aya | {custo.resumo()}")
+        self.logger.info(f"Chamada Aya | {custo_obj.resumo()}")
 
-        return cards, custo.custo_usd
+        return cards, custo_obj.custo_usd
 
     def _resumir_output_tecnico(self, agente: str, output_tecnico: dict) -> dict:
         """Extrai apenas campos relevantes pra economizar tokens."""

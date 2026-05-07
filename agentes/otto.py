@@ -1,5 +1,8 @@
 """Otto | Estrategista — Agente 1 do sistema Lemmon."""
+from typing import cast
+
 from core.agente_base import AgenteBase
+from core.tipos import AgenteResultado
 from core.validador import validar_briefing, validar_modo_visual
 
 # Schema da ferramenta forçada (structured output via tool use)
@@ -104,7 +107,7 @@ class Otto(AgenteBase):
     versao_prompt = "v3"
 
     def executar(self, briefing: str, modo_visual: str = "auto",
-                 contexto_extra: str = "") -> dict:
+                 contexto_extra: str = "") -> AgenteResultado:
         briefing = validar_briefing(briefing)
         modo_visual = validar_modo_visual(modo_visual)
 
@@ -154,7 +157,7 @@ class Otto(AgenteBase):
         arquivo_hist = self.historico.registrar(resultado)
         self.logger.info(f"Histórico salvo em: {arquivo_hist.name}")
 
-        return resultado
+        return cast(AgenteResultado, resultado)
 
     def _construir_mensagem(self, briefing: str, modo_visual: str,
                             contexto_extra: str) -> str:
