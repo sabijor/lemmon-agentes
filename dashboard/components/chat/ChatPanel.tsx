@@ -110,6 +110,15 @@ export default function ChatPanel({
 
   const [input, setInput] = useState('')
   const [minimized, setMinimized] = useState(false)
+  const [pinned, setPinned] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return localStorage.getItem('lemmon-chat-pinned') === 'true'
+  })
+  const togglePin = () => {
+    const next = !pinned
+    setPinned(next)
+    localStorage.setItem('lemmon-chat-pinned', String(next))
+  }
   const [configOpen, setConfigOpen] = useState(false)
   const [reuniaoManual, setReuniaoManual] = useState(false)
   const [reuniaoRating, setReuniaoRating] = useState(0)
@@ -518,8 +527,8 @@ export default function ChatPanel({
 
         {/* Header — drag handle */}
         <div
-          className="flex items-center justify-between px-4 py-3 border-b border-stone-200/50 dark:border-stone-700/50 flex-shrink-0 cursor-grab active:cursor-grabbing select-none"
-          onPointerDown={e => dragControls?.start(e)}
+          className={`flex items-center justify-between px-4 py-3 border-b border-stone-200/50 dark:border-stone-700/50 flex-shrink-0 select-none ${pinned ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'}`}
+          onPointerDown={e => { if (!pinned) dragControls?.start(e) }}
         >
           <div className="flex items-center gap-2">
             <div className="w-1.5 h-1.5 rounded-full bg-stone-900 dark:bg-stone-100" />
@@ -655,6 +664,14 @@ export default function ChatPanel({
                 </svg>
               </button>
             )}
+
+            {/* Pin / Unpin */}
+            <button onClick={togglePin} title={pinned ? 'Desafixar painel (arrastar livre)' : 'Fixar painel (bloquear arraste)'}
+              className={`w-7 h-7 rounded-lg border flex items-center justify-center transition-all text-[11px] ${
+                pinned ? 'bg-stone-900 border-stone-900 text-white' : 'border-stone-200 bg-white text-stone-500 hover:bg-stone-50 hover:border-stone-400'
+              }`}>
+              {pinned ? '📍' : '📌'}
+            </button>
 
             {/* Minimize / Restore */}
             <button onClick={() => setMinimized(v => !v)} title={minimized ? 'Restaurar' : 'Minimizar'}
