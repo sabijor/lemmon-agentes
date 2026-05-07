@@ -12,6 +12,7 @@ Uso:
         contexto_max_chars=15000,
     )
 """
+import hashlib
 from pathlib import Path
 from typing import Optional, cast
 
@@ -82,7 +83,9 @@ class EspelhoCliente(AgenteBase):
                 partes.append("\n\n")
             else:
                 self.logger.warning(f"Material não encontrado: {p}")
-        return "".join(partes)
+        material = "".join(partes)
+        self._material_hash = hashlib.sha256(material.encode("utf-8")).hexdigest()[:12]
+        return material
 
     def executar(
         self,
@@ -133,6 +136,7 @@ class EspelhoCliente(AgenteBase):
             "duracao_segundos": duracao,
             "modelo_usado": self.modelo,
             "versao_prompt": self.versao_prompt,
+            "material_hash": self._material_hash,
         }
         self.historico.registrar(resultado)
         return cast(AgenteResultado, resultado)

@@ -1,7 +1,7 @@
 # LEMMON AGENTES — Manual do Sistema
 
-**Versão atual:** v1.16
-**Última atualização:** 2026-05-07 (v1.16)
+**Versão atual:** v1.17
+**Última atualização:** 2026-05-07
 **Mantido por:** Calebe Alves / Lemmon Produções
 
 > Este é o documento de referência viva do sistema Lemmon Agentes. Sempre que uma função nova for implementada ou um épico fechar, este manual deve ser atualizado e uma nova versão de PDF gerada em `docs/releases/`.
@@ -11,6 +11,16 @@
 ## Histórico de versões
 
 > **Convenção:** versões mais novas no topo. Cada release lista o que mudou em relação à anterior, mantendo histórico completo.
+
+### v1.17 — 2026-05-07
+
+**FASE 5 — BLOCO 4: doc + versionamento de materiais espelho (T76 → T77 → T85).**
+
+- **T76 — Receitas §6 (7 novas):** 6.7 Modo Remix, 6.8 Fast-track, 6.9 Sandbox, 6.10 A/B Salles, 6.11 Briefing Reverso, 6.12 Cortes-prontos, 6.13 Gate Espelho. Cada receita com 4–6 passos, referenciando a feature real no código.
+- **T77 — §10 "Como adicionar cliente espelho":** Guia de 8 etapas do onboarding: `onboard_cliente.py`, dossiê, transcrições, system prompt, instanciação Python, snippet TS em `agents.ts`, alias em `AGENTE_ALIAS`, teste CLI.
+- **T85 — Versionamento de materiais primários (código):** `EspelhoCliente._carregar_material_primario()` calcula SHA-256 (primeiros 12 chars) do material combinado e registra em `self._material_hash`. Campo `material_hash` adicionado ao resultado de cada execução (`AgenteResultado` TypedDict atualizado). Sessões antigas sem o campo tratam com `?? "?"`. Pasta `inputs/clientes/pedro/historico/` criada como convenção de arquivo de versões antigas.
+
+---
 
 ### v1.16 — 2026-05-07
 
@@ -1102,12 +1112,12 @@ cp inputs/clientes/pedro/transcricoes.md inputs/clientes/pedro/historico/transcr
 grep "material_hash" historico/pedro_abrahao/*.json | tail -5
 ```
 
-**Estrutura esperada:**
+**Estrutura esperada** (pasta `historico/` criada manualmente — não é rastreada pelo git):
 ```
 inputs/clientes/pedro/
 ├── dossie.md              # versão atual (sempre editável)
 ├── transcricoes.md        # versão atual
-└── historico/
+└── historico/             # criar: mkdir inputs/clientes/pedro/historico
     ├── dossie_v1.md       # versão anterior arquivada
     └── transcricoes_v1.md
 ```

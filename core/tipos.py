@@ -17,3 +17,4 @@ class AgenteResultado(TypedDict, total=False):
     breakdown_custo: dict
     cancelado: bool
     motivo: str
+    material_hash: str
