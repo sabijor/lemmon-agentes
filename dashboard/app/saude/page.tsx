@@ -1,9 +1,12 @@
 'use client'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { fetchHistorico, type Session } from '@/lib/api-client'
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine,
+} from 'recharts'
+import { fetchHistorico, fetchLatencias, type Session, type LatenciaSemana } from '@/lib/api-client'
 import { useApiQuery } from '@/lib/use-api-query'
-import { AGENT_MAP } from '@/lib/agents'
+import { AGENT_MAP, type AgentId } from '@/lib/agents'
 
 function pct(n: number, total: number) {
   if (!total) return 0
@@ -23,7 +26,51 @@ function getMonth(ts: string) {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`
 }
 
+const AGENTES_LATENCIA = Object.keys(AGENT_MAP) as AgentId[]
+
+function LatenciaChart({ agente, dias }: { agente: AgentId; dias: number }) {
+  const fetcher = useMemo(() => () => fetchLatencias(agente, dias), [agente, dias])
+  const { data, loading } = useApiQuery<{ semanas: LatenciaSemana[] }>(fetcher)
+  const agent = AGENT_MAP[agente]
+
+  if (loading) return <div className="h-32 flex items-center justify-center"><span className="text-[9px] font-mono text-stone-500">carregando...</span></div>
+  if (!data?.semanas.length) return <div className="h-32 flex items-center justify-center"><span className="text-[9px] font-mono text-stone-600">sem dados de duração para {agent?.name}</span></div>
+
+  return (
+    <ResponsiveContainer width="100%" height={120}>
+      <LineChart data={data.semanas} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#292524" />
+        <XAxis dataKey="semana" tick={{ fontSize: 8, fontFamily: 'monospace', fill: '#78716c' }} />
+        <YAxis tick={{ fontSize: 8, fontFamily: 'monospace', fill: '#78716c' }} unit="s" />
+        <Tooltip
+          contentStyle={{ background: '#1c1917', border: '1px solid #292524', borderRadius: 8, fontSize: 10, fontFamily: 'monospace' }}
+          labelStyle={{ color: '#a8a29e' }}
+          formatter={(v) => {
+            const num = typeof v === 'number' ? v : Number(v)
+            const entry = data.semanas.find(s => s.media_s === num)
+            return [`${num}s (${entry?.n ?? '?'} sessões)`, 'média']
+          }}
+        />
+        <ReferenceLine y={120} stroke="#ef4444" strokeDasharray="4 2" strokeOpacity={0.5} />
+        <Line
+          type="monotone"
+          dataKey="media_s"
+          stroke={agent?.color ?? '#a8a29e'}
+          strokeWidth={2}
+          dot={(props) => {
+            const entry = props.payload as LatenciaSemana
+            return <circle key={props.key} cx={props.cx} cy={props.cy} r={3} fill={entry.lenta ? '#ef4444' : (agent?.color ?? '#a8a29e')} stroke="none" />
+          }}
+          activeDot={{ r: 5 }}
+        />
+      </LineChart>
+    </ResponsiveContainer>
+  )
+}
+
 export default function Saude() {
+  const [agenteLatencia, setAgenteLatencia] = useState<AgentId>('otto')
+  const [diasLatencia, setDiasLatencia] = useState(30)
   const { data: sessions, loading } = useApiQuery<Session[]>(fetchHistorico)
 
   const stats = useMemo(() => {
@@ -185,6 +232,37 @@ export default function Saude() {
                   </div>
                 ))}
               </div>
+            </div>
+
+            {/* Latency trend */}
+            <div className="bg-stone-900 border border-stone-800 rounded-2xl p-6">
+              <div className="flex items-center justify-between mb-5">
+                <p className="text-[9px] font-mono text-stone-500 uppercase tracking-widest">latência semanal (média por sessão)</p>
+                <div className="flex items-center gap-3">
+                  <select
+                    value={agenteLatencia}
+                    onChange={e => setAgenteLatencia(e.target.value as AgentId)}
+                    className="text-[9px] font-mono bg-stone-800 border border-stone-700 rounded px-2 py-1 text-stone-300"
+                  >
+                    {AGENTES_LATENCIA.map(id => (
+                      <option key={id} value={id}>{AGENT_MAP[id]?.name ?? id}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={diasLatencia}
+                    onChange={e => setDiasLatencia(Number(e.target.value))}
+                    className="text-[9px] font-mono bg-stone-800 border border-stone-700 rounded px-2 py-1 text-stone-300"
+                  >
+                    <option value={30}>30 dias</option>
+                    <option value={60}>60 dias</option>
+                    <option value={90}>90 dias</option>
+                  </select>
+                </div>
+              </div>
+              <LatenciaChart agente={agenteLatencia} dias={diasLatencia} />
+              <p className="text-[8px] font-mono text-stone-600 mt-2">
+                Linha vermelha = 120s · pontos vermelhos = semanas acima do limite
+              </p>
             </div>
           </div>
         )}

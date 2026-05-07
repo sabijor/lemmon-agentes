@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { fetchCortesProntos } from '@/lib/api-client'
+import { notify } from '@/lib/toast'
 
 const DURACOES_DISPONIVEIS = [15, 30, 60, 90]
 
@@ -11,7 +12,6 @@ export default function CortesProntos() {
   const [resultado, setResultado] = useState('')
   const [custo, setCusto] = useState(0)
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
 
   const toggleDuracao = (d: number) => {
     setDuracoes(prev => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d].sort((a, b) => a - b))
@@ -21,13 +21,12 @@ export default function CortesProntos() {
     if (!transcricao.trim() || duracoes.length === 0 || loading) return
     setLoading(true)
     setResultado('')
-    setError('')
     try {
       const data = await fetchCortesProntos(transcricao, duracoes)
       setResultado(data.cortes)
       setCusto(data.custo_total_usd)
     } catch (e) {
-      setError((e as Error).message)
+      notify.error((e as Error).message)
     } finally {
       setLoading(false)
     }
@@ -77,10 +76,6 @@ export default function CortesProntos() {
               hover:bg-white active:scale-[0.99] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
             {loading ? 'Gerando cortes...' : `✂️ Gerar cortes (${duracoes.map(d => d + 's').join(', ')})`}
           </button>
-
-          {error && (
-            <p className="text-red-400 text-[10px] font-mono text-center">{error}</p>
-          )}
 
           {resultado && (
             <div className="bg-stone-900 border border-stone-700 rounded-2xl p-6">

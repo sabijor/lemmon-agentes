@@ -2,25 +2,24 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { fetchBriefingReverso } from '@/lib/api-client'
+import { notify } from '@/lib/toast'
 
 export default function BriefingReverso() {
   const [transcricao, setTranscricao] = useState('')
   const [resultado, setResultado] = useState('')
   const [custo, setCusto] = useState(0)
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
 
   const analisar = async () => {
     if (!transcricao.trim() || loading) return
     setLoading(true)
     setResultado('')
-    setError('')
     try {
       const data = await fetchBriefingReverso(transcricao)
       setResultado(data.resultado)
       setCusto(data.custo_total_usd)
     } catch (e) {
-      setError((e as Error).message)
+      notify.error((e as Error).message)
     } finally {
       setLoading(false)
     }
@@ -53,10 +52,6 @@ export default function BriefingReverso() {
               hover:bg-white active:scale-[0.99] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
             {loading ? 'Analisando...' : '🔍 Inferir briefing'}
           </button>
-
-          {error && (
-            <p className="text-red-400 text-[10px] font-mono text-center">{error}</p>
-          )}
 
           {resultado && (
             <div className="bg-stone-900 border border-stone-700 rounded-2xl p-6 space-y-1">

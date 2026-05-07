@@ -1,6 +1,6 @@
 # LEMMON AGENTES — Manual do Sistema
 
-**Versão atual:** v1.21
+**Versão atual:** v1.23
 **Última atualização:** 2026-05-07
 **Mantido por:** Calebe Alves / Lemmon Produções
 
@@ -11,6 +11,17 @@
 ## Histórico de versões
 
 > **Convenção:** versões mais novas no topo. Cada release lista o que mudou em relação à anterior, mantendo histórico completo.
+
+### v1.23 — 2026-05-07
+
+**BLOCO 5 — T80 + T86: gráfico de latência e toast global.**
+
+- **T80 — `GET /saude/latencias?agente=X&dias=30`:** médias semanais de `duracoes_segundos` por agente. Semanas com média > 120s retornam `lenta: true`. Registrado em `api/routes/saude.py`.
+- **T80 — recharts line chart em `/saude`:** seção "Latência Semanal" com selector de agente e período (30/60/90 dias). Pontos e linha mudam para vermelho em semanas lentas. Linha de referência em 120s.
+- **T86 — sonner + `@/lib/toast`:** `Toaster` em `layout.tsx` (bottom-right, rich colors). Wrapper `notify.{error,success,info,warning}` em `lib/toast.ts`. `useApiQuery` agora dispara `notify.error()` automaticamente em falhas. `/briefing-reverso` e `/cortes` refatorados para remover estado `error` inline.
+- **Manual:** §4.14 (gráfico latência), §4.15 (toast global).
+
+---
 
 ### v1.21 — 2026-05-07
 
@@ -626,6 +637,18 @@ Toggle no header da aplicação (ícone ☀/🌙). Alterna entre modo claro e es
 ## 4.13 Escritório virtual
 
 Cena RPG isométrica com sprites dos agentes em mesas. Quando você convoca um agente, ele caminha da mesa para a sala de reunião. Status físico (idle, thinking, speaking, done, error) reflete em cor e animação. Idle quotes aparecem em bolas de fala periodicamente. Whiteboards na sala respondem ao pipeline em tempo real (barras horizontais na cor do agente ativo). Mic destacado em reunião (anéis pulsantes ao redor do sprite quando `speaking`).
+
+## 4.14 Gráfico de latência semanal (T80)
+
+Na página `/saude`, nova seção "Latência Semanal". Mostra a média de duração (segundos) de cada agente por semana ISO, nos últimos 30/60/90 dias (selecionável). Semanas com média > 120s ficam marcadas em vermelho.
+
+**Controles:** selector de agente + selector de período. O gráfico é atualizado a cada troca de filtro.
+
+**Backend:** `GET /saude/latencias?agente=X&dias=30` — lê `duracoes_segundos` de `*_sessao.json`, agrupa por semana ISO, retorna médias com flag `lenta`. Sem cache (endpoint de diagnóstico — chamado com baixa frequência).
+
+## 4.15 Toast global de erros (T86)
+
+Erros de API exibidos em toast (bottom-right) via [sonner](https://github.com/emilkowalski/sonner). Cobre: falhas de fetch em `useApiQuery` (páginas `/saude`, `/historico`, etc.) e chamadas manuais em `/briefing-reverso` e `/cortes`. `notify.error()` / `notify.success()` disponíveis em `@/lib/toast` para uso em qualquer página.
 
 ---
 

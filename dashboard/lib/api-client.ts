@@ -141,3 +141,19 @@ export async function postComentario(
     body: JSON.stringify(payload),
   })
 }
+
+export interface LatenciaSemana {
+  semana: string
+  media_s: number
+  n: number
+  lenta: boolean
+}
+
+export interface LatenciasResponse {
+  semanas: LatenciaSemana[]
+}
+
+/** GET /saude/latencias?agente=X&dias=30 */
+export async function fetchLatencias(agente: string, dias = 30): Promise<LatenciasResponse> {
+  return apiFetch<LatenciasResponse>(`/saude/latencias?agente=${encodeURIComponent(agente)}&dias=${dias}`)
+}

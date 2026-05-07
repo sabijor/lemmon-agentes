@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
+import { notify } from '@/lib/toast'
 
 export function useApiQuery<T>(
   fn: () => Promise<T>,
@@ -16,7 +17,9 @@ export function useApiQuery<T>(
     try {
       setData(await fn())
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Erro desconhecido')
+      const msg = e instanceof Error ? e.message : 'Erro desconhecido'
+      setError(msg)
+      notify.error(msg)
     } finally {
       setLoading(false)
     }
