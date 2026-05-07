@@ -120,10 +120,9 @@ def main():
     if pubs:
         print(f"📸 Publicações:   {len(pubs)} peças")
 
-    estoque = out_dir / "estoque"
-    descartes = list(estoque.glob(f"{ts}_descartes.txt")) if estoque.exists() else []
-    if descartes:
-        print(f"🗑  Descartes:     {descartes[0]}")
+    descartes_path = resultado.get("descartes_path")
+    if descartes_path:
+        print(f"🗑  Descartes:     {descartes_path}")
 
 
 if __name__ == "__main__":

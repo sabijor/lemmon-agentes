@@ -58,7 +58,6 @@ DATAS_FIXAS: list[dict] = [
     {"data": "04-06", "nome": "Dia do Esporte", "tags": ["esporte", "saude"]},
     {"data": "06-23", "nome": "Dia do Atleta (Dia do Esporte)", "tags": ["esporte"]},
     # ── Beleza ────────────────────────────────────────────
-    {"data": "09-06", "nome": "Dia da Beleza", "tags": ["beleza"]},
     {"data": "10-10", "nome": "Dia Nacional da Estética", "tags": ["beleza"]},
 ]
 

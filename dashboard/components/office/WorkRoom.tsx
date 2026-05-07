@@ -519,6 +519,10 @@ export function RoomBackground({ onDoorClick, whiteBoardFill, whiteBoardColor }:
       <Chair gx={5.1} gy={5.4} />
       <Chair gx={6.4} gy={5.4} />
 
+      {/* Agent desk — Renata */}
+      <Desk gx={3} gy={4.25} />
+      <Chair gx={4.2} gy={5.45} />
+
       {/* Arcade corner (near Salles) */}
       <ArcadeMachine gx={2.4} gy={5.5} color="#ef4444" />
 

@@ -20,8 +20,11 @@ from core.config import (
     OUTPUTS_DIR,
     RENATA_DOSSIE_MAX_CHARS,
     RENATA_DURACAO_MAX_DIAS,
+    RENATA_HEITOR_MAX_CHARS,
     RENATA_OUTPUT_MAX_CHARS,
     RENATA_PREVISAO_RANGE_USD,
+    RENATA_ROTEIRO_MAX_CHARS,
+    RENATA_SONIA_MAX_CHARS,
 )
 from core.tipos import AgenteResultado
 
@@ -209,8 +212,15 @@ class Renata(AgenteBase):
 
         resultado_validado = self._validar_resultado(resultado_bruto, duracao_dias)
 
+        # Garante que output_humano contenha as perguntas quando modo solo retornar clarificação
+        perguntas = resultado_validado.get("perguntas_clarificacao") or []
+        if perguntas and "?" not in resultado_validado.get("output_humano", ""):
+            resultado_validado["output_humano"] = "\n".join(
+                f"{i + 1}. {p}" for i, p in enumerate(perguntas)
+            )
+
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        self._salvar_descartes(resultado_validado, ts)
+        descartes_path = self._salvar_descartes(resultado_validado, ts)
 
         self.logger.info(f"Renata concluída | ${custo:.6f}")
 
@@ -228,6 +238,9 @@ class Renata(AgenteBase):
             "duracao_segundos":         round(_time.time() - _inicio, 2),
             "modelo_usado":             self.modelo,
             "versao_prompt":            self.versao_prompt,
+            "descartes_path":           descartes_path,
+            "data_inicio":              data_inicio.isoformat(),
+            "data_fim":                 data_fim.isoformat(),
         }
         self.historico.registrar(saida)
         return cast(AgenteResultado, saida)
@@ -254,17 +267,29 @@ class Renata(AgenteBase):
             )
 
     def _extrair_nichos_cliente(self, cliente_id: Optional[str]) -> list[str]:
-        """Lê nichos_calendario do dossie.md do cliente."""
+        """Lê nichos_calendario do dossie.md do cliente.
+
+        Retorna ["nacional"] como mínimo seguro quando nenhum nicho é encontrado,
+        evitando que datas_na_janela devolva todo o calendário para clientes sem config.
+        """
         if not cliente_id:
-            return []
+            return ["nacional"]
         dossie = ESPELHO_CLIENTES_DIR / cliente_id / "dossie.md"
         if not dossie.exists():
-            return []
+            self.logger.warning(
+                f"Renata: dossiê não encontrado para cliente '{cliente_id}' — usando nicho nacional."
+            )
+            return ["nacional"]
         for linha in dossie.read_text(encoding="utf-8").splitlines():
             if linha.strip().lower().startswith("nichos_calendario:"):
                 raw = linha.split(":", 1)[1].strip()
-                return [n.strip() for n in raw.split(",") if n.strip()]
-        return []
+                nichos = [n.strip() for n in raw.split(",") if n.strip()]
+                if nichos:
+                    return nichos
+        self.logger.warning(
+            f"Renata: nichos_calendario não definido no dossiê de '{cliente_id}' — usando nacional."
+        )
+        return ["nacional"]
 
     def _montar_prompt(
         self,
@@ -311,13 +336,13 @@ class Renata(AgenteBase):
                     texto += "\n[TRUNCADO]"
                 partes.append(f"\n── DOSSIÊ AYA ──\n{texto}\n")
             if roteiro_salles:
-                partes.append(f"\n── ROTEIRO SALLES ──\n{roteiro_salles[:20000]}\n")
+                partes.append(f"\n── ROTEIRO SALLES ──\n{roteiro_salles[:RENATA_ROTEIRO_MAX_CHARS]}\n")
             if analise_sonia:
-                partes.append(f"\n── ANÁLISE SÔNIA ──\n{analise_sonia[:10000]}\n")
+                partes.append(f"\n── ANÁLISE SÔNIA ──\n{analise_sonia[:RENATA_SONIA_MAX_CHARS]}\n")
             if diretrizes_heitor:
                 partes.append(
                     f"\n── DIRETRIZES HEITOR ──\n"
-                    f"{_json.dumps(diretrizes_heitor, ensure_ascii=False, indent=2)[:5000]}\n"
+                    f"{_json.dumps(diretrizes_heitor, ensure_ascii=False, indent=2)[:RENATA_HEITOR_MAX_CHARS]}\n"
                 )
         else:
             partes.append(
@@ -374,13 +399,14 @@ Use `registrar_linha_editorial`.
 
         tem_arco = resultado.get("linha_narrativa", {}).get("tem_arco", False)
         if tem_arco:
+            max_ordem = max((p.get("ordem", 0) for p in pubs), default=0)
             for pub in pubs:
                 o = pub.get("ordem", 0)
                 if o >= 2 and not pub.get("gancho_anterior", "").strip():
                     self.logger.warning(
                         f"Renata: publicação {o} sem gancho_anterior (tem_arco=true)."
                     )
-                if o < total and not pub.get("gancho_proxima", "").strip():
+                if o < max_ordem and not pub.get("gancho_proxima", "").strip():
                     self.logger.warning(
                         f"Renata: publicação {o} sem gancho_proxima (tem_arco=true)."
                     )
@@ -414,11 +440,14 @@ Use `registrar_linha_editorial`.
 
         return resultado
 
-    def _salvar_descartes(self, resultado: dict, ts: str) -> None:
-        """Salva descartes em outputs/renata/estoque/<ts>_descartes.txt."""
+    def _salvar_descartes(self, resultado: dict, ts: str) -> Optional[str]:
+        """Salva descartes em outputs/renata/estoque/<ts>_descartes.txt.
+
+        Retorna o path absoluto do arquivo gerado, ou None se não havia descartes.
+        """
         descartes = resultado.get("descartes", [])
         if not descartes:
-            return
+            return None
         estoque_dir = OUTPUTS_DIR / "renata" / "estoque"
         estoque_dir.mkdir(parents=True, exist_ok=True)
         arquivo = estoque_dir / f"{ts}_descartes.txt"
@@ -428,3 +457,4 @@ Use `registrar_linha_editorial`.
             linhas.append(f"Justificativa: {d.get('justificativa', '')}\n")
         arquivo.write_text("".join(linhas), encoding="utf-8")
         self.logger.info(f"Descartes salvos: {arquivo}")
+        return str(arquivo)

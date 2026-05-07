@@ -205,3 +205,8 @@ RENATA_OUTPUT_MAX_CHARS = 5000
 # Duração padrão de campanha em dias
 RENATA_DURACAO_PADRAO_DIAS = 14
 RENATA_DURACAO_MAX_DIAS = 60
+
+# Limites de contexto injetado no prompt (proteção contra prompts gigantes)
+RENATA_ROTEIRO_MAX_CHARS = 20000
+RENATA_SONIA_MAX_CHARS = 10000
+RENATA_HEITOR_MAX_CHARS = 5000

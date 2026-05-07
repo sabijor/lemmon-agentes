@@ -93,6 +93,9 @@ const PAIR_CONVO: Record<string, [string, string][]> = {
   'otto-pedro_abrahao': [['Estratégia traçada.', 'Faz sentido!'], ['ROI projetado.', 'Convencido.']],
   'pedro_abrahao-salles': [['Roteiro pronto.', 'Emocionou!'], ['Narrativa forte!', 'Me identifiquei.']],
   'pedro_abrahao-sonia':  [['CTR vai bem!', 'Percebo isso.'], ['Dados bons.', 'Autêntico.']],
+  'renata-sonia':  [['Qual formato bombou?', 'Reels, sem dúvida!'], ['Melhor horário?', 'Terça às 19h!']],
+  'renata-salles': [['Hook do roteiro?', 'Já te mando.'], ['Preciso do arco.', 'Quase pronto!']],
+  'renata-aya':    [['Dossiê atualizado?', 'Compilando já.'], ['Calendário ok?', 'Confirmado!']],
 }
 
 function initMoveStates(): Record<AgentId, AgentMoveState> {
