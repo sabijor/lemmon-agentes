@@ -15,6 +15,7 @@ def _salvar_sessao_reuniao(
     historico: list[dict],
     respostas: dict[str, str],
     custos: dict[str, float],
+    skip_index: bool = False,
 ) -> tuple[str, Path]:
     """Cria ou atualiza sessão de reunião conversacional no histórico."""
     session_dir = HISTORICO_DIR / "dashboard"
@@ -28,7 +29,8 @@ def _salvar_sessao_reuniao(
         registro["custo_total_usd"] = sum(custos.values())
         registro["historico"] = historico
         session_path.write_text(json.dumps(registro, ensure_ascii=False, indent=2), encoding="utf-8")
-        adicionar_entrada(session_path)
+        if not skip_index:
+            adicionar_entrada(session_path)
         return session_id, session_path
 
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -47,7 +49,8 @@ def _salvar_sessao_reuniao(
     }
     path = session_dir / f"{ts}_reuniao.json"
     path.write_text(json.dumps(registro, ensure_ascii=False, indent=2), encoding="utf-8")
-    adicionar_entrada(path)
+    if not skip_index:
+        adicionar_entrada(path)
     return path.stem, path
 
 
