@@ -50,6 +50,7 @@ export const ROLES: Record<AgentId, string> = {
   sonia: 'Perform.',
   aya: 'Assistente',
   pedro_abrahao: 'Consultor',
+  renata: 'Social Media',
 }
 
 // ─── Idle speech quotes ──────────────────────────────────────────────
@@ -60,4 +61,5 @@ export const IDLE_QUOTES: Record<AgentId, string[]> = {
   sonia:  ['CTR +23%!', 'Novo criativo: GO!', 'ROI aprovado!', 'Métricas no verde!'],
   aya:    ['Compilando outputs.', 'Dossiê pronto.', 'Fluxos conectados.', 'Processando...'],
   pedro_abrahao: ['Faz sentido pra mim.', 'Como paciente...', 'Isso ressoa.', 'Autenticidade.'],
+  renata: ['Costurando narrativa...', 'Post-its no ar.', 'Calendário pronto.', 'Dia 1 lançado!'],
 }

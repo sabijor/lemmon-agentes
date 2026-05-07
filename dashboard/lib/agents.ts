@@ -1,4 +1,4 @@
-export type AgentId = 'otto' | 'heitor' | 'salles' | 'sonia' | 'aya' | 'pedro_abrahao'
+export type AgentId = 'otto' | 'heitor' | 'salles' | 'sonia' | 'aya' | 'pedro_abrahao' | 'renata'
 
 export interface AgentConfig {
   id: AgentId
@@ -87,6 +87,18 @@ export const AGENTS: AgentConfig[] = [
     meetingPosition: { x: 440, y: 260 },
     idleQuote: 'Avaliando pela ótica do paciente...',
     reuniaoOnly: true,
+  },
+  {
+    id: 'renata',
+    name: 'Renata',
+    title: 'Social Media',
+    rpgClass: 'Comunicadora',
+    color: '#e11d48',
+    colorDim: '#ffe4e6',
+    colorText: '#fff',
+    deskPosition: { x: 180, y: 140 },
+    meetingPosition: { x: 510, y: 240 },
+    idleQuote: 'Costurando narrativa em calendário...',
   },
 ]
 

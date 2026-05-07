@@ -375,6 +375,68 @@ export default function CharacterSprite({ id, size = 1, speaking, walking, sitti
         <rect x="20" y="61" width="13" height="2" rx="1" fill="#38bdf8" opacity="0.7"/>
       </svg>
     ),
+
+    // ─── Renata — Social Media: roupa coral, prancheta com post-its, cabelo solto
+    renata: (
+      <svg width={W * size} height={H * size} viewBox="0 0 40 72" fill="none" className={cls}>
+        {/* Cabelo longo solto — castanho */}
+        <rect x="8" y="3" width="24" height="16" rx="6" fill="#7c3d12"/>
+        <rect x="6" y="10" width="5" height="20" rx="2.5" fill="#7c3d12"/>
+        <rect x="29" y="10" width="5" height="20" rx="2.5" fill="#7c3d12"/>
+        {/* Franja suave */}
+        <rect x="9" y="10" width="22" height="4" rx="2" fill="#92400e"/>
+        {/* Ear */}
+        <ellipse cx="9.5" cy="20" rx="2.5" ry="3.5" fill="#f5c5a0"/>
+        <ellipse cx="30.5" cy="20" rx="2.5" ry="3.5" fill="#f5c5a0"/>
+        {/* Head */}
+        <ellipse cx="20" cy="19" rx="11" ry="10.5" fill="#fde8d0"/>
+        {/* Eyes — expressivos */}
+        <ellipse cx="15" cy="17" rx="2.5" ry="2.8" fill="#1c1917"/>
+        <ellipse cx="25" cy="17" rx="2.5" ry="2.8" fill="#1c1917"/>
+        <circle cx="15.8" cy="16.2" r="0.9" fill="#fff"/>
+        <circle cx="25.8" cy="16.2" r="0.9" fill="#fff"/>
+        {/* Nariz */}
+        <circle cx="20" cy="22" r="1" fill="#d4956a"/>
+        {/* Sorriso — entusiasmado */}
+        <path d="M14.5 25.5 Q20 29 25.5 25.5" stroke="#b06040" strokeWidth="1.1" fill="none" strokeLinecap="round"/>
+        {/* Roupa coral (cor da Renata) */}
+        <rect x="9" y="28" width="22" height="22" rx="3" fill="#e11d48"/>
+        {/* Detalhe gola V */}
+        <path d="M20 28 L16 34 M20 28 L24 34" stroke="#be123c" strokeWidth="1.2" fill="none"/>
+        {/* Braço esquerdo */}
+        <rect x="1" y="29" width="8" height="14" rx="3" fill="#e11d48"/>
+        {/* Mão esquerda */}
+        <ellipse cx="5" cy="44" rx="4" ry="3" fill="#fde8d0"/>
+        {/* Braço direito — segura prancheta */}
+        <rect x="31" y="27" width="8" height="14" rx="3" fill="#e11d48"/>
+        {/* Mão direita */}
+        <ellipse cx="35" cy="42" rx="4" ry="3" fill="#fde8d0"/>
+        {/* Prancheta */}
+        <rect x="28" y="22" width="14" height="18" rx="2" fill="#d6d3d1"/>
+        <rect x="29" y="23" width="12" height="15" rx="1" fill="#fafaf9"/>
+        {/* Clipe da prancheta */}
+        <rect x="33" y="20" width="4" height="5" rx="1" fill="#78716c"/>
+        {/* Post-its coloridos na prancheta */}
+        <rect x="29.5" y="24" width="5" height="4" rx="0.5" fill="#fde047"/>
+        <rect x="35" y="24" width="5" height="4" rx="0.5" fill="#86efac"/>
+        <rect x="29.5" y="29" width="5" height="4" rx="0.5" fill="#f9a8d4"/>
+        <rect x="35" y="29" width="5" height="4" rx="0.5" fill="#93c5fd"/>
+        {/* Linhas simulando texto nos post-its */}
+        <line x1="30" y1="25.5" x2="34" y2="25.5" stroke="#a16207" strokeWidth="0.5"/>
+        <line x1="35.5" y1="25.5" x2="39.5" y2="25.5" stroke="#166534" strokeWidth="0.5"/>
+        <line x1="30" y1="30.5" x2="34" y2="30.5" stroke="#9d174d" strokeWidth="0.5"/>
+        <line x1="35.5" y1="30.5" x2="39.5" y2="30.5" stroke="#1e40af" strokeWidth="0.5"/>
+        {/* Calça branca/creme */}
+        <rect x="10" y="49" width="8" height="14" rx="2" fill="#f5f0eb"/>
+        <rect x="22" y="49" width="8" height="14" rx="2" fill="#f5f0eb"/>
+        {/* Sapatos coral escuro */}
+        <rect x="8" y="61" width="12" height="8" rx="3" fill="#be123c"/>
+        <rect x="20" y="61" width="12" height="8" rx="3" fill="#be123c"/>
+        {/* Brilho sapato */}
+        <rect x="8" y="61" width="12" height="2" rx="1" fill="#f43f5e" opacity="0.6"/>
+        <rect x="20" y="61" width="12" height="2" rx="1" fill="#f43f5e" opacity="0.6"/>
+      </svg>
+    ),
   }
 
   return <>{sprites[id]}</>

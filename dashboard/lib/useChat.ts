@@ -42,6 +42,7 @@ export interface AgentConfig {
   heitor: { max_buscas: number }
   salles: { formato: 'auto' | 'reels' | 'documental' | 'mini-doc' | 'tese' | 'aftermovie'; gate_espelho: 'off' | 'auto' | 'manual'; alternativas: 0 | 3 }
   sonia: { com_busca: boolean; usar_tendencias: boolean }
+  renata: { incluir: boolean; duracao_dias: number }
 }
 
 const DEFAULT_CONFIG: AgentConfig = {
@@ -49,12 +50,13 @@ const DEFAULT_CONFIG: AgentConfig = {
   heitor: { max_buscas: 3 },
   salles: { formato: 'auto', gate_espelho: 'off', alternativas: 0 },
   sonia: { com_busca: false, usar_tendencias: true },
+  renata: { incluir: false, duracao_dias: 14 },
 }
 
 export function useChat() {
   const [messages, setMessages] = useState<Message[]>([])
   const [agentStatus, setAgentStatus] = useState<Record<AgentId, AgentStatus>>({
-    otto: 'idle', heitor: 'idle', salles: 'idle', sonia: 'idle', aya: 'idle', pedro_abrahao: 'idle',
+    otto: 'idle', heitor: 'idle', salles: 'idle', sonia: 'idle', aya: 'idle', pedro_abrahao: 'idle', renata: 'idle',
   })
   const [isRunning, setIsRunning] = useState(false)
   const [sessionId, setSessionId] = useState<string | null>(null)
@@ -99,7 +101,7 @@ export function useChat() {
     setAvaliado(detail.avaliacao !== null)
     setIsRunning(false)
     setAwaitingApproval(null)
-    setAgentStatus({ otto: 'idle', heitor: 'idle', salles: 'idle', sonia: 'idle', aya: 'idle', pedro_abrahao: 'idle' })
+    setAgentStatus({ otto: 'idle', heitor: 'idle', salles: 'idle', sonia: 'idle', aya: 'idle', pedro_abrahao: 'idle', renata: 'idle' })
     setResumedFrom(detail.session_id)
     currentMsgId.current = {}
     resumeContextRef.current = (detail as HistoryDetail & { contexto_tecnico?: Record<string, unknown> }).contexto_tecnico ?? {
@@ -308,7 +310,7 @@ export function useChat() {
   const reset = useCallback(() => {
     wsRef.current?.close()
     setMessages([])
-    setAgentStatus({ otto: 'idle', heitor: 'idle', salles: 'idle', sonia: 'idle', aya: 'idle', pedro_abrahao: 'idle' })
+    setAgentStatus({ otto: 'idle', heitor: 'idle', salles: 'idle', sonia: 'idle', aya: 'idle', pedro_abrahao: 'idle', renata: 'idle' })
     setIsRunning(false)
     setSessionId(null)
     setAvaliado(false)

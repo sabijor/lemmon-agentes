@@ -5,7 +5,7 @@ import { type Message, type AgentStatus } from './useChat'
 import { WS_URL } from './api'
 
 const DEFAULT_STATUS = (): Record<AgentId, AgentStatus> => ({
-  otto: 'idle', heitor: 'idle', salles: 'idle', sonia: 'idle', aya: 'idle', pedro_abrahao: 'idle',
+  otto: 'idle', heitor: 'idle', salles: 'idle', sonia: 'idle', aya: 'idle', pedro_abrahao: 'idle', renata: 'idle',
 })
 
 export function useReuniao() {

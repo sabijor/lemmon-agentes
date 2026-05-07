@@ -123,6 +123,41 @@ export function ConfigSidebar({ agentConfig, onUpdateConfig, isRunning, custoCap
           </div>
         </div>
 
+        {/* Renata */}
+        <div>
+          <div className="flex items-center gap-1.5 mb-2">
+            <div className="w-1.5 h-1.5 rounded-full" style={{ background: AGENT_MAP.renata?.color ?? '#e11d48' }} />
+            <span className="text-[9px] font-mono uppercase tracking-widest text-stone-500 font-bold">Renata</span>
+          </div>
+          <button disabled={isRunning}
+            onClick={() => onUpdateConfig('renata', { incluir: !agentConfig.renata.incluir })}
+            className="flex items-center gap-2 disabled:opacity-50 mb-2">
+            <div className={`w-7 h-4 rounded-full transition-colors relative flex-shrink-0 ${
+              agentConfig.renata.incluir ? 'bg-stone-900' : 'bg-stone-200'
+            }`}>
+              <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-transform ${
+                agentConfig.renata.incluir ? 'translate-x-3.5' : 'translate-x-0.5'
+              }`} />
+            </div>
+            <span className="text-[9px] font-mono text-stone-500">editorial (~$0.20)</span>
+          </button>
+          {agentConfig.renata.incluir && (
+            <div>
+              <p className="text-[8px] font-mono text-stone-400 mb-1">
+                duração: {agentConfig.renata.duracao_dias} dias
+              </p>
+              <input type="range" min={1} max={60} value={agentConfig.renata.duracao_dias}
+                disabled={isRunning}
+                onChange={e => onUpdateConfig('renata', { duracao_dias: Number(e.target.value) })}
+                className="w-full accent-stone-900 disabled:opacity-50" />
+              <div className="flex justify-between mt-0.5">
+                <span className="text-[8px] font-mono text-stone-300">1</span>
+                <span className="text-[8px] font-mono text-stone-300">60</span>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Custo-cap */}
         <div>
           <div className="flex items-center gap-1.5 mb-2">

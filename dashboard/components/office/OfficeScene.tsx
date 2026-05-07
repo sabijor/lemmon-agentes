@@ -18,6 +18,7 @@ const DESK_POS: Record<AgentId, { gx: number; gy: number }> = {
   sonia:         { gx: 11.2, gy: 7.45 },
   aya:           { gx: 7.2,  gy: 2.45 },
   pedro_abrahao: { gx: 5.5,  gy: 2.0  },
+  renata:        { gx: 4.2,  gy: 5.45 },
 }
 
 const MEET_CHAR_POS: Record<AgentId, { gx: number; gy: number }> = {
@@ -27,6 +28,7 @@ const MEET_CHAR_POS: Record<AgentId, { gx: number; gy: number }> = {
   salles:        { gx: 3.5, gy: 7.5 },
   sonia:         { gx: 8.1, gy: 7.5 },
   pedro_abrahao: { gx: 7.5, gy: 2.0 },
+  renata:        { gx: 6.3, gy: 6.0 },
 }
 
 // charY: sprite hip (~y=49 of 72 sprite, local offset=53) should sit on chair seat (h=13)
@@ -72,6 +74,7 @@ const ROUTINE_DESTS: Record<AgentId, { gx: number; gy: number }[]> = {
   sonia:         [{ gx: 11.2, gy: 7.45 }, { gx: 9.0, gy: 4.8 }, { gx: 6.5, gy: 5.2 }, { gx: 11.2, gy: 7.45 }],
   aya:           [{ gx: 7.2,  gy: 2.45 }, { gx: 5.8, gy: 4.2 }, { gx: 9.5, gy: 4.8 }, { gx: 5.0, gy: 6.2 }, { gx: 7.2, gy: 2.45 }],
   pedro_abrahao: [{ gx: 5.5, gy: 2.0 }, { gx: 4.8, gy: 3.5 }, { gx: 6.0, gy: 1.5 }, { gx: 5.5, gy: 2.0 }],
+  renata:        [{ gx: 4.2, gy: 5.45 }, { gx: 6.5, gy: 4.8 }, { gx: 3.8, gy: 7.0 }, { gx: 4.2, gy: 5.45 }],
 }
 
 // ─── Pair conversations ──────────────────────────────────────────────────
