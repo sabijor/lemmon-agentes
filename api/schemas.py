@@ -11,6 +11,7 @@ class AvaliacaoPayload(BaseModel):
 
 class ExportarPayload(BaseModel):
     session_id: str
+    agente: str = "aya"
 
 
 class ExemplarPayload(BaseModel):

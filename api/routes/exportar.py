@@ -1,8 +1,8 @@
-"""Rotas de exportação de dossiê (Aya) e download."""
+"""Rotas de exportação de dossiê/editorial e download."""
 import asyncio
 import json
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse
 
 from api.deps import AYA_GERAR_HTML, AYA_GERAR_PDF, AYA_PDF_ENGINE, HISTORICO_DIR, OUTPUTS_DIR
@@ -14,24 +14,31 @@ router = APIRouter()
 
 @router.post("/exportar")
 async def exportar(payload: ExportarPayload):
-    """Gera HTML + PDF do dossiê da Aya a partir de uma sessão salva."""
+    """Gera HTML + PDF do output de um agente a partir de uma sessão salva.
+
+    O campo `agente` (padrão "aya") seleciona qual output exportar.
+    Compatibilidade: chamadas sem o campo continuam exportando Aya.
+    """
     session_dir = HISTORICO_DIR / "dashboard"
     path = session_dir / f"{payload.session_id}.json"
     if not path.exists():
         raise HTTPException(status_code=404, detail="Sessão não encontrada")
 
     dados = json.loads(path.read_text(encoding="utf-8"))
-    markdown_aya = dados.get("respostas", {}).get("aya", "")
-    if not markdown_aya.strip():
-        raise HTTPException(status_code=400, detail="Sessão não contém output da Aya")
+    agente = payload.agente
+    markdown = dados.get("respostas", {}).get(agente, "")
+    if not markdown.strip():
+        raise HTTPException(status_code=400, detail=f"Sessão não contém output do agente '{agente}'")
 
+    # agentes_consultados é contexto específico do dossiê da Aya (lista de agentes que rodaram).
+    # Para outros agentes, não faz sentido injetar esse contexto no documento.
     respostas = dados.get("respostas", {})
-    agentes_detectados = [
-        a for a in dados.get("agentes_usados", [])
-        if a != "aya" and respostas.get(a, "").strip()
-    ]
+    agentes_detectados = (
+        [a for a in dados.get("agentes_usados", []) if a != "aya" and respostas.get(a, "").strip()]
+        if agente == "aya" else []
+    )
 
-    out_dir = OUTPUTS_DIR / "aya"
+    out_dir = OUTPUTS_DIR / agente
     out_dir.mkdir(parents=True, exist_ok=True)
     caminho_md = out_dir / f"{payload.session_id}.md"
 
@@ -39,7 +46,7 @@ async def exportar(payload: ExportarPayload):
     resultado = await loop.run_in_executor(
         None,
         lambda: exportar_dossie(
-            markdown_original=markdown_aya,
+            markdown_original=markdown,
             caminho_md=caminho_md,
             agentes_consultados=agentes_detectados,
             gerar_html=AYA_GERAR_HTML,
@@ -58,9 +65,17 @@ async def exportar(payload: ExportarPayload):
 
 
 @router.get("/download/{session_id}/{tipo}")
-async def download_arquivo(session_id: str, tipo: str):
-    """Serve o HTML ou PDF gerado para download pelo browser."""
-    out_dir = OUTPUTS_DIR / "aya"
+async def download_arquivo(
+    session_id: str,
+    tipo: str,
+    agente: str = Query(default="aya"),
+):
+    """Serve o HTML ou PDF gerado para download.
+
+    O query param `agente` (padrão "aya") seleciona o subdiretório correto
+    em outputs/. Ex: /download/20260507_133528_sessao/pdf?agente=renata
+    """
+    out_dir = OUTPUTS_DIR / agente
     if tipo == "html":
         path = out_dir / f"{session_id}.html"
         media_type = "text/html"
