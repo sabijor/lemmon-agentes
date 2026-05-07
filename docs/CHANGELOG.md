@@ -4,6 +4,20 @@ Convenção: novidades no topo. Datas em formato ISO. Cada entrada referencia o 
 
 ---
 
+## v1.27 — 2026-05-07
+
+**FASE 6 — T94: Modo Loop Autônomo em Reunião.**
+
+- `api/ws_reuniao.py`: branch `modo=loop` com while-loop completo — roteamento por @mentions, round-robin, stagnação (3 turnos consecutivos), cap de custo, interrupção do operador via `asyncio.wait_for(timeout=0.05)`, `WebSocketDisconnect` tratado; eventos `turn_iteration` e `loop_stopped`
+- `api/storage.py`: `_salvar_sessao_reuniao` ganha `skip_index: bool = False` — JSON salvo a cada turno, índice atualizado uma vez no `loop_stopped`
+- Prompts: todos os 7 agentes com bloco "QUANDO EM MODO LOOP" (contrato `@nome` / `[ENTREGA FINAL]` / `[PRECISO DE AYUDA OPERADOR]`)
+- `useReuniao.ts`: estado de loop (`loopMode`, `loopMaxTurnos`, `loopCustoCap`, `loopActive`, `loopTurn`, `loopCost`, `loopStatus`); handlers `turn_iteration` + `loop_stopped`; `send()` envia `modo=loop` + `loop_config`; `loopStop()` envia `{type: loop_stop}`; export `LoopStatus` interface
+- `ChatPanel.tsx`: segmented control 3-pill (Auto/Manual/Loop) substituindo toggle binário; inputs de turnos + cap $ na participants bar quando Loop selecionado; header "Turno N/M · $X/$Y" + botão vermelho "parar" durante loop ativo; banners pós-loop: verde (final), azul (ayuda), âmbar (turnos_max/stagnação/operador), overlay bloqueante (custo_max)
+- `page.tsx`: desestrutura 11 novos campos de `useReuniao()` e passa para ChatPanel
+- Manual §3.2 (subseção Loop) + §4.18
+
+---
+
 ## v1.26 — 2026-05-07
 
 **T98 (hotfix) + T97: piso watchdog 60s→180s + Otto 'auto'.**
