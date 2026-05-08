@@ -7,6 +7,7 @@ export interface FilterState {
   agente: string
   apenasFavoritas: boolean
   origem: string
+  incluirSandbox: boolean
 }
 
 export const DEFAULT_FILTER: FilterState = {
@@ -14,11 +15,13 @@ export const DEFAULT_FILTER: FilterState = {
   agente: '',
   apenasFavoritas: false,
   origem: '',
+  incluirSandbox: false,
 }
 
 export function applyFilter(sessions: HistoryItem[], f: FilterState): HistoryItem[] {
   return sessions.filter(s => {
     if (f.apenasFavoritas && !s.favorito) return false
+    if (!f.incluirSandbox && s.origem === 'sandbox') return false
     if (f.agente && !s.agentes_usados.includes(f.agente)) return false
     if (f.origem && s.origem !== f.origem) return false
     if (f.periodo) {
@@ -85,6 +88,17 @@ export function FilterBar({ filter, onChange, sessions }: {
           }`}
         >
           ★ favoritas
+        </button>
+        {/* Sandbox */}
+        <button
+          onClick={() => onChange({ incluirSandbox: !filter.incluirSandbox })}
+          className={`px-1.5 py-0.5 rounded-md border text-[8px] font-mono transition-colors ${
+            filter.incluirSandbox
+              ? 'bg-violet-100 border-violet-300 text-violet-700'
+              : 'bg-stone-100 border-stone-200 text-stone-500 hover:border-stone-300'
+          }`}
+        >
+          🧪 LAB
         </button>
       </div>
     </div>

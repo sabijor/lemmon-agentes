@@ -115,8 +115,9 @@ export async function fetchCortesProntos(
 }
 
 /** GET /historico */
-export async function fetchHistorico(): Promise<Session[]> {
-  return apiFetch<Session[]>('/historico')
+export async function fetchHistorico(incluirSandbox = false): Promise<Session[]> {
+  const qs = incluirSandbox ? '?incluir_sandbox=1' : ''
+  return apiFetch<Session[]>(`/historico${qs}`)
 }
 
 /** GET /calibragem_pedro */

@@ -16,6 +16,7 @@ def _salvar_sessao_reuniao(
     respostas: dict[str, str],
     custos: dict[str, float],
     skip_index: bool = False,
+    sandbox: bool = False,
 ) -> tuple[str, Path]:
     """Cria ou atualiza sessão de reunião conversacional no histórico."""
     session_dir = HISTORICO_DIR / "dashboard"
@@ -34,9 +35,10 @@ def _salvar_sessao_reuniao(
         return session_id, session_path
 
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    origem = "sandbox" if sandbox else "reuniao"
     registro = {
         "timestamp": datetime.now().isoformat(),
-        "origem": "reuniao",
+        "origem": origem,
         "briefing": briefing,
         "agentes_usados": agentes_usados,
         "respostas": respostas,
@@ -62,15 +64,17 @@ def _salvar_sessao(
     custos: dict[str, float],
     contexto_tecnico: dict | None = None,
     duracoes: dict[str, float] | None = None,
+    sandbox: bool = False,
 ) -> Path:
     """Salva sessão completa da dashboard no histórico."""
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     session_dir = HISTORICO_DIR / "dashboard"
     session_dir.mkdir(parents=True, exist_ok=True)
 
+    origem = "sandbox" if sandbox else "dashboard"
     registro = {
         "timestamp": datetime.now().isoformat(),
-        "origem": "dashboard",
+        "origem": origem,
         "briefing": briefing,
         "agentes_usados": agentes_usados,
         "respostas": respostas,

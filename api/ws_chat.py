@@ -483,12 +483,9 @@ async def chat(ws: WebSocket):
                 "custos_usd": custos,
                 "agentes_usados": all_agents,
             }
-            # T27: sandbox — não salva no histórico
-            if not sandbox:
-                session_path = _salvar_sessao(briefing, all_agents, respostas, custos, contexto_tecnico, duracoes=duracoes)
-                session_id = session_path.stem
-            else:
-                session_id = None
+            # T27/T106: sandbox salva com origem='sandbox', excluído das listagens default
+            session_path = _salvar_sessao(briefing, all_agents, respostas, custos, contexto_tecnico, duracoes=duracoes, sandbox=sandbox)
+            session_id = session_path.stem
 
             # Sugerir tags automaticamente via Aya (T15) — nunca em sandbox
             if not pipeline_cancelled and respostas and not sandbox:

@@ -14,7 +14,7 @@ interface Props {
   loading: boolean
   loadingDetail: boolean
   dragControls: DragControls
-  onOpen: () => void
+  onOpen: (incluirSandbox?: boolean) => void
   onSelectSession: (id: string) => void
   onClearSelected: () => void
   onClose: () => void
@@ -62,7 +62,7 @@ export default function HistoryPanel({
     window.addEventListener('pointerup', resizeHandlers.current.end)
   }
 
-  useEffect(() => { onOpen() }, [onOpen])
+  useEffect(() => { onOpen(filter.incluirSandbox) }, [filter.incluirSandbox, onOpen])
 
   const bodyH = panelSize.h - HEADER_H
 

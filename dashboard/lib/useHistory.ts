@@ -10,7 +10,7 @@ export interface HistoryItem {
   custo_total_usd: number
   avaliacao: number | null
   favorito?: boolean
-  origem?: 'dashboard' | 'reuniao'
+  origem?: 'dashboard' | 'reuniao' | 'sandbox'
 }
 
 export interface HistoryDetail extends HistoryItem {
@@ -29,10 +29,11 @@ export function useHistory() {
   const [loading, setLoading] = useState(false)
   const [loadingDetail, setLoadingDetail] = useState(false)
 
-  const fetchSessions = useCallback(async () => {
+  const fetchSessions = useCallback(async (incluirSandbox = false) => {
     setLoading(true)
     try {
-      const res = await fetch(`${API_URL}/historico`)
+      const qs = incluirSandbox ? '?incluir_sandbox=1' : ''
+      const res = await fetch(`${API_URL}/historico${qs}`)
       setSessions(await res.json())
     } catch {
       setSessions([])

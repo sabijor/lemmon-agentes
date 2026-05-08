@@ -1,7 +1,7 @@
 """Rotas de histórico de sessões."""
 import json
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
 from api.deps import (
     HISTORICO_DIR,
@@ -15,16 +15,18 @@ router = APIRouter()
 
 
 @router.get("/historico")
-async def listar_historico():
+async def listar_historico(incluir_sandbox: bool = Query(False)):
     """Lista sessões a partir do índice incremental (_index.json).
 
+    Por padrão exclui sessões com origem='sandbox'. Use ?incluir_sandbox=1 para vê-las.
     Fallback para glob se o índice não existir (compatibilidade).
     """
     from core.historico_index import _ler_indice, INDEX_PATH
 
     if INDEX_PATH.exists():
         entradas = _ler_indice()
-        # Índice está em ordem de inserção; retornar mais recentes primeiro
+        if not incluir_sandbox:
+            entradas = [e for e in entradas if e.get("origem") != "sandbox"]
         return list(reversed(entradas))[:200]
 
     # Fallback: glob direto (índice ainda não criado)
@@ -40,6 +42,9 @@ async def listar_historico():
     for path in all_files:
         try:
             dados = json.loads(path.read_text(encoding="utf-8"))
+            origem = dados.get("origem", "dashboard")
+            if not incluir_sandbox and origem == "sandbox":
+                continue
             sessions.append({
                 "session_id": path.stem,
                 "timestamp": dados.get("timestamp"),
@@ -47,7 +52,8 @@ async def listar_historico():
                 "agentes_usados": dados.get("agentes_usados", []),
                 "custo_total_usd": dados.get("custo_total_usd", 0),
                 "avaliacao": dados.get("avaliacao"),
-                "origem": dados.get("origem", "dashboard"),
+                "favorito": dados.get("favorito", False),
+                "origem": origem,
             })
         except Exception:
             pass
