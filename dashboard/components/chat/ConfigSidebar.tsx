@@ -11,12 +11,12 @@ interface Props {
 
 export function ConfigSidebar({ agentConfig, onUpdateConfig, isRunning, custoCap, onSetCustoCap }: Props) {
   return (
-    <div className="w-44 flex-shrink-0 border-r border-stone-200/50 flex flex-col bg-stone-50/70">
+    <div className="w-44 h-full flex-shrink-0 border-r border-stone-200/50 flex flex-col bg-stone-50/70">
       <div className="px-3 py-2.5 border-b border-stone-200/40">
         <span className="text-[9px] font-mono uppercase tracking-widest text-stone-400">Configurações</span>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-5">
+      <div className="flex-1 overflow-y-auto pl-4 pr-3 py-3 space-y-5">
         {/* Otto */}
         <div>
           <div className="flex items-center gap-1.5 mb-2">
