@@ -79,7 +79,11 @@ export function useChat() {
   const [tagsSugeridas, setTagsSugeridas] = useState<string[]>([])
   const [fastTrack, setFastTrack] = useState(false)
   const [sandbox, setSandbox] = useState(false)
-  const [custoCap, setCustoCap] = useState<number | null>(null)
+  const [custoCap, setCustoCap] = useState<number | null>(() => {
+    if (typeof window === 'undefined') return null
+    const s = localStorage.getItem('lemmon-custo-cap')
+    return s ? parseFloat(s) : null
+  })
   const [custoCapAtingido, setCustoCapAtingido] = useState<{ total: number; cap: number } | null>(null)
   const [custoAviso, setCustoAviso] = useState<{ total: number; cap: number; pct: number } | null>(null)
   const [agentProgress, setAgentProgress] = useState<Record<string, number>>({})
@@ -91,6 +95,11 @@ export function useChat() {
   const activeAgentsRef = useRef<Set<string>>(new Set())
   const watchdogTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const timedOutAgentsRef = useRef<Set<string>>(new Set())
+
+  useEffect(() => {
+    if (custoCap === null) localStorage.removeItem('lemmon-custo-cap')
+    else localStorage.setItem('lemmon-custo-cap', String(custoCap))
+  }, [custoCap])
 
   useEffect(() => {
     return () => {
