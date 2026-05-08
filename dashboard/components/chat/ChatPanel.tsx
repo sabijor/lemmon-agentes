@@ -130,6 +130,7 @@ export default function ChatPanel({
 
   useEffect(() => { setTagsAceitas(tagsSugeridas) }, [tagsSugeridas])
   useEffect(() => { if (!loopStatus) setLoopCustoDismissed(false) }, [loopStatus])
+  useEffect(() => { if (mode === 'reuniao') setConfigOpen(false) }, [mode])
 
   const sugerirPipeline = async () => {
     const q = input.trim()
