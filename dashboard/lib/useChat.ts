@@ -4,6 +4,7 @@ import type { AgentId } from './agents'
 import type { HistoryDetail } from './useHistory'
 import { API_URL, WS_URL } from './api'
 import { WATCHDOG_TIMEOUT_MIN, PROGRESS_CURVE_POWER } from './config'
+import { useLocalStorage } from './hooks/useLocalStorage'
 
 export type MessageRole = 'user' | AgentId
 export interface Message {
@@ -79,11 +80,7 @@ export function useChat() {
   const [tagsSugeridas, setTagsSugeridas] = useState<string[]>([])
   const [fastTrack, setFastTrack] = useState(false)
   const [sandbox, setSandbox] = useState(false)
-  const [custoCap, setCustoCap] = useState<number | null>(() => {
-    if (typeof window === 'undefined') return null
-    const s = localStorage.getItem('lemmon-custo-cap')
-    return s ? parseFloat(s) : null
-  })
+  const [custoCap, setCustoCap] = useLocalStorage<number | null>('lemmon-custo-cap', null)
   const [custoCapAtingido, setCustoCapAtingido] = useState<{ total: number; cap: number } | null>(null)
   const [custoAviso, setCustoAviso] = useState<{ total: number; cap: number; pct: number } | null>(null)
   const [agentProgress, setAgentProgress] = useState<Record<string, number>>({})
@@ -95,11 +92,6 @@ export function useChat() {
   const activeAgentsRef = useRef<Set<string>>(new Set())
   const watchdogTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const timedOutAgentsRef = useRef<Set<string>>(new Set())
-
-  useEffect(() => {
-    if (custoCap === null) localStorage.removeItem('lemmon-custo-cap')
-    else localStorage.setItem('lemmon-custo-cap', String(custoCap))
-  }, [custoCap])
 
   useEffect(() => {
     return () => {

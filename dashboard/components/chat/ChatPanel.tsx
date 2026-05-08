@@ -13,6 +13,7 @@ interface ISpeechRecognition extends EventTarget {
 declare const SpeechRecognition: { new(): ISpeechRecognition } | undefined
 declare const webkitSpeechRecognition: { new(): ISpeechRecognition } | undefined
 import { AGENT_MAP, AGENTS as AGENTS_LIST, type AgentId } from '@/lib/agents'
+import { useLocalStorage } from '@/lib/hooks/useLocalStorage'
 import { type Message, type AgentStatus, type ImageData, type ApprovalRequest, type AgentConfig, type ExportResult, type ProgressMeta } from '@/lib/useChat'
 import { type LoopStatus } from '@/lib/useReuniao'
 import { API_URL } from '@/lib/api'
@@ -110,15 +111,8 @@ export default function ChatPanel({
 
   const [input, setInput] = useState('')
   const [minimized, setMinimized] = useState(false)
-  const [pinned, setPinned] = useState(() => {
-    if (typeof window === 'undefined') return false
-    return localStorage.getItem('lemmon-chat-pinned') === 'true'
-  })
-  const togglePin = () => {
-    const next = !pinned
-    setPinned(next)
-    localStorage.setItem('lemmon-chat-pinned', String(next))
-  }
+  const [pinned, setPinned] = useLocalStorage('lemmon-chat-pinned', false)
+  const togglePin = () => setPinned(!pinned)
   const [configOpen, setConfigOpen] = useState(false)
   const [reuniaoManual, setReuniaoManual] = useState(false)
   const [reuniaoRating, setReuniaoRating] = useState(0)
