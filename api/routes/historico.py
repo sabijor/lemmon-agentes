@@ -54,6 +54,7 @@ async def listar_historico(incluir_sandbox: bool = Query(False)):
                 "avaliacao": dados.get("avaliacao"),
                 "favorito": dados.get("favorito", False),
                 "origem": origem,
+                "tags": dados.get("tags", []),
             })
         except Exception:
             pass

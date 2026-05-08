@@ -114,7 +114,10 @@ export default function Home() {
 
   const handleRemix = (detail: HistoryDetail) => {
     loadSession(detail)
-    setInMeeting(new Set(['salles', 'sonia', 'aya'] as AgentId[]))
+    const activeIds = detail.agentes_usados.filter(
+      id => AGENTS.find(a => a.id === id && !a.reuniaoOnly)
+    ) as AgentId[]
+    setInMeeting(new Set(activeIds.length ? activeIds : (['salles', 'sonia', 'aya'] as AgentId[])))
     setHistoryOpen(false)
     setChatOpen(true)
     setChatMode('pipeline')

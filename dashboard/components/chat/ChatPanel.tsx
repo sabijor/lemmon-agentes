@@ -127,10 +127,21 @@ export default function ChatPanel({
   const [sugestao, setSugestao] = useState<{ agentes: AgentId[]; razoes: Record<string, string> } | null>(null)
   const [loadingSugestao, setLoadingSugestao] = useState(false)
   const [sugestaoError, setSugestaoError] = useState('')
+  const [dossiePronto, setDossiePronto] = useState(false)
+  const prevIsRunningRef = useRef(false)
 
   useEffect(() => { setTagsAceitas(tagsSugeridas) }, [tagsSugeridas])
   useEffect(() => { if (!loopStatus) setLoopCustoDismissed(false) }, [loopStatus])
   useEffect(() => { if (mode === 'reuniao') setConfigOpen(false) }, [mode])
+  useEffect(() => {
+    const justFinished = prevIsRunningRef.current && !isRunning
+    prevIsRunningRef.current = isRunning
+    if (justFinished && activeMessages.some(m => m.role === 'aya' && m.done)) {
+      setDossiePronto(true)
+      const t = setTimeout(() => setDossiePronto(false), 8000)
+      return () => clearTimeout(t)
+    }
+  }, [isRunning, activeMessages])
 
   const sugerirPipeline = async () => {
     const q = input.trim()
@@ -491,6 +502,18 @@ export default function ChatPanel({
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Dossiê pronto — toast 8s */}
+      {dossiePronto && (
+        <div className="absolute top-14 right-4 z-40 flex items-center gap-2 px-3 py-2 rounded-xl bg-stone-900 border border-stone-700 shadow-lg pointer-events-none">
+          <span className="text-sm">📄</span>
+          <span className="text-[10px] font-mono text-stone-100 font-semibold">Dossiê pronto!</span>
+          <button
+            className="ml-1 text-stone-400 hover:text-stone-100 transition-colors pointer-events-auto"
+            onClick={() => setDossiePronto(false)}
+          >×</button>
         </div>
       )}
 

@@ -11,6 +11,7 @@ export interface HistoryItem {
   avaliacao: number | null
   favorito?: boolean
   origem?: 'dashboard' | 'reuniao' | 'sandbox'
+  tags?: string[]
 }
 
 export interface HistoryDetail extends HistoryItem {

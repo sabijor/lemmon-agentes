@@ -58,6 +58,7 @@ def _resumo_de_arquivo(path: Path) -> dict | None:
             "avaliacao": dados.get("avaliacao"),
             "favorito": bool(dados.get("favorito", False)),
             "origem": dados.get("origem", "dashboard"),
+            "tags": dados.get("tags", []),
         }
     except Exception as exc:
         _log.warning("Ignorando arquivo %s: %s", path.name, exc)

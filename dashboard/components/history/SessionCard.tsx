@@ -13,6 +13,13 @@ function fmt(ts: string) {
   })
 }
 
+const ORIGEM_ICON: Record<string, string> = {
+  dashboard: '📊',
+  reuniao: '💬',
+  sandbox: '🧪',
+  cli: '⌨️',
+}
+
 export function Stars({ n }: { n: number | null }) {
   if (n === null) return <span className="text-[9px] font-mono text-stone-300">—</span>
   return (
@@ -51,36 +58,42 @@ export function SessionList({ sessions, loading, selectedId, onSelect }: {
     <>
       {sessions.map(s => {
         const active = s.session_id === selectedId
+        const origemIcon = ORIGEM_ICON[s.origem ?? 'dashboard'] ?? '📊'
+        const tags = (s.tags ?? []).slice(0, 3)
         return (
           <button key={s.session_id} onClick={() => onSelect(s.session_id)}
             className={`w-full text-left px-4 py-3 border-b border-stone-100 transition-colors
               ${active ? 'bg-stone-900' : 'hover:bg-stone-50'}`}
           >
-            <div className="flex items-center gap-1.5 mb-1">
-              {s.origem === 'reuniao' && (
-                <span className={`text-[7px] font-mono px-1 py-0.5 rounded-full border ${
-                  active ? 'bg-white/10 border-white/20 text-white/60' : 'bg-violet-50 border-violet-200 text-violet-500'
-                }`}>reunião</span>
-              )}
+            {/* Origin icon + favorito */}
+            <div className="flex items-center gap-1 mb-1">
+              <span
+                className="text-[9px] leading-none"
+                title={s.origem ?? 'dashboard'}
+              >
+                {origemIcon}
+              </span>
+              {s.favorito && <span className="text-[10px] ml-auto" style={{ color: '#f59e0b' }}>★</span>}
             </div>
+
             <p className={`text-[10px] font-mono font-bold leading-snug line-clamp-2 mb-1.5
               ${active ? 'text-white' : 'text-stone-700'}`}>
               {s.briefing || '(sem briefing)'}
             </p>
-            <div className="flex items-center justify-between gap-2">
+
+            <div className="flex items-center justify-between gap-2 mb-1.5">
               <span className="text-[8px] font-mono text-stone-400">
                 {s.timestamp ? fmt(s.timestamp) : '—'}
               </span>
-              <div className="flex items-center gap-1.5 flex-shrink-0">
-                {s.custo_total_usd > 0 && (
-                  <span className="text-[8px] font-mono text-stone-400">
-                    ${s.custo_total_usd.toFixed(4)}
-                  </span>
-                )}
-                {s.favorito && <span className="text-[10px]" style={{ color: '#f59e0b' }}>★</span>}
-              </div>
+              {s.custo_total_usd > 0 && (
+                <span className="text-[8px] font-mono text-stone-400 flex-shrink-0">
+                  ${s.custo_total_usd.toFixed(4)}
+                </span>
+              )}
             </div>
-            <div className="flex gap-1 mt-1.5">
+
+            {/* Agent chips */}
+            <div className="flex gap-1 flex-wrap">
               {s.agentes_usados.map(a => {
                 const ag = AGENT_MAP[a as keyof typeof AGENT_MAP]
                 if (!ag) return null
@@ -92,6 +105,22 @@ export function SessionList({ sessions, loading, selectedId, onSelect }: {
                 )
               })}
             </div>
+
+            {/* Semantic tags */}
+            {tags.length > 0 && (
+              <div className="flex gap-1 flex-wrap mt-1">
+                {tags.map(tag => (
+                  <span key={tag}
+                    className={`text-[7px] font-mono px-1.5 py-0.5 rounded-full border ${
+                      active
+                        ? 'border-white/20 text-white/60'
+                        : 'border-stone-200 text-stone-500 bg-stone-50'
+                    }`}>
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            )}
           </button>
         )
       })}
