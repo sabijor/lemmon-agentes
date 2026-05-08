@@ -6,15 +6,18 @@ Convenção: novidades no topo. Datas em formato ISO. Cada entrada referencia o 
 
 ## v1.33 — 2026-05-08
 
-**FASE 8 — T114: hydration mismatch fix (localStorage SSR-safe).**
+**FASE 8 — T114: hydration mismatch fix (localStorage SSR-safe). FASE 9 — T115 + T116 + T117: Round 3 QA (bugs visuais + UX header).**
 
 - **Hook `useLocalStorage`** criado em `dashboard/lib/hooks/useLocalStorage.ts`. Genérico `<T>`, retorna `[value, setValue, mounted]`. Sempre inicia com `defaultValue` (compatível com SSR); lê `localStorage` no `useEffect` (cliente); persiste com `JSON.stringify`/`JSON.parse`. O terceiro retorno `mounted` permite guard condicional no componente quando necessário.
 - **ChatPanel.tsx — `pinned`** migrado de `useState` lazy init + `localStorage.setItem` manual para `useLocalStorage('lemmon-chat-pinned', false)`. `togglePin` simplificado para `setPinned(!pinned)`.
 - **useChat.ts — `custoCap`** migrado de `useState` lazy init + `useEffect` de persistência para `useLocalStorage<number | null>('lemmon-custo-cap', null)`. `useEffect` redundante removido.
 - **Auditoria:** zero acessos diretos a `localStorage` fora do hook após migração.
 - **Manual §8.7** documenta o padrão e lista os componentes migrados.
+- **T115 — Labels ConfigSidebar: primeira letra cortada corrigida:** `px-3` → `pl-4 pr-3` no container scrollável do `ConfigSidebar.tsx`. A fonte de 8px em combinação com `overflow-hidden` do `motion.div` pai causava truncamento subpixel na margem esquerda. Padding extra (16px vs 12px) garante folga suficiente.
+- **T116 — ConfigSidebar: Custo-cap visível sem scroll externo:** outer div do `ConfigSidebar.tsx` ganha `h-full`. Sem essa declaração, `flex-1 overflow-y-auto` interno não tinha altura delimitada pelo container pai e nunca ativava o scroll — todo conteúdo ultrapassava o viewport. Com `h-full`, o scroll interno funciona corretamente e a seção Custo-cap é alcançável em 1080p.
+- **T117 — ChatPanel header: espaçamento, separador e confirmação:** `gap-1.5` → `gap-2` (mínimo 8px entre botões). Botão × envolto em `div` com `border-l pl-2 ml-1` criando separador visual antes do controle de fechar. Ao clicar ×, `window.confirm` é exibido quando há sessão ativa ou mensagens — evita fechar acidentalmente.
 
-Fecha FASE 8 (única tarefa). Round 3 QA abre a partir desta base.
+Fecha FASE 8 + FASE 9. Dashboard em estado QA aprovado (v1.33).
 
 ---
 

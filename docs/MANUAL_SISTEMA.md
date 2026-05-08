@@ -12,6 +12,42 @@
 
 > **Convenção:** versões mais novas no topo. Cada release lista o que mudou em relação à anterior, mantendo histórico completo.
 
+### v1.33 — 2026-05-08
+
+**FASE 8 (T114) + FASE 9 (T115 + T116 + T117) — hydration fix e Round 3 QA.**
+
+- **T114 — Hook `useLocalStorage` (SSR-safe):** lógica de `localStorage` movida para `useEffect` via hook em `dashboard/lib/hooks/useLocalStorage.ts`. `pinned` (ChatPanel) e `custoCap` (useChat) migrados. Elimina divergência servidor/cliente. §8.7 documenta o padrão.
+- **T115 — ConfigSidebar: primeira letra das labels não é cortada:** `px-3` → `pl-4 pr-3` no container scrollável. Subpixel rendering em font-size 8px somado ao `overflow-hidden` do motion.div pai truncava o início das strings.
+- **T116 — ConfigSidebar: scroll interno funciona (Custo-cap visível):** `h-full` adicionado ao outer div do ConfigSidebar. Sem ele, `flex-1 overflow-y-auto` interno crescia sem limite — a seção Custo-cap ficava fora do viewport. Agora o scroll interno é ativado pelo container pai delimitado.
+- **T117 — ChatPanel header: espaçamento, separador e confirmação ao fechar:** `gap-1.5` → `gap-2` (mínimo 8px). Botão × envolto em wrapper com `border-l` criando separador visual. `window.confirm` exibido quando há sessão ativa, prevenindo fechamento acidental.
+
+Fecha FASE 8 + FASE 9. Dashboard em estado QA aprovado.
+
+---
+
+### v1.32 — 2026-05-08
+
+**FASE 7 (Round 2 QA) — 9/9 tarefas concluídas.**
+
+- **T109 — Custo-cap persiste:** estado `custoCap` salvo em `localStorage` entre reloads via `useLocalStorage`.
+- **T110 — Renata híbrida:** prompt `renata_system_v1.md` ganha bloco "pedido direto → rascunho provisório + 3 contextos; pergunta vaga → questionário primeiro". Manual §2.7 atualizado.
+- **T102 — Gráfico de latência "Todos":** `saude/page.tsx` modo `todos` usa `Promise.all` de todos os agentes com linhas sobrepostas. Manual §4.14 reescrito.
+- **T111 — Toast "Dossiê pronto!":** toast `📄 Dossiê pronto!` com auto-dismiss 8s quando pipeline conclui com Aya.
+- **T112 — SessionCard com ícone de origem + tags:** chip texto substituído por ícone (📊/💬/🧪/⌨️). Até 3 tags semânticas exibidas como chips; backend inclui campo `tags` nos endpoints de histórico.
+- **T113 — Remix destaca agentes corretos:** `handleRemix` usa `detail.agentes_usados` em vez de lista hardcoded.
+
+---
+
+### v1.31 — 2026-05-08
+
+**FASE 7 (Round 2 QA) — Bloco D: T106 + T107 + T108.**
+
+- **T106 — Sandbox wiring frontend:** `HistoryPanel` re-fetcha ao alternar toggle sandbox; `FilterBar` chip 🧪 LAB; sessões sandbox filtradas por padrão (`origem='sandbox'`).
+- **T107 — Testes de share:** `tests/test_share.py` com dois casos (roundtrip e 404 para token inválido).
+- **T108 — ConfigSidebar fecha ao entrar em Reunião:** `useEffect` em `ChatPanel` detecta mudança de `mode` e fecha o sidebar automaticamente.
+
+---
+
 ### v1.30 — 2026-05-08
 
 **T100 — Refatorar avaliação 5⭐ → favoritar binário (★/☆).**
