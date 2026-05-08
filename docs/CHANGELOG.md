@@ -4,6 +4,20 @@ Convenção: novidades no topo. Datas em formato ISO. Cada entrada referencia o 
 
 ---
 
+## v1.30 — 2026-05-08
+
+**T100 — Refatorar sistema de avaliação 5⭐ → favoritar binário (★/☆).**
+
+**Migração de dados:** `python scripts/migrar_avaliacao_para_favorito.py` — sessões com `avaliacao == 5` na v1.29 foram automaticamente marcadas como `favorito: true`. Sessões com avaliação 1–4 não entram nos favoritos (intencional: eram abaixo do limiar de qualidade). Campo `avaliacao` mantido nos JSONs para auditoria.
+
+- **Commit 1/5 — Script de migração:** `scripts/migrar_avaliacao_para_favorito.py` — itera `historico/dashboard/*.json`, seta `favorito = (avaliacao == 5)`, chama `reconstruir()`. Resultado: 18 sessões processadas, 2 favoritas, 0 erros.
+- **Commit 2/5 — Backend:** `api/schemas.py` + `FavoritarPayload(session_id, favorito)`; `core/historico_index.py` + `marcar_favorito()` (persiste JSON + índice); `api/routes/historico.py` + `POST /favoritar` (idempotente); `POST /avaliar` retorna 410 Gone; `api/storage.py` + `favorito: False` no schema de sessão.
+- **Commit 3/5 — Frontend:** `useChat.ts` `avaliado/avaliar` → `favoritado/favoritar`; `ChatPanel.tsx` 5 estrelas → toggle ★/☆ único; `SessionCard.tsx` ★ indicator quando `favorito === true`; `SessionDetail.tsx` botão ★/☆ inline com optimistic update; `FilterBar.tsx` select nota → chip "★ favoritas"; `page.tsx` props atualizados.
+- **Commit 4/5 — Cascata:** `saude/page.tsx` `fiveStar/fiveRate` → `favoritas/favRate`; `hall-of-fame/page.tsx` `avaliacao === 5` → `favorito === true`; `core/historico.py` `listar_avaliados()` → `listar_favoritas()`; `agentes/salles.py` `_carregar_casos_similares` usa `listar_favoritas()`; `scripts/limpar_outputs.py` `cinco_estrelas` → `favoritas`.
+- **Commit 5/5 — Manual v1.30:** seções §3.5, §4.4–4.8, §5.11 e workflows §6.1, §6.4, §6.7 atualizados.
+
+---
+
 ## v1.29 — 2026-05-07
 
 **FASE 6 — T101 + T99 + T104 (T102 já era semanal).**

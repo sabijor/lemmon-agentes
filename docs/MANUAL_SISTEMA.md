@@ -1,7 +1,7 @@
 # LEMMON AGENTES — Manual do Sistema
 
-**Versão atual:** v1.29
-**Última atualização:** 2026-05-07
+**Versão atual:** v1.30
+**Última atualização:** 2026-05-08
 **Mantido por:** Calebe Alves / Lemmon Produções
 
 > Este é o documento de referência viva do sistema Lemmon Agentes. Sempre que uma função nova for implementada ou um épico fechar, este manual deve ser atualizado e uma nova versão de PDF gerada em `docs/releases/`.
@@ -11,6 +11,17 @@
 ## Histórico de versões
 
 > **Convenção:** versões mais novas no topo. Cada release lista o que mudou em relação à anterior, mantendo histórico completo.
+
+### v1.30 — 2026-05-08
+
+**T100 — Refatorar avaliação 5⭐ → favoritar binário (★/☆).**
+
+- Sistema de avaliação 1-5 estrelas removido. Substituído por toggle ★/☆ simples e idempotente
+- Migração automática: sessões com nota 5 na v1.29 foram marcadas como favoritas
+- `POST /avaliar` deprecado (410 Gone) → `POST /favoritar`
+- `FilterBar` ganhou chip "★ favoritas" em vez de select de nota mínima
+- Hall of Fame, saúde, few-shot e limpar_outputs migrados para `favorito === true`
+- Ver CHANGELOG para detalhes dos 5 commits
 
 ### v1.29 — 2026-05-07
 
@@ -107,7 +118,7 @@
 **BLOCO 5 — T83 + T87 + T84: segurança de arquivo e scripts de manutenção.**
 
 - **T83 — `chmod 600 .env`:** permissão do arquivo `.env` restrita ao dono (`-rw-------`). Script `scripts/setup_seguro.sh` aplica `600` no `.env` e `700` em `backups/` — executar após clonar o repositório. Documentado em §8.5.
-- **T87 — `scripts/limpar_outputs.py`:** limpeza de outputs por idade (--dias, padrão 30). Lê `historico/dashboard/*.json` diretamente para identificar sessões 5⭐ e preservá-las. Flag `--dry-run` obrigatória para simulação. Mínimo de 7 dias recusado automaticamente. Documentado em §5.11.
+- **T87 — `scripts/limpar_outputs.py`:** limpeza de outputs por idade (--dias, padrão 30). Lê `historico/dashboard/*.json` diretamente para identificar sessões favoritas (★) e preservá-las. Flag `--dry-run` obrigatória para simulação. Mínimo de 7 dias recusado automaticamente. Documentado em §5.11.
 - **T84 — `scripts/backup_historico.py`:** backup compactado (ZIP deflate) de `historico/`, `outputs/`, `inputs/clientes/` e `core/exemplares/`. Destino padrão `backups/lemmon-YYYYMMDD_HHMMSS.zip`. Aceita `--destino` para HD externo. Documentado em §5.12.
 
 ---
@@ -318,12 +329,12 @@
 **Épico C — Memória institucional e saúde do sistema.**
 
 - **Pulse semanal (T11):** Script `scripts/pulse_semanal.py` gera relatório semanal em markdown — sessões, custos, tendências e análise narrativa por Aya. Rodável via cron ou manualmente: `python scripts/pulse_semanal.py --semana 2026-W18`. Output em `outputs/pulse/`.
-- **Few-shot curado (T12):** Sessões 5⭐ podem ter trechos marcados como exemplares. Botão `☆ exemplar` aparece em cada resposta de agente nas sessões 5-estrelas do histórico. Exemplares são salvos em `core/exemplares/<agente>.json` e injetados automaticamente no `system_prompt` de cada agente. Endpoints: `POST /exemplares`, `GET /exemplares/{agente}`, `DELETE /exemplares/{agente}/{id}`.
+- **Few-shot curado (T12):** Sessões favoritas (★) podem ter trechos marcados como exemplares. Botão `☆ exemplar` aparece em cada resposta de agente nas sessões favoritas do histórico. Exemplares são salvos em `core/exemplares/<agente>.json` e injetados automaticamente no `system_prompt` de cada agente. Endpoints: `POST /exemplares`, `GET /exemplares/{agente}`, `DELETE /exemplares/{agente}/{id}`.
 - **Busca semântica (T13):** Antes de enviar um briefing, botão "🔍 ver referências similares" (aparece quando input > 20 chars, modo pipeline) busca sessões passadas com briefings similares por TF-IDF de tokens. Endpoint `GET /historico/similar?briefing=...&n=3`.
-- **Hall of Fame (T14):** Página `/hall-of-fame` lista todas as sessões 5⭐ em grid de cards com briefing, agentes, custo e filtros por período e agente. Acessível pelo ícone 🏆 no header.
-- **Tags semi-automáticas (T15):** Ao fim de todo pipeline, Haiku sugere automaticamente 3-5 tags descritivas. Chips aparecem na sessão; o operador pode remover tags indesejadas (× em cada chip). Tags aceitas são salvas com a avaliação via `POST /tags`. Endpoint `POST /tags` também disponível para salvar tags sem nota.
-- **Dashboard de saúde (T16):** Página `/saude` com KPIs do sistema: sessões totais, custo total e médio, taxa de avaliação, taxa 5⭐; bar charts CSS de sessões e custo por mês (últimos 6); horizontal bars de uso por agente. Acessível pelo ícone de atividade no header.
-- **Histórico filtrável (T17):** FilterBar no painel de histórico com filtros por período (7/30/90 dias), origem (dashboard/reunião), agente envolvido, e nota mínima (inclui opção "sem avaliação"). Contador no cabeçalho mostra `filtradas/total` quando filtro ativo. Botão "limpar (N)" reseta tudo.
+- **Hall of Fame (T14):** Página `/hall-of-fame` lista todas as sessões favoritas (★) em grid de cards com briefing, agentes, custo e filtros por período e agente. Acessível pelo ícone 🏆 no header.
+- **Tags semi-automáticas (T15):** Ao fim de todo pipeline, Haiku sugere automaticamente 3-5 tags descritivas. Chips aparecem na sessão; o operador pode remover tags indesejadas (× em cada chip). Tags aceitas são salvas via `POST /tags`.
+- **Dashboard de saúde (T16):** Página `/saude` com KPIs do sistema: sessões totais, custo total e médio, taxa de sessões favoritadas; bar charts CSS de sessões e custo por mês (últimos 6); horizontal bars de uso por agente. Acessível pelo ícone de atividade no header.
+- **Histórico filtrável (T17):** FilterBar no painel de histórico com filtros por período (7/30/90 dias), origem (dashboard/reunião), agente envolvido, e chip "★ favoritas". Contador no cabeçalho mostra `filtradas/total` quando filtro ativo. Botão "limpar (N)" reseta tudo.
 
 ---
 
@@ -661,13 +672,13 @@ Você pode pegar uma sessão antiga do histórico, clicar **Retomar**, e o siste
 
 **Detalhe.** Ao retomar, se você mandar nova mensagem, ela vira `[INSTRUÇÃO ADICIONAL]` concatenada ao briefing original. Se mandar mensagem vazia (placeholder), o sistema usa só o briefing original.
 
-## 3.5 Avaliação
+## 3.5 Favoritar
 
-Após cada sessão concluída, aparece barra "Como foi essa sessão?" com 5 estrelas. Avaliação salva no JSON da sessão. Pode também adicionar observações e tags.
+Após cada sessão concluída, aparece botão ★/☆ "Sessão favorita?". Clicar alterna o estado (toggle), salvo imediatamente no JSON da sessão via `POST /favoritar`. Tags sugeridas pelo Haiku aparecem acima e são salvas separadamente via `POST /tags`.
 
-**Quando usar.** Sempre que possível — vira combustível para o sistema aprender (Épico C do plano: few-shot curado de 5⭐).
+**Quando usar.** Sempre que o resultado ficar bom — sessões favoritadas alimentam o few-shot curado (botão `☆ exemplar` aparece em cada resposta de agente no histórico), o Hall of Fame e a proteção do `limpar_outputs.py`.
 
-**Onde fica.** No JSON da sessão como `avaliacao`, `observacoes_operador`, `tags`. Endpoint `/avaliar` lê do disco (sobrevive a reinício do servidor).
+**Onde fica.** No JSON da sessão como `favorito: true/false`. Endpoint `POST /favoritar` é idempotente e persiste no disco (sobrevive a reinício).
 
 ---
 
@@ -695,19 +706,19 @@ Botão de download no header do chat panel. Gera arquivo `lemmon_sessao_<data>.t
 
 ## 4.4 Histórico
 
-Painel flutuante, ícone de relógio no header geral. Lista as 200 sessões mais recentes (limite atual). Cada item mostra: timestamp, briefing truncado, agentes usados, custo total, avaliação, e badge se é pipeline ou reunião.
+Painel flutuante, ícone de relógio no header geral. Lista as 200 sessões mais recentes (limite atual). Cada item mostra: timestamp, briefing truncado, agentes usados, custo total, ★ se favorita, e badge se é pipeline ou reunião.
 
 **Detalhe da sessão.** Click → painel abre detalhe completo, incluindo respostas por agente, custos individuais, e — para reuniões — o histórico cronológico dos turnos.
 
-**Filtros (T17).** FilterBar acima da lista: período (7/30/90 dias), origem (dashboard/reunião), agente envolvido, e nota mínima. Contador `filtradas/total` no cabeçalho quando filtro ativo.
+**Filtros (T17).** FilterBar acima da lista: período (7/30/90 dias), origem (dashboard/reunião), agente envolvido, e chip "★ favoritas". Contador `filtradas/total` no cabeçalho quando filtro ativo.
 
 ## 4.5 Hall of Fame
 
-Página `/hall-of-fame` (ícone 🏆 no header). Grid de cards com todas as sessões 5⭐. Filtros por período e por agente. Útil para mostrar ao cliente o tipo de trabalho que o sistema produz, ou para inspiração antes de uma nova sessão.
+Página `/hall-of-fame` (ícone 🏆 no header). Grid de cards com todas as sessões favoritas (★). Filtros por período e por agente. Útil para mostrar ao cliente o tipo de trabalho que o sistema produz, ou para inspiração antes de uma nova sessão.
 
 ## 4.6 Dashboard de saúde
 
-Página `/saude` (ícone de atividade no header). KPIs: sessões totais, custo total e médio, taxa de avaliação e taxa 5⭐. Bar charts de sessões e custo por mês (últimos 6). Horizontal bars de uso por agente com percentual.
+Página `/saude` (ícone de atividade no header). KPIs: sessões totais, custo total e médio, taxa de sessões favoritadas. Bar charts de sessões e custo por mês (últimos 6). Horizontal bars de uso por agente com percentual.
 
 ## 4.7 Referências similares (busca semântica)
 
@@ -715,7 +726,7 @@ No modo pipeline, quando o campo de input tem mais de 20 caracteres, aparece o b
 
 ## 4.8 Tags sugeridas
 
-Ao fim de cada pipeline, Haiku gera automaticamente 3-5 tags descritivas. Aparecem como chips logo acima do bloco de avaliação. Clique × em qualquer chip para dispensar a tag — a lista restante é salva imediatamente. As tags aceitas também são incluídas quando você avalia com estrelas.
+Ao fim de cada pipeline, Haiku gera automaticamente 3-5 tags descritivas. Aparecem como chips logo acima do botão de favoritar. Clique × em qualquer chip para dispensar a tag — a lista restante é salva imediatamente via `POST /tags`.
 
 ## 4.9 Painéis flutuantes
 
@@ -769,7 +780,7 @@ Erros de API exibidos em toast (bottom-right) via [sonner](https://github.com/em
 
 ## 4.16 Export por agente — Aya e Renata (T93)
 
-Quando uma sessão inclui output da **Aya**, o botão "Exportar Dossiê (Aya)" aparece na área de avaliação. Quando inclui output da **Renata**, aparece "Exportar Editorial (Renata)". Os dois botões coexistem se o pipeline rodou ambos.
+Quando uma sessão inclui output da **Aya**, o botão "Exportar Dossiê (Aya)" aparece no header do detalhe de sessão. Quando inclui output da **Renata**, aparece "Exportar Editorial (Renata)". Os dois botões coexistem se o pipeline rodou ambos.
 
 Cada export gera HTML + PDF independente em `outputs/<agente>/<session_id>.{html,pdf}`.
 
@@ -953,7 +964,7 @@ Gerenciado pelo endpoint `/exemplares`, mas também pode ser inspecionado direto
 
 ## 5.11 Limpeza de outputs antigos
 
-Remove arquivos em `outputs/` com mais de N dias, preservando automaticamente qualquer output associado a sessões avaliadas com 5 estrelas (lê `historico/dashboard/*.json` diretamente).
+Remove arquivos em `outputs/` com mais de N dias, preservando automaticamente qualquer output associado a sessões favoritas (★) (lê `historico/dashboard/*.json` diretamente).
 
 ```bash
 # Simular sem remover
@@ -994,7 +1005,7 @@ Recomendado rodar antes de atualizações e semanalmente. O diretório `backups/
 7. Aprovar Salles após ler roteiro
 8. Aprovar Sônia
 9. Aya compila automaticamente
-10. Avaliar sessão (5⭐ se ficou bom)
+10. Favoritar sessão (★ se ficou bom)
 
 **Tempo médio:** 5–10 min com modo manual, 2–4 min em automático.
 
@@ -1020,7 +1031,7 @@ Você não tem briefing fechado ainda. Quer pensar em voz alta com a equipe.
 
 ## 6.4 Variação de algo que já funcionou
 
-1. Histórico → encontrar sessão antiga 5⭐
+1. Histórico → encontrar sessão antiga favorita (★)
 2. Botão **Retomar**
 3. Modo pipeline com Salles + Sônia + Aya (Otto não precisa rodar de novo)
 4. Mensagem: `mesma tese, formato Reels em vez de mini-doc`
@@ -1046,7 +1057,7 @@ done
 
 ## 6.7 Variar uma estratégia que funcionou (Modo Remix)
 
-1. Histórico → encontrar sessão 5⭐ com tese que funcionou
+1. Histórico → encontrar sessão favorita (★) com tese que funcionou
 2. Botão **Retomar** — dashboard envia `resume_context` com análise Otto herdada
 3. Convocar apenas Salles + Sônia + Aya (Otto não precisa rodar de novo)
 4. Mensagem: `novo formato: Reels 30s em vez de mini-doc, mesma tese`
