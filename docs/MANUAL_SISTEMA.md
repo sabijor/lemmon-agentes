@@ -1,6 +1,6 @@
 # LEMMON AGENTES — Manual do Sistema
 
-**Versão atual:** v1.31
+**Versão atual:** v1.32
 **Última atualização:** 2026-05-08
 **Mantido por:** Calebe Alves / Lemmon Produções
 
@@ -768,13 +768,17 @@ Cena RPG isométrica com sprites dos agentes em mesas. Quando você convoca um a
 
 ## 4.14 Gráfico de latência semanal (T80 + T102)
 
-Na página `/saude`, nova seção "Latência Semanal". Mostra a média de duração (segundos) de cada agente por **semana ISO**, nos últimos 30/60/90 dias (selecionável). Semanas com média > 120s ficam marcadas em vermelho.
+Na página `/saude`, seção "Latência Semanal". Mostra a média de duração (segundos) por **semana ISO**, nos últimos 30/60/90 dias (selecionável). Semanas com média > 120s ficam com pontos vermelhos; linha de referência horizontal vermelha em 120s.
 
-**Controles:** selector de agente + selector de período. O gráfico é atualizado a cada troca de filtro.
+**Controles:**
+- Selector de agente: **Todos** (default) exibe todos os agentes como linhas sobrepostas com legenda de cores. Agente individual exibe linha única.
+- Selector de período: 30 / 60 / 90 dias.
 
-**Granularidade:** o eixo X exibe rótulos de semana ISO (ex.: `2026-W19`). O frontend usa `dataKey="semana"` sobre o array `semanas[]` retornado pelo backend — granularidade semanal ponta a ponta.
+**Modo "Todos":** busca cada agente em paralelo (`Promise.all`) e mescla por semana. Linhas conectam semanas mesmo com lacunas (`connectNulls`). Tooltip exibe duração em décimos de segundo.
 
-**Backend:** `GET /saude/latencias?agente=X&dias=30` — lê `duracoes_segundos` de `*_sessao.json`, agrupa por semana ISO, retorna médias com flag `lenta`. Sem cache (endpoint de diagnóstico — chamado com baixa frequência).
+**Empty state:** "Sem dados de latência ainda. Rode pelo menos 3 sessões pra começar a ver tendência."
+
+**Backend:** `GET /saude/latencias?agente=X&dias=30` — lê `duracoes_segundos` de `*_sessao.json`, agrupa por semana ISO, retorna médias com flag `lenta`. Granularidade semanal ponta a ponta (`dataKey="semana"` / `data.semanas`).
 
 ## 4.15 Toast global de erros (T86)
 

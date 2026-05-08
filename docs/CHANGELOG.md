@@ -4,6 +4,19 @@ Convenção: novidades no topo. Datas em formato ISO. Cada entrada referencia o 
 
 ---
 
+## v1.32 — 2026-05-08
+
+**FASE 7 (Round 2 QA) — FECHADA. 9/9 tarefas concluídas.**
+
+- **T109 — Custo-cap persiste entre sessões:** `custoCap` inicializado de `localStorage('lemmon-custo-cap')` via lazy `useState`; `useEffect` persiste a cada mudança. Campo já existia no ConfigSidebar — só faltava sobreviver a reloads.
+- **T110 — Renata: pedido direto → provisório + questionário:** `prompts/renata_system_v1.md` ganha bloco "Modo solo: pedido direto vs. pergunta vaga". Pedido com número + artefato quantificado → rascunho imediato marcado `## N artefatos provisórios` + 3 contextos de refinamento. Pergunta vaga → questionário primeiro. Manual §2.7 atualizado.
+- **T102 — Gráfico de latência construído:** `saude/page.tsx` adiciona `LatenciaMultiChart` para modo "Todos" (default) com `Promise.all` de todos os agentes e linhas sobrepostas com legenda. Agente individual preservado. Empty state padronizado. Manual §4.14 reescrito.
+- **T111 — Toast "Dossiê pronto!":** `ChatPanel.tsx` exibe toast `📄 Dossiê pronto!` quando pipeline conclui com Aya (`isRunning: true → false` + mensagem `aya.done`). Auto-dismiss 8s + botão × manual.
+- **T112 — SessionCard: ícone de origem + tags semânticas:** chip texto da origem substituído por ícone com `title` tooltip (📊 dashboard / 💬 reunião / 🧪 sandbox / ⌨️ cli). Até 3 tags semânticas (`s.tags`) exibidas como chips. Backend: `_resumo_de_arquivo` e GET /historico incluem campo `tags`. `HistoryItem.tags?: string[]` adicionado.
+- **T113 — Remix destaca todos os agentes corretos:** `handleRemix` em `page.tsx` usa `detail.agentes_usados` filtrado por agentes válidos não-reuniaoOnly em vez de lista hardcoded `['salles','sonia','aya']`. Todos os agentes da sessão original ficam destacados no header após Remix.
+
+---
+
 ## v1.31 — 2026-05-08
 
 **FASE 7 Bloco D — T106 + T107 + T108: sandbox persistente, testes de share e fix do ConfigSidebar.**
