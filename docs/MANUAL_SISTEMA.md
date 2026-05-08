@@ -1,6 +1,6 @@
 # LEMMON AGENTES — Manual do Sistema
 
-**Versão atual:** v1.30
+**Versão atual:** v1.31
 **Última atualização:** 2026-05-08
 **Mantido por:** Calebe Alves / Lemmon Produções
 
@@ -1073,13 +1073,14 @@ done
 5. Pipeline completo em ~50% do tempo normal
 6. Aviso aparece no chat: "Heitor pulado — valide compliance manualmente antes de publicar"
 
-## 6.9 Testar ideia maluca sem poluir histórico (Sandbox)
+## 6.9 Testar ideia maluca sem poluir o histórico principal (Sandbox)
 
 1. Dashboard → toggle **Sandbox** (ícone 🧪 no header do chat)
 2. Montar pipeline normalmente, enviar briefing experimental
-3. Pipeline roda completo — sessão **não aparece** em `/historico` nem conta para métricas
+3. Pipeline roda completo — sessão é salva com `origem: "sandbox"` mas **não aparece** no Histórico por padrão nem conta para métricas da aba Saúde
 4. Explorar abordagens arriscadas, linguagem nova, formatos incomuns
-5. Para salvar de verdade: desativar sandbox e rodar a versão aprovada
+5. Para ver sessões sandbox no Histórico: clique no chip **🧪 LAB** na barra de filtros — faz re-fetch incluindo sandboxes
+6. Para promover a ideia: desativar sandbox e rodar a versão aprovada normalmente
 
 ## 6.10 Comparar 3 abordagens de roteiro (A/B Salles)
 

@@ -4,6 +4,17 @@ Convenção: novidades no topo. Datas em formato ISO. Cada entrada referencia o 
 
 ---
 
+## v1.31 — 2026-05-08
+
+**FASE 7 Bloco D — T106 + T107 + T108: sandbox persistente, testes de share e fix do ConfigSidebar.**
+
+- **T106 — Sandbox persistente:** sessões sandbox eram descartadas — agora salvas com `origem="sandbox"`. Backend: `api/storage.py` aceita `sandbox: bool`, `api/ws_chat.py` sempre chama `_salvar_sessao(sandbox=sandbox)`. `GET /historico` filtra `origem != "sandbox"` por padrão; `?incluir_sandbox=1` reexibe. Frontend: `FilterBar.tsx` + chip **🧪 LAB** (violet quando ativo); `HistoryPanel.tsx` re-faz fetch ao toggle; `HistoryItem.origem` ampliado para `'dashboard' | 'reuniao' | 'sandbox'`.
+- **T107 — Testes de share:** `tests/test_share.py` com dois testes de integração: `test_gera_e_consome_token_imediatamente` (POST /share → token; GET /share/{token}.json → 200 + dados corretos) e `test_token_inexistente_retorna_404` (GET com token fake → 404). Ambos usam `tmp_path` + `monkeypatch` para isolar sistema de arquivos.
+- **T108 — ConfigSidebar colapsa ao trocar modo:** `ChatPanel.tsx` ganha `useEffect(() => { if (mode === 'reuniao') setConfigOpen(false) }, [mode])` — fecha o drawer antes da animação de transição de modo, eliminando artefato visual ~10px.
+- **Manual §6.9** atualizado: sandbox agora salva (não descarta), chip 🧪 LAB para reexibir no histórico, passo de "promover ideia" ao final.
+
+---
+
 ## v1.30 — 2026-05-08
 
 **T100 — Refatorar sistema de avaliação 5⭐ → favoritar binário (★/☆).**
