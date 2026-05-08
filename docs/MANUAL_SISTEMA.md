@@ -568,7 +568,9 @@ resultado = pedro.executar(pergunta="...", modo="validacao")
 | `pipeline` | Após Aya no pipeline completo | `dossie_aya` ou `roteiro_salles` |
 | `solo` | Em Reunião isolada | `contexto_solo` (pode ser raso) |
 
-> Modo solo com contexto raso: Renata retorna 3 perguntas DE UMA VEZ antes de gerar.
+> **Regra híbrida (v1.32):** Renata distingue pedido direto de pergunta vaga.
+> - **Pedido direto** (número + artefato claro: "3 ganchos", "calendário de 14 dias") → entrega **rascunho provisório** imediatamente, marcado como `## N artefatos provisórios`, seguido pelos 3 contextos de refinamento.
+> - **Pergunta vaga** ("o que você acha?", "tem ideia?") → questionário primeiro, igual ao comportamento anterior.
 
 **Quando usar.** Pipeline: toggle "editorial" no ConfigSidebar + duração (1–60 dias). Reunião: `@renata`.
 
