@@ -4,6 +4,20 @@ Convenção: novidades no topo. Datas em formato ISO. Cada entrada referencia o 
 
 ---
 
+## v1.33 — 2026-05-08
+
+**FASE 8 — T114: hydration mismatch fix (localStorage SSR-safe).**
+
+- **Hook `useLocalStorage`** criado em `dashboard/lib/hooks/useLocalStorage.ts`. Genérico `<T>`, retorna `[value, setValue, mounted]`. Sempre inicia com `defaultValue` (compatível com SSR); lê `localStorage` no `useEffect` (cliente); persiste com `JSON.stringify`/`JSON.parse`. O terceiro retorno `mounted` permite guard condicional no componente quando necessário.
+- **ChatPanel.tsx — `pinned`** migrado de `useState` lazy init + `localStorage.setItem` manual para `useLocalStorage('lemmon-chat-pinned', false)`. `togglePin` simplificado para `setPinned(!pinned)`.
+- **useChat.ts — `custoCap`** migrado de `useState` lazy init + `useEffect` de persistência para `useLocalStorage<number | null>('lemmon-custo-cap', null)`. `useEffect` redundante removido.
+- **Auditoria:** zero acessos diretos a `localStorage` fora do hook após migração.
+- **Manual §8.7** documenta o padrão e lista os componentes migrados.
+
+Fecha FASE 8 (única tarefa). Round 3 QA abre a partir desta base.
+
+---
+
 ## v1.32 — 2026-05-08
 
 **FASE 7 (Round 2 QA) — FECHADA. 9/9 tarefas concluídas.**

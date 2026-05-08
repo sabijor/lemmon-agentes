@@ -1,6 +1,6 @@
 # LEMMON AGENTES — Manual do Sistema
 
-**Versão atual:** v1.32
+**Versão atual:** v1.33
 **Última atualização:** 2026-05-08
 **Mantido por:** Calebe Alves / Lemmon Produções
 
@@ -1309,6 +1309,23 @@ cd lemmon-agentes/dashboard
 npm install
 npm run dev  # http://localhost:3000
 ```
+
+## 8.7 Padrão localStorage no Next.js (T114)
+
+Componentes que dependem de `localStorage` **devem** usar o hook `useLocalStorage` em `dashboard/lib/hooks/useLocalStorage.ts`. Acesso direto via `localStorage.getItem` no `useState` initializer causa **hydration mismatch**: o servidor renderiza com o valor default enquanto o cliente hidrata com o valor do storage — React detecta a divergência e emite warning.
+
+**Padrão correto:**
+```ts
+import { useLocalStorage } from '@/lib/hooks/useLocalStorage'
+
+const [pinned, setPinned, mounted] = useLocalStorage('lemmon-chat-pinned', false)
+// Se montar o valor for crítico pro layout, proteger o return:
+if (!mounted) return <PlaceholderEstavel />
+```
+
+O hook garante que SSR e hidratação inicial usam `defaultValue`; o localStorage só é lido no `useEffect` (cliente). O terceiro retorno `mounted` é opcional — use-o apenas se o componente precisar suprimir um flicker real antes de conhecer o valor armazenado.
+
+**Componentes migrados:** `ChatPanel` (`lemmon-chat-pinned`) e `useChat` (`lemmon-custo-cap`).
 
 ---
 
