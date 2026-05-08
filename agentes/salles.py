@@ -422,7 +422,7 @@ class Salles(AgenteBase):
         raise RuntimeError("Otto não retornou resposta via tool_use.")
 
     def _carregar_casos_similares(self, formato: str, tags: list) -> list:
-        avaliados = self.historico.listar_avaliados(nota_minima=4)
+        avaliados = self.historico.listar_favoritas()
         if not avaliados:
             return []
         caso_atual = {"formato": formato, "tags": tags}

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-Limpa arquivos antigos de outputs/, preservando sessões avaliadas com 5 estrelas.
+Limpa arquivos antigos de outputs/, preservando sessões favoritas.
 
-Identificação de sessões 5⭐:
+Identificação de sessões favoritas:
   - Lê todos historico/dashboard/*.json diretamente
-  - Extrai timestamps de sessões com avaliacao == 5
-  - Preserva qualquer output cujo timestamp de arquivo bata com sessão 5⭐
+  - Extrai timestamps de sessões com favorito == True
+  - Preserva qualquer output cujo timestamp de arquivo bata com sessão favorita
 
 Uso:
   python scripts/limpar_outputs.py --dias 30 --dry-run
@@ -24,15 +24,15 @@ HISTORICO_DIR = ROOT / "historico" / "dashboard"
 SKIP_FILES = {"README.md", "REFERENCIA_LEPRI_SALLES_v1.1.md", ".DS_Store"}
 
 
-def _coletar_timestamps_cinco_estrelas() -> set[str]:
-    """Retorna prefixos de timestamp (YYYYMMDD_HHMMSS) de sessões com nota 5."""
+def _coletar_timestamps_favoritas() -> set[str]:
+    """Retorna prefixos de timestamp (YYYYMMDD_HHMMSS) de sessões favoritas."""
     timestamps: set[str] = set()
     if not HISTORICO_DIR.exists():
         return timestamps
     for path in HISTORICO_DIR.glob("*.json"):
         try:
             dados = json.loads(path.read_text(encoding="utf-8"))
-            if dados.get("avaliacao") == 5:
+            if dados.get("favorito") is True:
                 # stem format: 20260504_175459_sessao → prefixo 20260504_175459
                 stem = path.stem
                 parts = stem.split("_")
@@ -44,7 +44,7 @@ def _coletar_timestamps_cinco_estrelas() -> set[str]:
 
 
 def _arquivo_protegido(path: Path, protegidos: set[str]) -> bool:
-    """True se o arquivo pertence a uma sessão 5⭐."""
+    """True se o arquivo pertence a uma sessão favorita."""
     name = path.name
     for ts in protegidos:
         if name.startswith(ts):
@@ -54,7 +54,7 @@ def _arquivo_protegido(path: Path, protegidos: set[str]) -> bool:
 
 def limpar(dias: int, dry_run: bool) -> None:
     limite = datetime.now() - timedelta(days=dias)
-    protegidos = _coletar_timestamps_cinco_estrelas()
+    protegidos = _coletar_timestamps_favoritas()
 
     removidos = 0
     preservados_estrela = 0
@@ -76,7 +76,7 @@ def limpar(dias: int, dry_run: bool) -> None:
 
         if _arquivo_protegido(arquivo, protegidos):
             preservados_estrela += 1
-            print(f"  ⭐ preservado  {arquivo.relative_to(ROOT)}")
+            print(f"  ★ preservado  {arquivo.relative_to(ROOT)}")
             continue
 
         if dry_run:
@@ -92,11 +92,11 @@ def limpar(dias: int, dry_run: bool) -> None:
                 erros += 1
 
     prefixo = "[DRY-RUN] " if dry_run else ""
-    print(f"\n{prefixo}Resultado: {removidos} removido(s), {preservados_estrela} preservado(s) por ⭐, {erros} erro(s)")
+    print(f"\n{prefixo}Resultado: {removidos} removido(s), {preservados_estrela} preservado(s) por ★, {erros} erro(s)")
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Limpa outputs antigos preservando sessões 5⭐")
+    parser = argparse.ArgumentParser(description="Limpa outputs antigos preservando sessões favoritas")
     parser.add_argument("--dias", type=int, default=30, help="Remover arquivos mais antigos que N dias (padrão: 30)")
     parser.add_argument("--dry-run", action="store_true", help="Simular sem remover")
     args = parser.parse_args()

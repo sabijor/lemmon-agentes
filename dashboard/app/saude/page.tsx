@@ -79,10 +79,8 @@ export default function Saude() {
     const total = sessions.length
     const totalCost = sessions.reduce((s, r) => s + (r.custo_total_usd || 0), 0)
     const avgCost = totalCost / total
-    const evaluated = sessions.filter(s => s.avaliacao !== null).length
-    const fiveStar = sessions.filter(s => s.avaliacao === 5).length
-    const avalRate = pct(evaluated, total)
-    const fiveRate = pct(fiveStar, total)
+    const favoritas = sessions.filter(s => s.favorito === true).length
+    const favRate = pct(favoritas, total)
 
     // Sessions + cost per month (last 6)
     const now = new Date()
@@ -110,7 +108,7 @@ export default function Saude() {
     const maxMonth = Math.max(...months.map(m => m.count), 1)
     const maxAgent = Math.max(...agentRanking.map(a => a.count), 1)
 
-    return { total, totalCost, avgCost, evaluated, fiveStar, avalRate, fiveRate, months, agentRanking, maxMonth, maxAgent }
+    return { total, totalCost, avgCost, favoritas, favRate, months, agentRanking, maxMonth, maxAgent }
   }, [sessions])
 
   return (
@@ -151,8 +149,7 @@ export default function Saude() {
               {[
                 { label: 'sessões totais', value: stats.total.toString(), sub: '' },
                 { label: 'custo total', value: fmt$(stats.totalCost), sub: `avg ${fmt$(stats.avgCost)}/sessão` },
-                { label: 'taxa avaliação', value: `${stats.avalRate}%`, sub: `${stats.evaluated} de ${stats.total}` },
-                { label: 'taxa 5 estrelas', value: `${stats.fiveRate}%`, sub: `${stats.fiveStar} sessões` },
+                { label: 'taxa favoritadas', value: `${stats.favRate}%`, sub: `${stats.favoritas} sessões` },
               ].map(card => (
                 <div key={card.label} className="bg-stone-900 border border-stone-800 rounded-2xl p-5">
                   <p className="text-[9px] font-mono text-stone-500 uppercase tracking-widest mb-2">{card.label}</p>

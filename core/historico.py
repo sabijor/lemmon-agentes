@@ -19,6 +19,7 @@ class Historico:
 
         registro.setdefault("observacoes_operador", "")
         registro.setdefault("avaliacao", None)
+        registro.setdefault("favorito", False)
         registro.setdefault("correcoes_aplicadas", "")
         registro.setdefault("tags", [])
         registro.setdefault("fontes_consultadas", [])  # Heitor
@@ -35,11 +36,9 @@ class Historico:
         arquivos = sorted(self.dir.glob("*.json"), reverse=True)[:limite]
         return [json.loads(a.read_text(encoding="utf-8")) for a in arquivos]
 
-    def listar_avaliados(self, nota_minima: int = 4) -> list:
+    def listar_favoritas(self) -> list:
         todos = self.listar(limite=1000)
-        return [r for r in todos
-                if r.get("avaliacao") is not None
-                and r["avaliacao"] >= nota_minima]
+        return [r for r in todos if r.get("favorito") is True]
 
     def buscar_pendentes_avaliacao(self) -> list:
         todos = self.listar(limite=1000)

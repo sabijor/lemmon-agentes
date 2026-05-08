@@ -14,7 +14,7 @@ function fmt(ts: string) {
 
 export default function HallOfFame() {
   const { data: allSessions, loading } = useApiQuery<Session[]>(fetchHistorico)
-  const sessions = allSessions?.filter(s => s.avaliacao === 5) ?? []
+  const sessions = allSessions?.filter(s => s.favorito === true) ?? []
   const [filter, setFilter] = useState<{ formato: string; periodo: string }>({ formato: '', periodo: '' })
 
   const filtered = sessions.filter(s => {
@@ -37,7 +37,7 @@ export default function HallOfFame() {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-2xl font-display font-bold tracking-tight">Hall of Fame</h1>
-            <p className="text-sm font-mono text-stone-400 mt-1">Sessões 5⭐ — o melhor da Lemmon Produções</p>
+            <p className="text-sm font-mono text-stone-400 mt-1">Sessões favoritas ★ — o melhor da Lemmon Produções</p>
           </div>
           <Link href="/" className="text-[10px] font-mono text-stone-500 hover:text-stone-300 transition-colors uppercase tracking-widest">
             ← Voltar
@@ -79,8 +79,8 @@ export default function HallOfFame() {
         ) : filtered.length === 0 ? (
           <div className="text-center py-24">
             <p className="text-4xl mb-4">🏆</p>
-            <p className="text-sm font-mono text-stone-500">Nenhuma sessão 5⭐ encontrada.</p>
-            <p className="text-[10px] font-mono text-stone-600 mt-1">Avalie sessões no histórico para aparecerem aqui.</p>
+            <p className="text-sm font-mono text-stone-500">Nenhuma sessão favorita encontrada.</p>
+            <p className="text-[10px] font-mono text-stone-600 mt-1">Marque sessões com ★ no histórico para aparecerem aqui.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
