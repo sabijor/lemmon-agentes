@@ -1,12 +1,12 @@
 'use client'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine,
 } from 'recharts'
 import { fetchHistorico, fetchLatencias, type Session, type LatenciaSemana } from '@/lib/api-client'
 import { useApiQuery } from '@/lib/use-api-query'
-import { AGENT_MAP, type AgentId } from '@/lib/agents'
+import { AGENT_MAP, AGENTS, type AgentId } from '@/lib/agents'
 
 function pct(n: number, total: number) {
   if (!total) return 0
@@ -26,18 +26,26 @@ function getMonth(ts: string) {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`
 }
 
-const AGENTES_LATENCIA = Object.keys(AGENT_MAP) as AgentId[]
+type AgenteSelector = 'todos' | AgentId
+const AGENTES_PIPELINE = AGENTS.filter(a => !a.reuniaoOnly).map(a => a.id)
 
+// ── Chart: agente único ────────────────────────────────────────────────────────
 function LatenciaChart({ agente, dias }: { agente: AgentId; dias: number }) {
   const fetcher = useMemo(() => () => fetchLatencias(agente, dias), [agente, dias])
   const { data, loading } = useApiQuery<{ semanas: LatenciaSemana[] }>(fetcher)
   const agent = AGENT_MAP[agente]
 
-  if (loading) return <div className="h-32 flex items-center justify-center"><span className="text-[9px] font-mono text-stone-500">carregando...</span></div>
-  if (!data?.semanas.length) return <div className="h-32 flex items-center justify-center"><span className="text-[9px] font-mono text-stone-600">sem dados de duração para {agent?.name}</span></div>
+  if (loading) return <div className="h-36 flex items-center justify-center"><span className="text-[9px] font-mono text-stone-500">carregando...</span></div>
+  if (!data?.semanas.length) return (
+    <div className="h-36 flex items-center justify-center">
+      <span className="text-[9px] font-mono text-stone-500 text-center px-4">
+        Sem dados de latência para {agent?.name}. Rode pelo menos 3 sessões pra começar a ver tendência.
+      </span>
+    </div>
+  )
 
   return (
-    <ResponsiveContainer width="100%" height={120}>
+    <ResponsiveContainer width="100%" height={140}>
       <LineChart data={data.semanas} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#292524" />
         <XAxis dataKey="semana" tick={{ fontSize: 8, fontFamily: 'monospace', fill: '#78716c' }} />
@@ -45,10 +53,10 @@ function LatenciaChart({ agente, dias }: { agente: AgentId; dias: number }) {
         <Tooltip
           contentStyle={{ background: '#1c1917', border: '1px solid #292524', borderRadius: 8, fontSize: 10, fontFamily: 'monospace' }}
           labelStyle={{ color: '#a8a29e' }}
-          formatter={(v) => {
+          formatter={(v, _name, props) => {
             const num = typeof v === 'number' ? v : Number(v)
-            const entry = data.semanas.find(s => s.media_s === num)
-            return [`${num}s (${entry?.n ?? '?'} sessões)`, 'média']
+            const entry = props.payload as LatenciaSemana
+            return [`${num.toFixed(1)}s · n=${entry?.n ?? '?'}`, agent?.name ?? agente]
           }}
         />
         <ReferenceLine y={120} stroke="#ef4444" strokeDasharray="4 2" strokeOpacity={0.5} />
@@ -68,8 +76,83 @@ function LatenciaChart({ agente, dias }: { agente: AgentId; dias: number }) {
   )
 }
 
+// ── Chart: todos os agentes sobrepostos ───────────────────────────────────────
+type MultiRow = { semana: string } & Partial<Record<AgentId, number>>
+
+function LatenciaMultiChart({ dias }: { dias: number }) {
+  const [rows, setRows] = useState<MultiRow[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    setLoading(true)
+    Promise.all(
+      AGENTES_PIPELINE.map(id => fetchLatencias(id, dias).then(r => ({ id, semanas: r.semanas })).catch(() => ({ id, semanas: [] as LatenciaSemana[] })))
+    ).then(results => {
+      const map: Record<string, MultiRow> = {}
+      results.forEach(({ id, semanas }) => {
+        semanas.forEach(s => {
+          if (!map[s.semana]) map[s.semana] = { semana: s.semana }
+          map[s.semana][id as AgentId] = s.media_s
+        })
+      })
+      setRows(Object.values(map).sort((a, b) => a.semana.localeCompare(b.semana)))
+      setLoading(false)
+    })
+  }, [dias])
+
+  if (loading) return <div className="h-36 flex items-center justify-center"><span className="text-[9px] font-mono text-stone-500">carregando...</span></div>
+  if (!rows.length) return (
+    <div className="h-36 flex items-center justify-center">
+      <span className="text-[9px] font-mono text-stone-500 text-center px-4">
+        Sem dados de latência ainda. Rode pelo menos 3 sessões pra começar a ver tendência.
+      </span>
+    </div>
+  )
+
+  return (
+    <>
+      <ResponsiveContainer width="100%" height={140}>
+        <LineChart data={rows} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#292524" />
+          <XAxis dataKey="semana" tick={{ fontSize: 8, fontFamily: 'monospace', fill: '#78716c' }} />
+          <YAxis tick={{ fontSize: 8, fontFamily: 'monospace', fill: '#78716c' }} unit="s" />
+          <Tooltip
+            contentStyle={{ background: '#1c1917', border: '1px solid #292524', borderRadius: 8, fontSize: 10, fontFamily: 'monospace' }}
+            labelStyle={{ color: '#a8a29e' }}
+            formatter={(v, name) => {
+              const num = typeof v === 'number' ? v : Number(v)
+              return [`${num.toFixed(1)}s`, AGENT_MAP[name as AgentId]?.name ?? name]
+            }}
+          />
+          <ReferenceLine y={120} stroke="#ef4444" strokeDasharray="4 2" strokeOpacity={0.5} />
+          {AGENTES_PIPELINE.map(id => (
+            <Line
+              key={id}
+              type="monotone"
+              dataKey={id}
+              stroke={AGENT_MAP[id]?.color ?? '#a8a29e'}
+              strokeWidth={1.5}
+              dot={false}
+              activeDot={{ r: 4 }}
+              connectNulls
+            />
+          ))}
+        </LineChart>
+      </ResponsiveContainer>
+      <div className="flex flex-wrap gap-3 mt-2">
+        {AGENTES_PIPELINE.map(id => (
+          <div key={id} className="flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: AGENT_MAP[id]?.color ?? '#a8a29e' }} />
+            <span className="text-[8px] font-mono text-stone-500">{AGENT_MAP[id]?.name ?? id}</span>
+          </div>
+        ))}
+      </div>
+    </>
+  )
+}
+
 export default function Saude() {
-  const [agenteLatencia, setAgenteLatencia] = useState<AgentId>('otto')
+  const [agenteLatencia, setAgenteLatencia] = useState<AgenteSelector>('todos')
   const [diasLatencia, setDiasLatencia] = useState(30)
   const { data: sessions, loading } = useApiQuery<Session[]>(fetchHistorico)
 
@@ -82,7 +165,6 @@ export default function Saude() {
     const favoritas = sessions.filter(s => s.favorito === true).length
     const favRate = pct(favoritas, total)
 
-    // Sessions + cost per month (last 6)
     const now = new Date()
     const months: { key: string; label: string; count: number; cost: number }[] = []
     for (let i = 5; i >= 0; i--) {
@@ -96,7 +178,6 @@ export default function Saude() {
       if (m) { m.count++; m.cost += s.custo_total_usd || 0 }
     })
 
-    // Agent usage
     const agentCounts: Record<string, number> = {}
     sessions.forEach(s => {
       s.agentes_usados?.forEach(a => { agentCounts[a] = (agentCounts[a] || 0) + 1 })
@@ -114,7 +195,6 @@ export default function Saude() {
   return (
     <div className="min-h-screen bg-stone-950 text-stone-100 p-8">
       <div className="max-w-4xl mx-auto">
-        {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-2xl font-display font-bold tracking-tight">Dashboard de Saúde</h1>
@@ -238,10 +318,11 @@ export default function Saude() {
                 <div className="flex items-center gap-3">
                   <select
                     value={agenteLatencia}
-                    onChange={e => setAgenteLatencia(e.target.value as AgentId)}
+                    onChange={e => setAgenteLatencia(e.target.value as AgenteSelector)}
                     className="text-[9px] font-mono bg-stone-800 border border-stone-700 rounded px-2 py-1 text-stone-300"
                   >
-                    {AGENTES_LATENCIA.map(id => (
+                    <option value="todos">Todos</option>
+                    {AGENTES_PIPELINE.map(id => (
                       <option key={id} value={id}>{AGENT_MAP[id]?.name ?? id}</option>
                     ))}
                   </select>
@@ -256,7 +337,10 @@ export default function Saude() {
                   </select>
                 </div>
               </div>
-              <LatenciaChart agente={agenteLatencia} dias={diasLatencia} />
+              {agenteLatencia === 'todos'
+                ? <LatenciaMultiChart dias={diasLatencia} />
+                : <LatenciaChart agente={agenteLatencia} dias={diasLatencia} />
+              }
               <p className="text-[8px] font-mono text-stone-600 mt-2">
                 Linha vermelha = 120s · pontos vermelhos = semanas acima do limite
               </p>
