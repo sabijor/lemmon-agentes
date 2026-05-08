@@ -563,7 +563,7 @@ export default function ChatPanel({
             </button>
           </div>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2">
             {/* Agent avatars */}
             <div className="flex -space-x-1 mr-1">
               {meetingAgents.map(a => (
@@ -699,12 +699,21 @@ export default function ChatPanel({
 
             {/* Close */}
             {onClose && (
-              <button onClick={onClose} title="Fechar"
-                className="w-7 h-7 rounded-lg border border-stone-200 bg-white flex items-center justify-center hover:bg-stone-50 hover:border-stone-400 transition-all ml-0.5">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#78716c" strokeWidth="2.5">
-                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                </svg>
-              </button>
+              <div className="flex items-center border-l border-stone-200/60 pl-2 ml-1">
+                <button
+                  onClick={() => {
+                    const hasSession = activeIsRunning || activeMessages.length > 0
+                    if (hasSession && !window.confirm('Fechar o painel? A sessão atual será preservada no histórico.')) return
+                    onClose()
+                  }}
+                  title="Fechar"
+                  className="w-7 h-7 rounded-lg border border-stone-200 bg-white flex items-center justify-center hover:bg-stone-50 hover:border-stone-400 transition-all"
+                >
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#78716c" strokeWidth="2.5">
+                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                  </svg>
+                </button>
+              </div>
             )}
           </div>
         </div>
