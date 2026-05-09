@@ -16,7 +16,7 @@ export function ConfigSidebar({ agentConfig, onUpdateConfig, isRunning, custoCap
         <span className="text-[9px] font-mono uppercase tracking-widest text-stone-400">Configurações</span>
       </div>
 
-      <div className="flex-1 overflow-y-auto pl-4 pr-3 py-3 space-y-5">
+      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-5">
         {/* Otto */}
         <div>
           <div className="flex items-center gap-1.5 mb-2">

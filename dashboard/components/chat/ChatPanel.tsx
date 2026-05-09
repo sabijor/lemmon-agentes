@@ -436,7 +436,7 @@ export default function ChatPanel({
     <motion.div
       animate={{ width: panelSize.w, height: minimized ? 48 : panelSize.h }}
       transition={{ type: 'spring', stiffness: 200, damping: 30 }}
-      className="flex flex-row glass border border-stone-200/60 overflow-hidden flex-shrink-0 rounded-2xl relative"
+      className="flex flex-row glass border border-stone-200/60 flex-shrink-0 rounded-2xl relative"
     >
       {/* Loop custo_max — blocking overlay (reunião) */}
       {mode === 'reuniao' && loopStatus?.motivo === 'custo_max' && !loopCustoDismissed && (
@@ -541,7 +541,7 @@ export default function ChatPanel({
       </AnimatePresence>
 
       {/* Main chat */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
 
         {/* Header — drag handle */}
         <div
