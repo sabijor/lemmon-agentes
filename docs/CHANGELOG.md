@@ -4,6 +4,18 @@ Convenção: novidades no topo. Datas em formato ISO. Cada entrada referencia o 
 
 ---
 
+## v1.35 — 2026-05-09
+
+**FASE 9 (Round 5 QA) — T119: fix definitivo da regressão do drawer ConfigSidebar.**
+
+- **T119 — Causa raiz correta identificada:** o `overflow-hidden` que clipava o ConfigSidebar não estava no `motion.div` interno do `ChatPanel.tsx` (que foi corrigido em T118), mas sim no drag wrapper `motion.div` em `app/page.tsx` (linha 231), que envolve o ChatPanel com `shadow-2xl shadow-black/20 rounded-2xl overflow-hidden`. Como ambos têm as mesmas dimensões, o clip do wrapper externo continuava cortando o conteúdo do ConfigSidebar nos cantos arredondados, mesmo após v1.34.
+- **Fix:** `overflow-hidden` removido de `className` do drag wrapper em `page.tsx`. O ChatPanel já tem `rounded-2xl` sem `overflow-hidden` (herdado de v1.34), mantendo a aparência visual arredondada. O `overflow-hidden` interno no `div.flex-1` do chat (adicionado em v1.34) continua garantindo clip correto das mensagens.
+- **Bônus — bug colateral corrigido:** com o drawer aberto (176px), o painel de 460px padrão deixava apenas 284px para a área de chat, quebrando o placeholder do input em 4 linhas. Fix: `useEffect` no ChatPanel expande o painel automaticamente para mínimo 540px ao abrir o drawer (540 − 176 = 364px para o chat). A expansão usa a animação spring existente, sem salto visual.
+
+Fecha T119. Round 5 QA aprovado. Dashboard v1.35 em estado visual e funcional limpo.
+
+---
+
 ## v1.34 — 2026-05-09
 
 **FASE 9 (Round 4 QA) — T118: fix da regressão visual T115.**

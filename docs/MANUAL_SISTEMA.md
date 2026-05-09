@@ -1,6 +1,6 @@
 # LEMMON AGENTES — Manual do Sistema
 
-**Versão atual:** v1.34
+**Versão atual:** v1.35
 **Última atualização:** 2026-05-09
 **Mantido por:** Calebe Alves / Lemmon Produções
 
@@ -11,6 +11,16 @@
 ## Histórico de versões
 
 > **Convenção:** versões mais novas no topo. Cada release lista o que mudou em relação à anterior, mantendo histórico completo.
+
+### v1.35 — 2026-05-09
+
+**T119 — fix definitivo da regressão do drawer ConfigSidebar (terceira tentativa, causa raiz correta).**
+
+- O `overflow-hidden` que clipava o ConfigSidebar estava no drag wrapper `motion.div` de `app/page.tsx`, não dentro do `ChatPanel.tsx` (onde T118 corrigiu erroneamente). Ambos têm dimensões idênticas, portanto o wrapper externo continuava aplicando o clip nos cantos arredondados.
+- Fix: `overflow-hidden` removido do drag wrapper. O visual arredondado é mantido pelo `rounded-2xl` do ChatPanel interno (sem overflow-hidden, corrigido em T118).
+- Bônus: `useEffect` no ChatPanel garante expansão mínima de 540px ao abrir o drawer, prevenindo quebra de linha no input do briefing.
+
+---
 
 ### v1.34 — 2026-05-09
 
