@@ -4,6 +4,18 @@ Convenção: novidades no topo. Datas em formato ISO. Cada entrada referencia o 
 
 ---
 
+## v1.34 — 2026-05-09
+
+**FASE 9 (Round 4 QA) — T118: fix da regressão visual T115.**
+
+- **T118 — Causa raiz identificada e corrigida:** `overflow-hidden` no `motion.div` raiz do ChatPanel (que também tem `rounded-2xl`) clipava o canto superior-esquerdo do ConfigSidebar. O `pl-4` aplicado em T115 empurrou o texto para dentro da zona de clip da borda arredondada (border-radius 16px), agravando o corte em todos os labels e botões ("CONFIGURAÇÕES" → "URAÇÕES"; "OTTO" → "TO"; "Completo" → "pleto").
+- **Fix aplicado:** `overflow-hidden` removido do `motion.div` raiz; reposicionado no `div.flex-1` do chat interno, que não tem border-radius e portanto não gera clip indesejado. `pl-4 pr-3` revertido para `px-3` no container scrollável do ConfigSidebar. `h-full` no outer div do ConfigSidebar permanece (T116 continua correto).
+- **Resultado:** todos os labels, botões e headers do ConfigSidebar renderizam inteiros; scroll interno funciona; nenhuma regressão visual no chat principal.
+
+Fecha T118. Round 4 QA aprovado. Dashboard em estado limpo (0 pendências visuais confirmadas).
+
+---
+
 ## v1.33 — 2026-05-08
 
 **FASE 8 — T114: hydration mismatch fix (localStorage SSR-safe). FASE 9 — T115 + T116 + T117: Round 3 QA (bugs visuais + UX header).**

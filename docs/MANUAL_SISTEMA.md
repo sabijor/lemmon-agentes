@@ -1,7 +1,7 @@
 # LEMMON AGENTES — Manual do Sistema
 
-**Versão atual:** v1.33
-**Última atualização:** 2026-05-08
+**Versão atual:** v1.34
+**Última atualização:** 2026-05-09
 **Mantido por:** Calebe Alves / Lemmon Produções
 
 > Este é o documento de referência viva do sistema Lemmon Agentes. Sempre que uma função nova for implementada ou um épico fechar, este manual deve ser atualizado e uma nova versão de PDF gerada em `docs/releases/`.
@@ -11,6 +11,16 @@
 ## Histórico de versões
 
 > **Convenção:** versões mais novas no topo. Cada release lista o que mudou em relação à anterior, mantendo histórico completo.
+
+### v1.34 — 2026-05-09
+
+**T118 — fix da regressão visual T115 (Round 4 QA).**
+
+- Causa raiz confirmada via DevTools: `overflow-hidden` + `rounded-2xl` no container pai do ChatPanel clipava o canto superior-esquerdo do ConfigSidebar. O `pl-4` do T115 agravou o problema ao empurrar o texto para dentro da zona de clip da borda arredondada (border-radius: 16px). No canto superior a y=0, o clip horizontal chega a 16px.
+- Fix: `overflow-hidden` removido do `motion.div` raiz do ChatPanel; recolocado no `div.flex-1` do chat (sem border-radius, sem clip indesejado). `pl-4 pr-3` revertido para `px-3`. `h-full` no ConfigSidebar permanece (T116 mantido).
+- Dashboard em estado visual limpo: todos os labels, botões e títulos do drawer ConfigSidebar renderizam sem truncamento.
+
+---
 
 ### v1.33 — 2026-05-08
 
