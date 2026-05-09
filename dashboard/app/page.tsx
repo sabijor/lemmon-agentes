@@ -228,7 +228,7 @@ export default function Home() {
           dragMomentum={false}
           dragElastic={0}
           style={{ x: panelX, y: panelY, position: 'fixed', top: 48, zIndex: 40 }}
-          className="shadow-2xl shadow-black/20 rounded-2xl overflow-hidden"
+          className="shadow-2xl shadow-black/20 rounded-2xl"
         >
           <ChatPanel
             mode={chatMode}

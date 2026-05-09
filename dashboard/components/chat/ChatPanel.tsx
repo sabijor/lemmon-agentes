@@ -128,6 +128,9 @@ export default function ChatPanel({
   useEffect(() => { if (!loopStatus) setLoopCustoDismissed(false) }, [loopStatus])
   useEffect(() => { if (mode === 'reuniao') setConfigOpen(false) }, [mode])
   useEffect(() => {
+    if (configOpen) setPanelSize(prev => prev.w < 540 ? { ...prev, w: 540 } : prev)
+  }, [configOpen])
+  useEffect(() => {
     const justFinished = prevIsRunningRef.current && !isRunning
     prevIsRunningRef.current = isRunning
     if (justFinished && activeMessages.some(m => m.role === 'aya' && m.done)) {
