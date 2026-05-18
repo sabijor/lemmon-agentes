@@ -89,7 +89,7 @@ export default function HallOfFame() {
                 className="bg-stone-900 border border-stone-800 rounded-2xl p-5 hover:border-amber-800/50 transition-colors group">
                 {/* Stars */}
                 <div className="flex items-center gap-2 mb-3">
-                  <span className="text-amber-400 text-sm">★★★★★</span>
+                  <span className="text-amber-400 text-sm">★</span>
                   <span className="text-[8px] font-mono text-stone-500 ml-auto">{fmt(s.timestamp)}</span>
                 </div>
 
