@@ -4,6 +4,20 @@ Convenção: novidades no topo. Datas em formato ISO. Cada entrada referencia o 
 
 ---
 
+## v1.36 — 2026-05-18
+
+**FASE 9 (Round 6 QA) — T120 + T121 + T122 + T123 + T124: polish visual, dark theme e UX.**
+
+- **T124 — Restaurar loop 3-pill + auto-expand modo reunião:** o segmented control auto/manual/loop recebia `flex-shrink-0` para evitar compressão quando o ChatPanel está estreito. `useEffect` adicionado: ao entrar em modo Reunião, o painel expande automaticamente para mínimo 520px (análogo ao auto-expand do drawer em T119). O loop não estava quebrado — a ausência era falso positivo do QA rodando em modo pipeline.
+- **T120 — Hall of Fame: exibir 1 estrela por card:** cada card exibia `★★★★★` (5 estrelas fixas) pois o campo `favorito` é binário. Reduzido para `★` único que expressa "sessão favorita" sem implicar nota 5/5.
+- **T121 — Dark theme na página `/calibragem`:** todas as superfícies (`bg-white`, `border-stone-200`, `text-stone-700/900`) receberam variantes `dark:` equivalentes. KPI cards → `dark:bg-stone-900 dark:border-stone-800`; inputs → `dark:bg-stone-800 dark:border-stone-700 dark:text-stone-100`; histórico → `dark:divide-stone-800`; botão submit → `dark:bg-stone-100 dark:text-stone-900`.
+- **T122 — Posição do ChatPanel persiste no localStorage:** `app/page.tsx` lê `chatPanelPos` do localStorage no mount (antes do default `window.innerWidth - 480`); `onDragEnd` salva `{ x, y }` após cada drag. Painel reabre exatamente onde foi deixado entre reloads.
+- **T123 — Botão fechar visible-disabled durante pipeline ativo:** `window.confirm` removido. Quando `activeIsRunning === true`, o botão fica `opacity-30 cursor-not-allowed disabled` com tooltip "Aguarde o pipeline terminar". Fora do pipeline, fecha diretamente sem diálogo.
+
+Fecha Round 6 QA. Dashboard v1.36 em estado limpo.
+
+---
+
 ## v1.35 — 2026-05-09
 
 **FASE 9 (Round 5 QA) — T119: fix definitivo da regressão do drawer ConfigSidebar.**
