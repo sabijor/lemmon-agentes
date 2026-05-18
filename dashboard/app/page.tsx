@@ -69,6 +69,15 @@ export default function Home() {
   const historyPanelY = useMotionValue(0)
 
   useEffect(() => {
+    try {
+      const saved = localStorage.getItem('chatPanelPos')
+      if (saved) {
+        const { x, y } = JSON.parse(saved) as { x: number; y: number }
+        panelX.set(x)
+        panelY.set(y)
+        return
+      }
+    } catch {}
     panelX.set(Math.max(0, window.innerWidth - 480))
     panelY.set(56)
   }, [panelX, panelY])
@@ -229,6 +238,9 @@ export default function Home() {
           dragElastic={0}
           style={{ x: panelX, y: panelY, position: 'fixed', top: 48, zIndex: 40 }}
           className="shadow-2xl shadow-black/20 rounded-2xl"
+          onDragEnd={() => {
+            try { localStorage.setItem('chatPanelPos', JSON.stringify({ x: panelX.get(), y: panelY.get() })) } catch {}
+          }}
         >
           <ChatPanel
             mode={chatMode}
