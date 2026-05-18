@@ -131,6 +131,9 @@ export default function ChatPanel({
     if (configOpen) setPanelSize(prev => prev.w < 540 ? { ...prev, w: 540 } : prev)
   }, [configOpen])
   useEffect(() => {
+    if (mode === 'reuniao') setPanelSize(prev => prev.w < 520 ? { ...prev, w: 520 } : prev)
+  }, [mode])
+  useEffect(() => {
     const justFinished = prevIsRunningRef.current && !isRunning
     prevIsRunningRef.current = isRunning
     if (justFinished && activeMessages.some(m => m.role === 'aya' && m.done)) {
@@ -591,7 +594,7 @@ export default function ChatPanel({
             {mode === 'reuniao' && (() => {
               const cm = loopMode ? 'loop' : reuniaoManual ? 'manual' : 'auto'
               return (
-                <div className="flex rounded-lg overflow-hidden border border-stone-200 dark:border-stone-700">
+                <div className="flex rounded-lg overflow-hidden border border-stone-200 dark:border-stone-700 flex-shrink-0">
                   {(['auto', 'manual', 'loop'] as const).map(m => (
                     <button key={m} disabled={reunIsRunning || loopActive}
                       onClick={() => {
