@@ -707,13 +707,14 @@ export default function ChatPanel({
             {onClose && (
               <div className="flex items-center border-l border-stone-200/60 pl-2 ml-1">
                 <button
-                  onClick={() => {
-                    const hasSession = activeIsRunning || activeMessages.length > 0
-                    if (hasSession && !window.confirm('Fechar o painel? A sessão atual será preservada no histórico.')) return
-                    onClose()
-                  }}
-                  title="Fechar"
-                  className="w-7 h-7 rounded-lg border border-stone-200 bg-white flex items-center justify-center hover:bg-stone-50 hover:border-stone-400 transition-all"
+                  disabled={activeIsRunning}
+                  onClick={() => { if (!activeIsRunning) onClose!() }}
+                  title={activeIsRunning ? 'Aguarde o pipeline terminar' : 'Fechar'}
+                  className={`w-7 h-7 rounded-lg border border-stone-200 bg-white flex items-center justify-center transition-all ${
+                    activeIsRunning
+                      ? 'opacity-30 cursor-not-allowed'
+                      : 'hover:bg-stone-50 hover:border-stone-400'
+                  }`}
                 >
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#78716c" strokeWidth="2.5">
                     <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
