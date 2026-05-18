@@ -65,7 +65,7 @@ export default function CalibragemPage() {
   const acertoPct = data?.media_acerto ? Math.round((data.media_acerto / 5) * 100) : 0
 
   return (
-    <div className="min-h-screen bg-stone-50 p-6">
+    <div className="min-h-screen bg-stone-50 dark:bg-stone-950 dark:text-stone-100 p-6">
       <div className="max-w-3xl mx-auto">
         <div className="flex items-center justify-between mb-8">
           <div>
@@ -82,17 +82,17 @@ export default function CalibragemPage() {
         {/* KPI */}
         {data && data.total > 0 && (
           <div className="grid grid-cols-3 gap-4 mb-8">
-            <div className="bg-white rounded-xl border border-stone-200 px-5 py-4">
+            <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800 px-5 py-4">
               <p className="text-[8px] font-mono text-stone-400 uppercase tracking-widest mb-1">Registros</p>
-              <p className="font-display font-bold text-2xl text-stone-900">{data.total}</p>
+              <p className="font-display font-bold text-2xl text-stone-900 dark:text-stone-100">{data.total}</p>
             </div>
-            <div className="bg-white rounded-xl border border-stone-200 px-5 py-4">
+            <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800 px-5 py-4">
               <p className="text-[8px] font-mono text-stone-400 uppercase tracking-widest mb-1">Média de acerto</p>
-              <p className="font-display font-bold text-2xl text-stone-900">
-                {data.media_acerto?.toFixed(1) ?? '—'}<span className="text-sm text-stone-400">/5</span>
+              <p className="font-display font-bold text-2xl text-stone-900 dark:text-stone-100">
+                {data.media_acerto?.toFixed(1) ?? '—'}<span className="text-sm text-stone-400 dark:text-stone-500">/5</span>
               </p>
             </div>
-            <div className="bg-white rounded-xl border border-stone-200 px-5 py-4">
+            <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800 px-5 py-4">
               <p className="text-[8px] font-mono text-stone-400 uppercase tracking-widest mb-1">Precisão</p>
               <p className={`font-display font-bold text-2xl ${acertoPct >= 80 ? 'text-green-600' : acertoPct >= 60 ? 'text-amber-600' : 'text-red-600'}`}>
                 {acertoPct}%
@@ -102,7 +102,7 @@ export default function CalibragemPage() {
         )}
 
         {/* Registrar novo feedback */}
-        <div className="bg-white rounded-xl border border-stone-200 p-6 mb-8">
+        <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800 p-6 mb-8">
           <h2 className="text-[10px] font-mono text-stone-500 uppercase tracking-widest font-bold mb-4">
             Registrar feedback real
           </h2>
@@ -113,7 +113,7 @@ export default function CalibragemPage() {
                 <input value={form.session_id} onChange={e => setForm(f => ({ ...f, session_id: e.target.value }))}
                   list="session-opts"
                   placeholder={sessionOptions.length ? 'Selecione ou digite...' : 'Ex: 20260505_152641_sessao'}
-                  className="w-full border border-stone-200 rounded-lg px-3 py-2 text-[11px] font-mono text-stone-700 focus:outline-none focus:border-stone-400" />
+                  className="w-full border border-stone-200 dark:border-stone-700 rounded-lg px-3 py-2 text-[11px] font-mono text-stone-700 dark:text-stone-100 bg-white dark:bg-stone-800 focus:outline-none focus:border-stone-400 dark:focus:border-stone-500" />
                 <datalist id="session-opts">
                   {sessionOptions.map(s => (
                     <option key={s.session_id} value={s.session_id}>{s.briefing}</option>
@@ -125,20 +125,20 @@ export default function CalibragemPage() {
                 <input value={form.elemento} onChange={e => setForm(f => ({ ...f, elemento: e.target.value }))}
                   placeholder="ex: tom do roteiro, objeção principal"
                   required
-                  className="w-full border border-stone-200 rounded-lg px-3 py-2 text-[11px] font-mono text-stone-700 focus:outline-none focus:border-stone-400" />
+                  className="w-full border border-stone-200 dark:border-stone-700 rounded-lg px-3 py-2 text-[11px] font-mono text-stone-700 dark:text-stone-100 bg-white dark:bg-stone-800 focus:outline-none focus:border-stone-400 dark:focus:border-stone-500" />
               </div>
             </div>
             <div>
               <label className="text-[9px] font-mono text-stone-400 uppercase tracking-widest block mb-1">Predição do Pedro IA</label>
               <textarea value={form.predicao_ia} onChange={e => setForm(f => ({ ...f, predicao_ia: e.target.value }))}
                 rows={2} required placeholder="O que o Pedro IA disse/previu..."
-                className="w-full border border-stone-200 rounded-lg px-3 py-2 text-[11px] font-mono text-stone-700 focus:outline-none focus:border-stone-400 resize-none" />
+                className="w-full border border-stone-200 dark:border-stone-700 rounded-lg px-3 py-2 text-[11px] font-mono text-stone-700 dark:text-stone-100 bg-white dark:bg-stone-800 focus:outline-none focus:border-stone-400 dark:focus:border-stone-500 resize-none" />
             </div>
             <div>
               <label className="text-[9px] font-mono text-stone-400 uppercase tracking-widest block mb-1">Feedback real do Pedro</label>
               <textarea value={form.feedback_real} onChange={e => setForm(f => ({ ...f, feedback_real: e.target.value }))}
                 rows={2} required placeholder="O que o Pedro real disse/reagiu..."
-                className="w-full border border-stone-200 rounded-lg px-3 py-2 text-[11px] font-mono text-stone-700 focus:outline-none focus:border-stone-400 resize-none" />
+                className="w-full border border-stone-200 dark:border-stone-700 rounded-lg px-3 py-2 text-[11px] font-mono text-stone-700 dark:text-stone-100 bg-white dark:bg-stone-800 focus:outline-none focus:border-stone-400 dark:focus:border-stone-500 resize-none" />
             </div>
             <div>
               <label className="text-[9px] font-mono text-stone-400 uppercase tracking-widest block mb-1">
@@ -154,8 +154,8 @@ export default function CalibragemPage() {
             </div>
             <div className="flex items-center gap-3 pt-1">
               <button type="submit" disabled={saving}
-                className="px-4 py-2 rounded-xl bg-stone-900 text-white text-[10px] font-mono font-bold uppercase tracking-widest
-                  hover:bg-stone-700 active:scale-[0.98] transition-all disabled:opacity-50">
+                className="px-4 py-2 rounded-xl bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-900 text-[10px] font-mono font-bold uppercase tracking-widest
+                  hover:bg-stone-700 dark:hover:bg-stone-300 active:scale-[0.98] transition-all disabled:opacity-50">
                 {saving ? 'Salvando...' : 'Registrar'}
               </button>
               {saved && (
@@ -166,8 +166,8 @@ export default function CalibragemPage() {
         </div>
 
         {/* Histórico */}
-        <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
-          <div className="px-6 py-4 border-b border-stone-100">
+        <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800 overflow-hidden">
+          <div className="px-6 py-4 border-b border-stone-100 dark:border-stone-800">
             <h2 className="text-[10px] font-mono text-stone-500 uppercase tracking-widest font-bold">
               Histórico de calibragens
             </h2>
@@ -179,12 +179,12 @@ export default function CalibragemPage() {
               Nenhum registro ainda.
             </p>
           ) : (
-            <div className="divide-y divide-stone-100">
+            <div className="divide-y divide-stone-100 dark:divide-stone-800">
               {[...data.registros].reverse().map(r => (
                 <div key={r.id} className="px-6 py-4">
                   <div className="flex items-start justify-between gap-4 mb-2">
                     <div>
-                      <span className="text-[9px] font-mono text-stone-500 font-bold uppercase tracking-widest">{r.elemento}</span>
+                      <span className="text-[9px] font-mono text-stone-500 dark:text-stone-400 font-bold uppercase tracking-widest">{r.elemento}</span>
                       {r.session_id && (
                         <span className="text-[8px] font-mono text-stone-300 ml-2">{r.session_id}</span>
                       )}
@@ -198,11 +198,11 @@ export default function CalibragemPage() {
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <p className="text-[8px] font-mono text-stone-400 uppercase tracking-widest mb-0.5">Predição IA</p>
-                      <p className="text-[10px] font-mono text-stone-600 leading-relaxed">{r.predicao_ia}</p>
+                      <p className="text-[10px] font-mono text-stone-600 dark:text-stone-300 leading-relaxed">{r.predicao_ia}</p>
                     </div>
                     <div>
                       <p className="text-[8px] font-mono text-stone-400 uppercase tracking-widest mb-0.5">Feedback real</p>
-                      <p className="text-[10px] font-mono text-stone-600 leading-relaxed">{r.feedback_real}</p>
+                      <p className="text-[10px] font-mono text-stone-600 dark:text-stone-300 leading-relaxed">{r.feedback_real}</p>
                     </div>
                   </div>
                   <p className="text-[8px] font-mono text-stone-300 mt-2">
