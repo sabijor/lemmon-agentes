@@ -152,6 +152,20 @@ FERRAMENTA_LINHA_EDITORIAL = {
 class Renata(AgenteBase):
     nome = "renata"
     versao_prompt = "v1"
+    papel_curto = "Social Media — calendário editorial multi-plataforma"
+    quando_usar = [
+        "precisa de cronograma de postagens (N dias/semanas)",
+        "adaptar conteúdo pra IG, TikTok, LinkedIn, YouTube",
+        "campanha programada com timing por plataforma",
+        "ditar quando publicar o quê em cada canal",
+    ]
+    quando_nao_usar = [
+        "só 1 vídeo isolado, sem plano de distribuição",
+        "estratégia pura sem nada pra publicar ainda",
+        "validação técnica de compliance",
+    ]
+    categoria = "distribuicao"
+    custo_medio_usd = 0.12
     system_prompt_reuniao = (
         "Você é a Renata, Social Media da Lemmon Produções. "
         "Em reuniões você responde sobre calendário editorial, linha narrativa e estratégia "

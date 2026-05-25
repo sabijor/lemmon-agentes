@@ -257,6 +257,20 @@ FERRAMENTA_FORMATACAO_SONIA = {
 class Sonia(AgenteBase):
     nome = "sonia"
     versao_prompt = "v1"
+    papel_curto = "Performance — otimiza roteiro pra retenção e CTR em social"
+    quando_usar = [
+        "roteiro de social media já existe",
+        "vai virar reels, tiktok ou shorts (formato vertical curto)",
+        "precisa de timestamps de corte e variações A/B",
+        "quer ranking entre 3 versões do mesmo roteiro",
+    ]
+    quando_nao_usar = [
+        "conteúdo longo (podcast, vídeo institucional, webinar)",
+        "ainda não tem roteiro pra otimizar",
+        "estratégia pura, sem entregável de vídeo",
+    ]
+    categoria = "performance"
+    custo_medio_usd = 0.10
 
     def __init__(self):
         super().__init__()

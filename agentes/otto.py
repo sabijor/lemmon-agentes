@@ -105,6 +105,19 @@ FERRAMENTA_ANALISE = {
 class Otto(AgenteBase):
     nome = "otto"
     versao_prompt = "v3"
+    papel_curto = "Estrategista — decodifica briefing em tese criativa"
+    quando_usar = [
+        "briefing novo ou aberto",
+        "definir tese, posicionamento ou ângulo",
+        "campanha do zero",
+        "entender o objetivo real por trás do pedido do cliente",
+    ]
+    quando_nao_usar = [
+        "só preciso revisar/editar texto já pronto",
+        "operação puramente de distribuição (agendar posts)",
+    ]
+    categoria = "estrategia"
+    custo_medio_usd = 0.08
 
     def executar(self, briefing: str, modo_visual: str = "auto",
                  contexto_extra: str = "") -> AgenteResultado:

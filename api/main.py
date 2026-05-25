@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.routes import auxiliares, calibragem, exemplares, exportar, historico, saude, sessoes, share, transcrever
+from api.routes import agentes, auxiliares, calibragem, exemplares, exportar, historico, saude, sessoes, share, transcrever
 from api.ws_chat import chat
 from api.ws_mesa import mesa_redonda
 from api.ws_reuniao import reuniao
@@ -26,6 +26,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(agentes.router)
 app.include_router(historico.router)
 app.include_router(exportar.router)
 app.include_router(exemplares.router)

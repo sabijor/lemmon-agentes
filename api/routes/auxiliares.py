@@ -19,41 +19,77 @@ from api.schemas import BriefingReversoPayload, CortesProntosPayload
 router = APIRouter()
 
 
+def _construir_prompt_sugestor(briefing: str, catalogo: list[dict]) -> str:
+    """Monta o prompt do Haiku dinamicamente a partir do catálogo de agentes (T139)."""
+    linhas_agentes = []
+    for a in catalogo:
+        linhas_agentes.append(
+            f"• {a['id']} [{a['categoria']}] — {a['papel_curto']}\n"
+            f"    Use quando: {'; '.join(a['quando_usar'][:3]) or '(sem critérios definidos)'}\n"
+            f"    NÃO use quando: {'; '.join(a['quando_nao_usar'][:2]) or '(sem restrições)'}\n"
+            f"    Custo médio: ~${a['custo_medio_usd']:.2f}"
+        )
+    bloco = "\n\n".join(linhas_agentes)
+    ids_validos = ", ".join(a["id"] for a in catalogo)
+    return (
+        "Você é o roteador da Lemmon Produções. Recebe um pedido do operador "
+        "e decide QUAIS agentes da equipe devem rodar pra atender. Use só os "
+        "agentes da lista abaixo — não invente nomes.\n\n"
+        "AGENTES DISPONÍVEIS:\n\n"
+        f"{bloco}\n\n"
+        "REGRAS:\n"
+        "- Escolha o MENOR conjunto suficiente. Não inclua agente irrelevante só pra dar volume.\n"
+        "- Ordem importa: cada agente recebe contexto dos anteriores. Coloque estratégia antes de roteiro, roteiro antes de performance.\n"
+        "- Aya (compilação) só faz sentido se houver 2+ agentes antes dela.\n"
+        "- Espelhos de cliente entram quando o briefing menciona o cliente específico.\n\n"
+        "RESPONDA SOMENTE COM JSON VÁLIDO, no formato:\n"
+        '{"agentes": ["id1", "id2", ...], "razoes": {"id1": "por que rodar", "id2": "..."}, "custo_estimado_usd": 0.00}\n\n'
+        f"IDs válidos: {ids_validos}\n\n"
+        f"PEDIDO DO OPERADOR:\n{briefing[:2000]}"
+    )
+
+
 @router.get("/sugerir_pipeline")
 async def sugerir_pipeline(briefing: str):
-    """T28: Haiku analisa o briefing e sugere quais agentes fazer sentido."""
+    """T28 + T139: Haiku analisa o briefing e sugere quais agentes acionar.
+
+    Lê o catálogo dinâmico via /agentes/catalogo (mesma fonte do front).
+    Adicionar agente novo: criar a classe com metadados, registrar em
+    api/routes/agentes.py — o sugestor passa a considerar automaticamente.
+    """
+    from api.routes.agentes import construir_catalogo
     loop = asyncio.get_running_loop()
-    AGENTES_DISPONIVEIS = ["otto", "heitor", "salles", "sonia", "aya"]
-    prompt = (
-        "Analise o briefing e sugira quais agentes da Lemmon Produções devem rodar:\n"
-        "- otto: análise estratégica, tese criativa (sempre útil)\n"
-        "- heitor: compliance (essencial se houver saúde, termos técnicos, suplementos, medicina)\n"
-        "- salles: roteiro filmável (use se precisar de conteúdo de vídeo/roteiro)\n"
-        "- sonia: performance e distribuição (use se o conteúdo vai para redes sociais)\n"
-        "- aya: compilação final (sempre recomendado no final)\n\n"
-        "Responda SOMENTE com JSON válido: "
-        '{\"agentes\": [\"otto\", ...], \"razoes\": {\"agente\": \"motivo curto\"}}'
-        f"\n\nBriefing:\n{briefing[:1000]}"
-    )
+    catalogo = construir_catalogo()
+    ids_validos = {a["id"] for a in catalogo}
+    prompt = _construir_prompt_sugestor(briefing, catalogo)
     try:
         resp = await loop.run_in_executor(
             None,
             lambda: _anthropic_client.messages.create(
                 model="claude-haiku-4-5-20251001",
-                max_tokens=200,
+                max_tokens=500,
                 messages=[{"role": "user", "content": prompt}],
             ),
         )
     except (APIError, APIConnectionError, AuthenticationError, RateLimitError) as e:
         raise HTTPException(status_code=503, detail=formatar_erro_anthropic(e))
     raw = next((b.text for b in resp.content if hasattr(b, "text")), "")
+    sugestao: dict = {}
     try:
         m = re.search(r'\{.*\}', raw, re.DOTALL)
-        sugestao = json.loads(m.group()) if m else {}
+        if m:
+            sugestao = json.loads(m.group())
     except Exception:
-        sugestao = {"agentes": AGENTES_DISPONIVEIS, "razoes": {}}
-    agentes = [a for a in sugestao.get("agentes", AGENTES_DISPONIVEIS) if a in AGENTES_DISPONIVEIS]
-    return {"agentes": agentes, "razoes": sugestao.get("razoes", {})}
+        sugestao = {}
+    agentes = [a for a in sugestao.get("agentes", []) if a in ids_validos]
+    if not agentes:
+        # fallback conservador: Otto + Aya (estratégia + compilação)
+        agentes = [a for a in ["otto", "aya"] if a in ids_validos]
+    return {
+        "agentes": agentes,
+        "razoes": sugestao.get("razoes", {}),
+        "custo_estimado_usd": sugestao.get("custo_estimado_usd"),
+    }
 
 
 @router.post("/briefing_reverso")

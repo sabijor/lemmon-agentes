@@ -168,6 +168,20 @@ FERRAMENTA_FORMATACAO = {
 class Salles(AgenteBase):
     nome = "salles"
     versao_prompt = "v1.2"
+    papel_curto = "Roteirista — transforma tese em roteiro filmável"
+    quando_usar = [
+        "precisa de roteiro de vídeo (reels, shorts, stories, vídeo longo)",
+        "estrutura de cena, falas, indicações de ação",
+        "hook + corpo + CTA",
+        "adaptação de tese estratégica em script",
+    ]
+    quando_nao_usar = [
+        "só análise estratégica, sem produzir conteúdo",
+        "só calendário editorial, sem roteirar nada",
+        "edição de copy de feed estático",
+    ]
+    categoria = "conteudo"
+    custo_medio_usd = 0.10
 
     def __init__(self):
         super().__init__()

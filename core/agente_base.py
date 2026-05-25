@@ -35,6 +35,15 @@ class AgenteBase(ABC):
     system_prompt_reuniao: str | None = None  # se definido, usado no modo conversacional
     modelo: str  # setado em __init__ via resolver_modelo(self.nome)
 
+    # ── METADADOS PARA AUTO-ROTEADOR (T139) ─────────────────────────────────
+    # Lidos por GET /agentes/catalogo e por /sugerir_pipeline para a IA
+    # decidir, sem hardcoded, quais agentes acionar dado um briefing.
+    papel_curto: str = ""           # 1 linha: "Estrategista — decodifica briefing"
+    quando_usar: list[str] = []     # gatilhos: ["briefing aberto", "campanha nova"]
+    quando_nao_usar: list[str] = [] # anti-gatilhos: ["só editar texto existente"]
+    categoria: str = "outros"       # estrategia | compliance | conteudo | performance | compilacao | distribuicao | espelho_cliente | outros
+    custo_medio_usd: float = 0.10   # estimativa para o sugestor ponderar custo
+
     def __init__(self):
         if not ANTHROPIC_API_KEY:
             raise RuntimeError(

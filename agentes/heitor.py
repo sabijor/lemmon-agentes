@@ -147,6 +147,20 @@ FERRAMENTA_FORMATACAO_HEITOR = {
 class Heitor(AgenteBase):
     nome = "heitor"
     versao_prompt = "v1"
+    papel_curto = "Compliance Meta — checa risco de bloqueio em ads/posts"
+    quando_usar = [
+        "conteúdo de saúde, medicina, suplementos, estética",
+        "afirmações de resultado, promessas, antes/depois",
+        "vai virar ad pago no Meta (Instagram/Facebook)",
+        "termos sensíveis (cura, milagre, garantia, transformação)",
+    ]
+    quando_nao_usar = [
+        "post institucional puro, sem promessa",
+        "briefing interno (não vai pra publicação)",
+        "conteúdo claramente seguro (educativo neutro)",
+    ]
+    categoria = "compliance"
+    custo_medio_usd = 0.25
 
     def __init__(self):
         super().__init__()

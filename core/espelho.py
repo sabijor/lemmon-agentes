@@ -39,6 +39,11 @@ class EspelhoCliente(AgenteBase):
         contexto_max_chars: int = 15000,
         versao_prompt: str = "v1",
         nichos_calendario: list[str] | None = None,
+        # Metadados pro auto-roteador (T139). Cada espelho passa o seu.
+        papel_curto: str = "",
+        quando_usar: list[str] | None = None,
+        quando_nao_usar: list[str] | None = None,
+        custo_medio_usd: float = 0.08,
     ):
         self.nome = id  # AgenteBase usa self.nome para carregar prompt
         self.versao_prompt = versao_prompt
@@ -50,6 +55,13 @@ class EspelhoCliente(AgenteBase):
         self._input_max = input_max_chars
         self._contexto_max = contexto_max_chars
         self.nichos_calendario: list[str] = nichos_calendario or []
+
+        # Auto-roteador (T139) — instance-level pra cada espelho ter os seus
+        self.papel_curto = papel_curto or f"Espelho do cliente {nome}"
+        self.quando_usar = quando_usar or []
+        self.quando_nao_usar = quando_nao_usar or []
+        self.categoria = "espelho_cliente"
+        self.custo_medio_usd = custo_medio_usd
 
         super().__init__()
 

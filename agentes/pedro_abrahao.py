@@ -25,4 +25,17 @@ def PedroAbrahao() -> EspelhoCliente:
         aviso_vermelho_usd=PEDRO_AVISO_VERMELHO_USD,
         input_max_chars=PEDRO_INPUT_MAX_CHARS,
         contexto_max_chars=PEDRO_CONTEXTO_OPCIONAL_MAX_CHARS,
+        # Metadados pro auto-roteador (T139)
+        papel_curto="Espelho do Dr. Pedro Abrahão (Hator Clinic — saúde estética orofacial)",
+        quando_usar=[
+            "conteúdo do nicho de saúde estética / orofacial / harmonização facial",
+            "validar voz, tom e ângulo do Pedro antes de mandar pro cliente real",
+            "feedback prévio de roteiro/copy do Pedro",
+            "qualquer pedido que cita Hator, Pedro Abrahão ou clínica do Pedro",
+        ],
+        quando_nao_usar=[
+            "briefing pra outro cliente (não Hator)",
+            "validação genérica sem alvo de cliente específico",
+        ],
+        custo_medio_usd=0.08,
     )

@@ -116,6 +116,19 @@ FERRAMENTA_DOSSIE_AYA = {
 class Aya(AgenteBase):
     nome = "aya"
     versao_prompt = "v1"
+    papel_curto = "Compiladora — gera dossiê visual juntando tudo do pipeline"
+    quando_usar = [
+        "pipeline com 2+ agentes terminou",
+        "precisa de entregável visual pro cliente (PDF/HTML)",
+        "fechamento de sessão de estratégia/roteiro",
+    ]
+    quando_nao_usar = [
+        "só 1 agente rodou (não vale compilar nada)",
+        "sessão de exploração rápida sem entregável final",
+        "operador só queria tirar uma dúvida solta",
+    ]
+    categoria = "compilacao"
+    custo_medio_usd = 0.08
     system_prompt_reuniao = (
         "Você é Aya, assistente virtual da Lemmon Produções. "
         "Em reuniões conversacionais você responde de forma natural, direta e prestativa. "
