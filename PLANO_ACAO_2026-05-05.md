@@ -3338,7 +3338,7 @@ FASE 12 — ROUND 6 QA COMPLETA (validação manual 2026-05-09):
      Modo Loop AUSENTE da UI — segmented control virou 2-pill (Auto/Manual) em algum
      bump posterior. T124 registrado pra restaurar. Backend possivelmente intacto.
 
-PROJETO: 9 tarefas pendentes (T127 sprites Safari + T129-T134, T136-T138 da auditoria backend). T120-T126, T128, T135 fechadas.
+PROJETO: 10 tarefas pendentes (T127 sprites Safari + T129-T134, T136-T138 da auditoria backend + T139 Sprint 2 frontend). T120-T126, T128, T135, T139 Sprint 1 fechadas.
 
 ---
 
@@ -3487,6 +3487,36 @@ Cálculo hardcoded (`resp.usage.input_tokens * 3e-6 + ...`) em vez de usar `Cust
 `except Exception: pass` ao falhar visão. Operador não sabe que contexto visual foi ignorado. Mesmo padrão do T55 antigo.
 
 **Fix:** `self.logger.warning("Falha ao descrever imagem: %s", e)` antes do pass.
+
+### T139 — 🆕 Auto-roteador IA: IA escolhe quais agentes acionar
+
+**Severidade:** alta de UX · **Tipo:** feature
+**Origem:** discussão 2026-05-25 — usuário pede que cliente leigo não precise escolher agentes manualmente, especialmente preparando pra escalar de 7 pra ~30 agentes.
+
+**Decisão:** Nível 3 (full auto) — cliente digita briefing → Enter → sistema escolhe agentes via Haiku + roda direto. Modo expert escondido fica pro Calebe testar manualmente.
+
+#### Sprint 1 — Base do catálogo ✓ commit c50257e (2026-05-25)
+
+- AgenteBase ganha 5 atributos de classe: `papel_curto`, `quando_usar`, `quando_nao_usar`, `categoria`, `custo_medio_usd`
+- Todos os 7 agentes declaram metadados (Otto, Heitor, Salles, Sônia, Aya, Renata, Pedro Abrahão)
+- Endpoint `GET /agentes/catalogo` retorna a lista pronta (sem instanciar)
+- `/sugerir_pipeline` reescrito: gera prompt do Haiku dinamicamente a partir do catálogo. Adicionar agente novo = 1 classe + 1 linha em `api/routes/agentes.py`
+- Fallback conservador (Otto+Aya) se IA não decidir
+- Smoke test 5 briefings: 4 acertos perfeitos, 1 com Heitor faltante em estética. Custo: $0.0014/decisão
+
+#### Sprint 2 — Frontend auto-run (pendente)
+
+- Tela inicial vira só input de briefing + botão Rodar (esconde pills OTTO/HEITOR/etc atrás de "modo expert")
+- Ao apertar Enter, backend chama `/sugerir_pipeline` → pega agentes → executa pipeline direto
+- Banner sutil "Usando: Otto, Salles, Aya ($0.25)" durante execução
+- Tratar lista vazia (briefing tipo "só me dá ideia" — front mostra "Sem agente — quer um chat livre?")
+- Refinar prompt do sugestor: forçar Heitor em conteúdo de saúde/estética (regra de domínio)
+- Modo expert: toggle no header reabilita seleção manual de agentes
+
+**Critério de aceite Sprint 2:**
+- [ ] Cliente novo consegue gerar conteúdo sem entender o que é "Otto/Heitor/etc"
+- [ ] Manual `§3` documenta o modo automático como padrão
+- [ ] Modo expert preserva fluxo antigo intacto
 
 ### T138 — 🟢 BAIXA: Sem endpoint `/health` para instalador
 
