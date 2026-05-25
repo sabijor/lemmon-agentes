@@ -3379,6 +3379,33 @@ Bugs descobertos durante teste do instalador `.command` em Mac limpo (1280×800)
 3. Se persistir, isolar SVG sem className e testar
 4. Workaround temporário: o instalador pode forçar abertura do Chrome em vez do navegador padrão
 
+### T128 — Modelo configurável por agente (Opus pros pensadores, Sonnet pros operacionais)
+
+**Severidade:** baixa de feature · **Afeta output: SIM** (qualidade)
+**Origem:** discussão pós-entrega do instalador (2026-05-25).
+
+**Estado atual:** todos os agentes usam `LEMMON_MODELO_PADRAO=claude-sonnet-4-6` (definido em `core/config.py:19`). Trocar pra `claude-opus-4-7` global aumenta custo ~5x mas eleva qualidade. Hoje é tudo-ou-nada.
+
+**Onde:** `core/config.py`, `core/agente_base.py`, opcionalmente `core/limites_*.py`, opcionalmente ConfigSidebar.
+
+**Proposta:**
+1. Cada `AgenteBase` declara `modelo_recomendado` no init (Otto/Salles → opus, Heitor/Aya/Sônia/Renata → sonnet)
+2. Resolução em runtime: env var específica > modelo_recomendado > MODELO_PADRAO
+3. Env vars opcionais: `LEMMON_MODELO_OTTO=...`, `LEMMON_MODELO_HEITOR=...`, etc.
+4. (Opcional) Dropdown no ConfigSidebar por agente — operador troca on-the-fly
+5. Custo por agente já é calculado em `core/custo.py`, KPIs ficam corretos automaticamente
+
+**Por que vale:**
+- Otto e Salles trabalham com tese/criatividade — Opus eleva notavelmente o output
+- Heitor (compliance), Aya (compilação), Renata (calendário), Sônia (performance) são mais operacionais — Sonnet basta
+- Custo extra real: ~$0.05-0.15 por sessão (não ~$1 do upgrade global)
+
+**Critério de aceite:**
+- [ ] `LEMMON_MODELO_OTTO=claude-opus-4-7` no .env troca SÓ o Otto
+- [ ] Sem env var nenhuma, comportamento atual preservado (Sonnet pra todos)
+- [ ] Histórico distingue modelo usado por agente
+- [ ] Manual §8 (custos) atualizado com tabela de preço por modelo
+
 Possível (visual export):  T96 (CSS Renata exportada) — só se ficar feio em uso
 Outros bugs:               registrar conforme aparecerem
 ```
