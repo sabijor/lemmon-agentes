@@ -69,17 +69,37 @@ export default function Home() {
   const historyPanelY = useMotionValue(0)
 
   useEffect(() => {
+    const PANEL_W = 540
+    const PANEL_H = 640
+    const TOP_OFFSET = 48
+    const clamp = (x: number, y: number) => ({
+      x: Math.min(Math.max(0, x), Math.max(0, window.innerWidth - PANEL_W)),
+      y: Math.min(Math.max(0, y), Math.max(0, window.innerHeight - TOP_OFFSET - PANEL_H)),
+    })
+
     try {
       const saved = localStorage.getItem('chatPanelPos')
       if (saved) {
         const { x, y } = JSON.parse(saved) as { x: number; y: number }
-        panelX.set(x)
-        panelY.set(y)
-        return
+        const { x: cx, y: cy } = clamp(x, y)
+        panelX.set(cx)
+        panelY.set(cy)
+      } else {
+        panelX.set(Math.max(0, window.innerWidth - 480))
+        panelY.set(56)
       }
-    } catch {}
-    panelX.set(Math.max(0, window.innerWidth - 480))
-    panelY.set(56)
+    } catch {
+      panelX.set(Math.max(0, window.innerWidth - 480))
+      panelY.set(56)
+    }
+
+    const onResize = () => {
+      const { x, y } = clamp(panelX.get(), panelY.get())
+      panelX.set(x)
+      panelY.set(y)
+    }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
   }, [panelX, panelY])
 
   useEffect(() => {
@@ -239,7 +259,11 @@ export default function Home() {
           style={{ x: panelX, y: panelY, position: 'fixed', top: 48, zIndex: 40 }}
           className="shadow-2xl shadow-black/20 rounded-2xl"
           onDragEnd={() => {
-            try { localStorage.setItem('chatPanelPos', JSON.stringify({ x: panelX.get(), y: panelY.get() })) } catch {}
+            const PANEL_W = 540, PANEL_H = 640, TOP_OFFSET = 48
+            const x = Math.min(Math.max(0, panelX.get()), Math.max(0, window.innerWidth - PANEL_W))
+            const y = Math.min(Math.max(0, panelY.get()), Math.max(0, window.innerHeight - TOP_OFFSET - PANEL_H))
+            panelX.set(x); panelY.set(y)
+            try { localStorage.setItem('chatPanelPos', JSON.stringify({ x, y })) } catch {}
           }}
         >
           <ChatPanel
