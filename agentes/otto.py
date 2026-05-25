@@ -104,7 +104,7 @@ FERRAMENTA_ANALISE = {
 
 class Otto(AgenteBase):
     nome = "otto"
-    versao_prompt = "v4"
+    versao_prompt = "v3"
 
     def executar(self, briefing: str, modo_visual: str = "auto",
                  contexto_extra: str = "") -> AgenteResultado:
