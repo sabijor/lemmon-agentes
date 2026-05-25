@@ -18,9 +18,32 @@ ESPELHO_CLIENTES_DIR = INPUTS_DIR / "clientes"  # inputs/clientes/<id>/
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 MODELO_PADRAO = os.getenv("LEMMON_MODELO_PADRAO", "claude-sonnet-4-6")
 
-# Custos (USD por 1M tokens) — Sonnet 4.6
+# Custos (USD por 1M tokens) — Sonnet 4.6 (preservado por compatibilidade)
 CUSTO_INPUT_USD_POR_MILHAO = 3.00
 CUSTO_OUTPUT_USD_POR_MILHAO = 15.00
+
+# Tabela de preços por modelo (USD por 1M tokens)
+# Atualizar quando Anthropic mudar preços.
+PRECOS_POR_MODELO: dict[str, dict[str, float]] = {
+    "claude-opus-4-7":   {"input": 15.00, "output": 75.00},
+    "claude-sonnet-4-6": {"input":  3.00, "output": 15.00},
+    "claude-haiku-4-5":  {"input":  0.80, "output":  4.00},
+}
+
+
+def precos_do_modelo(modelo: str) -> dict[str, float]:
+    """Retorna {input, output} em USD/1M tokens. Fallback = Sonnet 4.6."""
+    return PRECOS_POR_MODELO.get(modelo, PRECOS_POR_MODELO["claude-sonnet-4-6"])
+
+
+def resolver_modelo(nome_agente: str) -> str:
+    """Resolve modelo do agente: `LEMMON_MODELO_<AGENTE>` > MODELO_PADRAO.
+
+    Permite usar Opus pros agentes "pensadores" (Otto, Salles) e
+    Sonnet pros "operacionais" via env var, sem alterar código.
+    """
+    env_var = f"LEMMON_MODELO_{nome_agente.upper()}"
+    return os.getenv(env_var) or MODELO_PADRAO
 
 # Validação de input
 BRIEFING_MIN_CARACTERES = 50

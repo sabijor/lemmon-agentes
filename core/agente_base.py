@@ -5,7 +5,7 @@ from typing import Callable
 
 from anthropic import Anthropic, APIConnectionError, APIError, AuthenticationError, RateLimitError
 
-from .config import ANTHROPIC_API_KEY, MODELO_PADRAO, PROMPTS_DIR
+from .config import ANTHROPIC_API_KEY, MODELO_PADRAO, PROMPTS_DIR, resolver_modelo
 from .custo import Custo
 from .exemplares import formatar_exemplares_para_prompt
 from .historico import Historico
@@ -31,9 +31,9 @@ def formatar_erro_anthropic(e: Exception) -> str:
 class AgenteBase(ABC):
     nome: str = "agente_base"
     versao_prompt: str = "v1"
-    modelo: str = MODELO_PADRAO
     max_tokens: int = 16384
     system_prompt_reuniao: str | None = None  # se definido, usado no modo conversacional
+    modelo: str  # setado em __init__ via resolver_modelo(self.nome)
 
     def __init__(self):
         if not ANTHROPIC_API_KEY:
@@ -41,6 +41,9 @@ class AgenteBase(ABC):
                 "ANTHROPIC_API_KEY não configurada. "
                 "Verifique seu arquivo .env"
             )
+        # Resolve modelo por agente (env var LEMMON_MODELO_<NOME> > MODELO_PADRAO).
+        # Subclasse pode forçar um modelo específico sobrescrevendo após super().__init__().
+        self.modelo = resolver_modelo(self.nome)
         self.client = Anthropic(api_key=ANTHROPIC_API_KEY)
         self.logger = get_logger(f"lemmon.{self.nome}")
         self.historico = Historico(self.nome)
@@ -77,7 +80,8 @@ class AgenteBase(ABC):
         duracao = round(time.time() - inicio, 2)
         custo = Custo.calcular(
             response.usage.input_tokens,
-            response.usage.output_tokens
+            response.usage.output_tokens,
+            modelo=self.modelo,
         )
         self.logger.info(f"Execução em {duracao}s | {custo.resumo()}")
 
@@ -129,7 +133,8 @@ class AgenteBase(ABC):
         duracao = round(time.time() - inicio, 2)
         custo = Custo.calcular(
             response.usage.input_tokens,
-            response.usage.output_tokens
+            response.usage.output_tokens,
+            modelo=self.modelo,
         )
         self.logger.info(f"Stream em {duracao}s | {custo.resumo()}")
         return response, custo, duracao
