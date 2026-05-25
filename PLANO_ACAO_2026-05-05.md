@@ -3338,7 +3338,7 @@ FASE 12 — ROUND 6 QA COMPLETA (validação manual 2026-05-09):
      Modo Loop AUSENTE da UI — segmented control virou 2-pill (Auto/Manual) em algum
      bump posterior. T124 registrado pra restaurar. Backend possivelmente intacto.
 
-PROJETO: 1 tarefa pendente (T127 — sprites Safari). T120–T126 fechadas.
+PROJETO: 9 tarefas pendentes (T127 sprites Safari + T129-T134, T136-T138 da auditoria backend). T120-T126, T128, T135 fechadas.
 
 ---
 
@@ -3379,7 +3379,7 @@ Bugs descobertos durante teste do instalador `.command` em Mac limpo (1280×800)
 3. Se persistir, isolar SVG sem className e testar
 4. Workaround temporário: o instalador pode forçar abertura do Chrome em vez do navegador padrão
 
-### T128 — Modelo configurável por agente (Opus pros pensadores, Sonnet pros operacionais)
+### T128 — Modelo configurável por agente (Opus pros pensadores, Sonnet pros operacionais) ✓ commit 0209fe9 (2026-05-25)
 
 **Severidade:** baixa de feature · **Afeta output: SIM** (qualidade)
 **Origem:** discussão pós-entrega do instalador (2026-05-25).
@@ -3409,6 +3409,92 @@ Bugs descobertos durante teste do instalador `.command` em Mac limpo (1280×800)
 Possível (visual export):  T96 (CSS Renata exportada) — só se ficar feio em uso
 Outros bugs:               registrar conforme aparecerem
 ```
+
+---
+
+# FASE 14 — AUDITORIA BACKEND (2026-05-25)
+
+Achados de varredura focada em backend Python (core/, agentes/, api/, scripts/) — buscando bugs reais, dívida estrutural e problemas de processo. Front intencionalmente fora do escopo (em trabalho paralelo).
+
+### T129 — 🔴 ALTA: Path traversal em `/historico/{session_id}`
+
+**Tipo:** bug de segurança · **Onde:** `api/routes/historico.py:72-79`
+
+Endpoint não valida `session_id` antes de construir caminho do arquivo. Cliente malicioso pode usar `"../../../etc/passwd"` em URL para ler arquivos fora do diretório.
+
+**Fix:** validar com regex `^[0-9]{8}_[0-9]{6}` (formato timestamp dos session_ids reais) e rejeitar com 400 se não corresponder.
+
+### T130 — 🔴 ALTA: Race condition em favoritar/tags simultâneos
+
+**Tipo:** bug · **Onde:** `core/historico_index.py:103-119` + `core/historico.py:109-111`
+
+Duas requests simultâneas em `POST /favoritar` e `POST /tags` podem ler o mesmo JSON, modificar concorrentemente e uma sobrescrever a outra. Sem lock nem rename atômico.
+
+**Fix:** `fcntl.flock()` ou write-to-temp + rename atômico ao gravar JSON de sessão.
+
+### T131 — 🟡 MÉDIA: `custo_total_usd` mal tipado (dict vs float)
+
+**Tipo:** bug · **Onde:** `api/ws_chat.py:415-417` e Otto retornando dict
+
+`custo_total_usd` às vezes é float (vindo do `Custo.calcular()`), às vezes dict `{"usd": ...}` (Otto linhas 143-148). Quebra `sum(custos.values())` linha 366. Mesmo padrão da T1 do passado, regressão silenciosa.
+
+**Fix:** Otto retorna `float` direto. Remover branch dict do agregador.
+
+### T132 — 🟡 MÉDIA: Callback de confirmação trava executor por 5min em desconexão
+
+**Tipo:** bug · **Onde:** `api/ws_helpers.py:28-42`
+
+Se cliente desconecta enquanto agente espera confirmação, coroutine fica pendurada 300s bloqueando outros agentes.
+
+**Fix:** detectar `WebSocketDisconnect` em `receive_json()` do callback ou usar timeout menor (30s) com retry.
+
+### T133 — 🟡 MÉDIA: XSS via briefing no `/share/{token}` (escape parcial)
+
+**Tipo:** bug de segurança · **Onde:** `api/routes/share.py:52-111`
+
+`html_escape()` aplicado em comentários, mas `briefing` (linha 92) vem direto do JSON da sessão sem validação. Briefing malicioso (`<script>`) renderiza na página de share.
+
+**Fix:** validar briefing ao gravar sessão (rejeitar tags suspeitas) OU sanitizar com `bleach` ao renderizar HTML.
+
+### T134 — 🟡 MÉDIA: JSON do histórico sem `schema_version`
+
+**Tipo:** processo · **Onde:** `api/storage.py:60-94`
+
+Se schema mudar, JSONs antigos quebram silenciosamente. Sem versão pra disparar migrations.
+
+**Fix:** `"schema_version": 1` no topo de cada JSON; lógica de migration em `historico_index.py` quando incrementar.
+
+### T135 — 🔴 ALTA: `openai` SDK importado sem estar em requirements ✓ commit a004aa4 (2026-05-25)
+
+**Tipo:** bug · **Onde:** `api/routes/transcrever.py:22` + `requirements.txt`
+
+Mesmo padrão do `python-multipart` (T126). Em install limpa, upload de áudio falha com `ModuleNotFoundError: No module named 'openai'`.
+
+**Fix aplicado:** adicionado `openai>=1.0.0` ao requirements + `.env.example` documenta `OPENAI_API_KEY` como opcional com link pro Console OpenAI.
+
+### T136 — 🟢 BAIXA: Custo calculado manualmente em `auxiliares.py`
+
+**Tipo:** dívida técnica · **Onde:** `api/routes/auxiliares.py:84-85, 112-113`
+
+Cálculo hardcoded (`resp.usage.input_tokens * 3e-6 + ...`) em vez de usar `Custo.calcular()`. Se preço mudar (ou virar `Custo` por modelo via T128), aqui não atualiza.
+
+**Fix:** importar `Custo.calcular()` e usar consistentemente. Com T128, passar `modelo=` também.
+
+### T137 — 🟡 MÉDIA: Erro de descrição de imagem silenciado sem log
+
+**Tipo:** bug · **Onde:** `api/ws_chat.py:68-69`
+
+`except Exception: pass` ao falhar visão. Operador não sabe que contexto visual foi ignorado. Mesmo padrão do T55 antigo.
+
+**Fix:** `self.logger.warning("Falha ao descrever imagem: %s", e)` antes do pass.
+
+### T138 — 🟢 BAIXA: Sem endpoint `/health` para instalador
+
+**Tipo:** processo · **Onde:** `api/main.py`
+
+Instalador não tem forma simples de validar que backend subiu. Hoje só dá pra inferir via WebSocket (complicado).
+
+**Fix:** `@app.get("/health")` retornando `{"status": "ok", "version": "1.36"}`. Instalador pode fazer curl pra validar.
 
 > **Por que T95 antes de T94:** sem barra de progresso e sem watchdog, T94 (loop autônomo) vai ter o mesmo problema escalado — operador não vê o que está acontecendo durante 5 turnos seguidos, e qualquer travamento mata o loop sem feedback. T95 prepara o terreno.
 >
