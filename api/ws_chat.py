@@ -19,6 +19,25 @@ from api.ws_helpers import _make_confirmacao_callback, _stream
 
 async def chat(ws: WebSocket):
     await ws.accept()
+
+    # T140 — tolerância a desconexão.
+    # Chrome fecha o WS quando a aba vai pra background. Sem isso, qualquer
+    # ws.send_json após o close levantava RuntimeError e abortava o pipeline
+    # no meio — a sessão nem chegava a ser salva no histórico. Agora o pipeline
+    # roda até o fim mesmo sem cliente conectado e a sessão fica salva
+    # (cliente pega via reload/histórico ao voltar).
+    _original_send_json = ws.send_json
+
+    async def _tolerant_send_json(*args, **kwargs):  # type: ignore[no-redef]
+        try:
+            await _original_send_json(*args, **kwargs)
+        except RuntimeError as exc:
+            if "close" in str(exc).lower():
+                return  # WS já fechou — pipeline segue rodando até salvar a sessão
+            raise
+
+    ws.send_json = _tolerant_send_json  # type: ignore[method-assign]
+
     try:
         while True:
             data = await ws.receive_json()

@@ -42,8 +42,21 @@ def _construir_prompt_sugestor(briefing: str, catalogo: list[dict]) -> str:
         "- Ordem importa: cada agente recebe contexto dos anteriores. Coloque estratégia antes de roteiro, roteiro antes de performance.\n"
         "- Aya (compilação) só faz sentido se houver 2+ agentes antes dela.\n"
         "- Espelhos de cliente entram quando o briefing menciona o cliente específico.\n\n"
+        "REGRAS DE OURO (não-negociáveis):\n"
+        "- Se o pedido envolve SAÚDE, MEDICINA, ESTÉTICA, ODONTO, SUPLEMENTOS, HARMONIZAÇÃO, EMAGRECIMENTO, ESTÉTICA FACIAL/CORPORAL → INCLUIR Heitor SEMPRE.\n"
+        "- Se for produzir conteúdo pra ad pago (anúncio no Meta/Instagram/Facebook) → INCLUIR Heitor.\n"
+        "- Aya é compiladora obrigatória — SEMPRE entra no final quando há QUALQUER outro agente. Sistema força isso, mas você ainda inclui na sua lista.\n"
+        "- Se o pedido tem ação clara (faz/cria/roda/monta X), ATIVE agentes mesmo sem todo contexto. Use seu melhor julgamento. NÃO retorne vazio só porque falta detalhe.\n"
+        "- Só retorne lista VAZIA se o pedido for fundamentalmente incompleto (ex: 'me dá ideia [sem dizer ideia do quê]', 'roda esse texto: [vazio]') OU se for puramente conversacional sem entregável (ex: 'oi tudo bem'). Inclua razão em \"_motivo_vazio\".\n\n"
+        "EXEMPLOS DE CONJUNTOS MÍNIMOS:\n"
+        "- 'campanha completa pra [cliente/produto]' → otto + heitor (se ad/saúde) + salles + sonia + aya  (entrega completa: estratégia → roteiro → otimização performance → dossiê)\n"
+        "- 'reel/short pra [tema]' → otto + heitor (se saúde) + salles + sonia + aya\n"
+        "- 'estratégia pra [coisa]' → otto + aya (estratégia + dossiê)\n"
+        "- 'calendário editorial' (com contexto suficiente) → renata + aya\n"
+        "- 'compliance/validar texto' → heitor (sozinho — não precisa de aya)\n"
+        "- 'conteúdo pra Pedro/Hator' → adicionar pedro_abrahao ao conjunto que faria sentido\n\n"
         "RESPONDA SOMENTE COM JSON VÁLIDO, no formato:\n"
-        '{"agentes": ["id1", "id2", ...], "razoes": {"id1": "por que rodar", "id2": "..."}, "custo_estimado_usd": 0.00}\n\n'
+        '{"agentes": ["id1", "id2", ...], "razoes": {"id1": "por que rodar"}, "custo_estimado_usd": 0.00, "_motivo_vazio": "(só se agentes=[]) explicação amigável"}\n\n'
         f"IDs válidos: {ids_validos}\n\n"
         f"PEDIDO DO OPERADOR:\n{briefing[:2000]}"
     )
@@ -82,13 +95,26 @@ async def sugerir_pipeline(briefing: str):
     except Exception:
         sugestao = {}
     agentes = [a for a in sugestao.get("agentes", []) if a in ids_validos]
-    if not agentes:
-        # fallback conservador: Otto + Aya (estratégia + compilação)
-        agentes = [a for a in ["otto", "aya"] if a in ids_validos]
+    motivo_vazio = sugestao.get("_motivo_vazio") or ""
+    # Se a IA decidiu vazio CONSCIENTEMENTE (com motivo), respeitamos. Se decidiu
+    # vazio sem motivo, é falha de parse → fallback conservador (Otto sozinho dá um norte).
+    if not agentes and not motivo_vazio:
+        agentes = [a for a in ["otto"] if a in ids_validos]
+
+    # REGRA DE OURO: Aya é compiladora — SEMPRE entra no fim quando há outros agentes.
+    # Cliente espera SEMPRE um dossiê final. Exceção: agente único de compliance puro
+    # (Heitor sozinho — pedido tipo "valida esse texto" não precisa de dossiê).
+    if agentes and agentes != ["heitor"] and "aya" not in agentes and "aya" in ids_validos:
+        agentes.append("aya")
+    # Garante Aya na última posição (a IA pode ter colocado no meio)
+    if "aya" in agentes:
+        agentes = [a for a in agentes if a != "aya"] + ["aya"]
+
     return {
         "agentes": agentes,
         "razoes": sugestao.get("razoes", {}),
         "custo_estimado_usd": sugestao.get("custo_estimado_usd"),
+        "motivo_vazio": motivo_vazio,
     }
 
 
