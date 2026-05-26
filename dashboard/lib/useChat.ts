@@ -66,12 +66,17 @@ const DEFAULT_CONFIG: AgentConfig = {
 }
 
 export function useChat() {
-  const [messages, setMessages] = useState<Message[]>([])
+  // T139 Sprint 2 — persistir messages e sessionId em localStorage. Defende contra:
+  // (a) usuário muda de aba e estado some por algum motivo (relatado pelo Pedro),
+  // (b) reload acidental, (c) qualquer bug futuro que zere o React state.
+  // Pipeline em execução (isRunning + agentStatus transitório) NÃO persiste — o WS
+  // cai ao mudar/recarregar e não dá pra retomar.
+  const [messages, setMessages] = useLocalStorage<Message[]>('lemmon-last-messages', [])
   const [agentStatus, setAgentStatus] = useState<Record<AgentId, AgentStatus>>({
     otto: 'idle', heitor: 'idle', salles: 'idle', sonia: 'idle', aya: 'idle', pedro_abrahao: 'idle', renata: 'idle',
   })
   const [isRunning, setIsRunning] = useState(false)
-  const [sessionId, setSessionId] = useState<string | null>(null)
+  const [sessionId, setSessionId] = useLocalStorage<string | null>('lemmon-last-session-id', null)
   const [favoritado, setFavoritado] = useState(false)
   const [manualMode, setManualMode] = useState(false)
   const [awaitingApproval, setAwaitingApproval] = useState<ApprovalRequest | null>(null)
@@ -92,6 +97,10 @@ export function useChat() {
   const activeAgentsRef = useRef<Set<string>>(new Set())
   const watchdogTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const timedOutAgentsRef = useRef<Set<string>>(new Set())
+  // T140 — timestamp do último send() pra reconciliar via histórico quando o WS cai
+  // (ex: Chrome desconecta WS em aba background; backend continua e salva sessão)
+  const sessionStartTimeRef = useRef<number | null>(null)
+  const reconnectingRef = useRef<boolean>(false)
 
   useEffect(() => {
     return () => {
@@ -100,6 +109,60 @@ export function useChat() {
       progressIntervalsRef.current = {}
       watchdogTimersRef.current = {}
     }
+  }, [])
+
+  // T140 — Reconexão por visibilitychange.
+  // Chrome fecha WS em abas background. Quando o usuário volta, se uma sessão
+  // estava rodando, o WS já caiu e o backend continuou sozinho (mensagens novas
+  // não chegam mais). Aqui detectamos isso e fazemos poll do histórico até achar
+  // a sessão (que o backend salva ao terminar) — e carregamos o resultado.
+  useEffect(() => {
+    let cancelled = false
+    const onVisibility = async () => {
+      if (document.visibilityState !== 'visible') return
+      if (!sessionStartTimeRef.current) return
+      const wsClosed = !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN
+      if (!wsClosed) return
+      if (reconnectingRef.current) return
+      reconnectingRef.current = true
+      const startTime = sessionStartTimeRef.current
+      try {
+        // Até 3 min de polling (45 tentativas × 4s)
+        for (let i = 0; i < 45 && !cancelled; i++) {
+          try {
+            const resp = await fetch(`${API_URL}/historico`)
+            if (resp.ok) {
+              const data = await resp.json()
+              const list = data.sessions ?? data ?? []
+              const found = (list as Array<{ session_id: string; timestamp: string }>).find(
+                s => new Date(s.timestamp).getTime() > startTime - 5000,
+              )
+              if (found) {
+                const detailResp = await fetch(`${API_URL}/historico/${found.session_id}`)
+                if (detailResp.ok) {
+                  const detail = (await detailResp.json()) as HistoryDetail
+                  if (!cancelled) loadSession(detail)
+                  sessionStartTimeRef.current = null
+                  return
+                }
+              }
+            }
+          } catch {
+            /* network blip — retry */
+          }
+          await new Promise(r => setTimeout(r, 4000))
+        }
+      } finally {
+        reconnectingRef.current = false
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      cancelled = true
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
+    // loadSession é estável (useCallback), mas listamos pra deixar explícito
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const updateConfig = useCallback(<K extends keyof AgentConfig>(
@@ -142,6 +205,7 @@ export function useChat() {
   const send = useCallback((agents: AgentId[], userMessage: string, image?: ImageData) => {
     if (isRunning || !userMessage.trim() || agents.length === 0) return
 
+    sessionStartTimeRef.current = Date.now()  // T140 — pra reconciliar via histórico se WS cair
     setSessionId(null)
     setFavoritado(false)
     setAwaitingApproval(null)

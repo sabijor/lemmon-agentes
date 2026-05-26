@@ -39,10 +39,31 @@ import { AGENTS, type AgentId } from '@/lib/agents'
 import { useChat, type ImageData } from '@/lib/useChat'
 import { useHistory, type HistoryDetail } from '@/lib/useHistory'
 import { useReuniao } from '@/lib/useReuniao'
+import { useAutoRouter } from '@/lib/useAutoRouter'
+import { useLocalStorage } from '@/lib/hooks/useLocalStorage'
+import { notify } from '@/lib/toast'
 import Link from 'next/link'
 import OfficeScene from '@/components/office/OfficeScene'
 import ChatPanel from '@/components/chat/ChatPanel'
 import HistoryPanel from '@/components/history/HistoryPanel'
+
+function AutoModeToggle({ autoMode, setAutoMode, disabled }: { autoMode: boolean; setAutoMode: (v: boolean) => void; disabled?: boolean }) {
+  return (
+    <button
+      onClick={() => !disabled && setAutoMode(!autoMode)}
+      disabled={disabled}
+      title={autoMode ? 'Modo Auto — IA escolhe os agentes' : 'Modo Expert — você escolhe manualmente'}
+      className={`flex items-center gap-1.5 h-8 px-3 rounded-lg border text-[10px] font-mono uppercase tracking-widest transition-all
+        ${autoMode
+          ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20'
+          : 'bg-amber-500/10 border-amber-500/40 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20'}
+        ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+    >
+      <span className="text-sm leading-none">{autoMode ? '🤖' : '🔧'}</span>
+      <span>{autoMode ? 'Auto' : 'Expert'}</span>
+    </button>
+  )
+}
 
 export default function Home() {
   const [inMeeting, setInMeeting] = useState<Set<AgentId>>(new Set())
@@ -50,6 +71,10 @@ export default function Home() {
   const [chatMode, setChatMode] = useState<'pipeline' | 'reuniao'>('pipeline')
   const [historyOpen, setHistoryOpen] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
+  // T139 Sprint 2 — Modo Auto (default ligado): IA escolhe os agentes ao enviar briefing.
+  // Modo Expert: cliente avançado convoca manualmente (pills no header).
+  const [autoMode, setAutoMode] = useLocalStorage<boolean>('lemmon-auto-mode', true)
+  const { sugerir: sugerirPipeline } = useAutoRouter()
   const { messages, agentStatus, isRunning, sessionId, favoritado, resumedFrom, manualMode, fastTrack, sandbox, custoCap, custoCapAtingido, custoAviso, awaitingApproval, agentConfig, tagsSugeridas, agentProgress, agentProgressMeta, send, approve, abort, toggleManualMode, toggleFastTrack, toggleSandbox, setCustoCap, autorizarCusto, recusarCustoExtra, updateConfig, favoritar, exportar, reset, loadSession } = useChat()
   const {
     messages: reunMessages, agentStatus: reunAgentStatus, isRunning: reunIsRunning,
@@ -128,11 +153,36 @@ export default function Home() {
 
   const callAll = () => setInMeeting(new Set(AGENTS.map(a => a.id)))
   const exitMeeting = () => setInMeeting(new Set())
-  const handleSend = (msg: string, image?: ImageData) => send(
-    Array.from(inMeeting).filter(id => !AGENTS.find(a => a.id === id)?.reuniaoOnly),
-    msg,
-    image,
-  )
+
+  const handleSend = async (msg: string, image?: ImageData) => {
+    if (autoMode) {
+      // T139 Sprint 2 — auto-roteador escolhe os agentes pela IA antes de rodar
+      const sugestao = await sugerirPipeline(msg)
+      if (!sugestao) {
+        notify.error('Não consegui consultar o roteador. Tente de novo.')
+        return
+      }
+      if (sugestao.agentes.length === 0) {
+        notify.warning(sugestao.motivo_vazio || 'Pedido muito vago — adicione mais contexto e tente de novo.')
+        return
+      }
+      const ids = sugestao.agentes.filter(id => !AGENTS.find(a => a.id === id)?.reuniaoOnly)
+      setInMeeting(new Set(ids))
+      const nomes = ids.map(id => AGENTS.find(a => a.id === id)?.name ?? id).join(' · ')
+      const custoTxt = sugestao.custo_estimado_usd != null
+        ? ` (~$${sugestao.custo_estimado_usd.toFixed(2)})`
+        : ''
+      notify.info(`🤖 IA escolheu: ${nomes}${custoTxt}`)
+      send(ids, msg, image)
+      return
+    }
+    // Modo Expert — comportamento original (cliente convocou os agentes manualmente)
+    send(
+      Array.from(inMeeting).filter(id => !AGENTS.find(a => a.id === id)?.reuniaoOnly),
+      msg,
+      image,
+    )
+  }
 
   const handleResume = (detail: HistoryDetail) => {
     loadSession(detail)
@@ -167,7 +217,7 @@ export default function Home() {
         </div>
 
         <div className="flex items-center gap-6">
-          <div className="hidden md:flex items-center gap-2">
+          <div className={`hidden md:flex items-center gap-2 transition-opacity ${autoMode ? 'opacity-0 pointer-events-none w-0 overflow-hidden' : 'opacity-100'}`}>
             {AGENTS.map(agent => {
               const status = agentStatus[agent.id]
               const isIn = inMeeting.has(agent.id)
@@ -198,6 +248,7 @@ export default function Home() {
               )
             })}
           </div>
+          <AutoModeToggle autoMode={autoMode} setAutoMode={setAutoMode} disabled={isRunning || reunIsRunning} />
           <Clock />
           <Link href="/saude" title="Dashboard de Saúde"
             className="w-8 h-8 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 flex items-center justify-center hover:bg-stone-50 dark:hover:bg-stone-800 hover:border-stone-400 dark:hover:border-stone-500 transition-all text-stone-500 dark:text-stone-400">
@@ -287,6 +338,7 @@ export default function Home() {
             awaitingApproval={awaitingApproval}
             agentConfig={agentConfig}
             dragControls={dragControls}
+            autoMode={autoMode}
             onSend={handleSend}
             onReset={reset}
             onFavoritar={favoritar}

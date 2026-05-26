@@ -85,6 +85,8 @@ interface Props {
   onSetInMeeting?: (agents: AgentId[]) => void
   dragControls?: DragControls
   tagsSugeridas?: string[]
+  /** T139 Sprint 2 — em modo Auto, IA escolhe agentes ao enviar; UI desbloqueada mesmo com inMeeting vazio. */
+  autoMode?: boolean
 }
 
 // ─── Main panel ──────────────────────────────────────────────────────
@@ -101,7 +103,7 @@ export default function ChatPanel({
   loopMode, onSetLoopMode, loopMaxTurnos, onSetLoopMaxTurnos, loopCustoCap, onSetLoopCustoCap,
   loopActive, loopTurn, loopCost, loopStatus, onLoopStop,
   onExportar, onClose, onSetInMeeting,
-  tagsSugeridas = [],
+  tagsSugeridas = [], autoMode = false,
 }: Props) {
   // Mode-aware aliases
   const activeMessages    = mode === 'reuniao' ? reunMessages    : messages
@@ -426,7 +428,9 @@ export default function ChatPanel({
   const handleSend = () => {
     const msg = input.trim()
     setReferencias(null)
-    if (!msg || activeIsRunning || inMeeting.size === 0) return
+    // Em modo Auto (pipeline) o IA escolhe os agentes ao receber o briefing → inMeeting pode estar vazio.
+    const podeEnviarVazio = autoMode && mode === 'pipeline'
+    if (!msg || activeIsRunning || (inMeeting.size === 0 && !podeEnviarVazio)) return
     if (mode === 'reuniao') {
       onReunSend(Array.from(inMeeting) as AgentId[], msg, reuniaoManual)
     } else {
@@ -801,9 +805,11 @@ export default function ChatPanel({
           )}
           {activeMessages.length === 0 && inMeeting.size === 0 && (
             <div className="h-full flex flex-col items-center justify-center text-center gap-3">
-              <span className="text-4xl">{mode === 'reuniao' ? '💬' : '⚔️'}</span>
+              <span className="text-4xl">{autoMode && mode === 'pipeline' ? '🤖' : (mode === 'reuniao' ? '💬' : '⚔️')}</span>
               <p className="text-xs font-mono text-stone-400 uppercase tracking-widest leading-relaxed">
-                Convoque agentes ao escritório<br />para iniciar uma sessão
+                {autoMode && mode === 'pipeline'
+                  ? <>Descreva seu pedido<br />a IA escolhe os agentes</>
+                  : <>Convoque agentes ao escritório<br />para iniciar uma sessão</>}
               </p>
             </div>
           )}
@@ -1214,7 +1220,7 @@ export default function ChatPanel({
 
         {/* Input */}
         {!minimized && <div className="p-4 border-t border-stone-200/50 dark:border-stone-700/50 flex-shrink-0">
-          {inMeeting.size === 0 ? (
+          {inMeeting.size === 0 && !(autoMode && mode === 'pipeline') ? (
             <div className="text-center text-[10px] font-mono text-stone-400 uppercase tracking-widest py-3">
               Nenhum agente na sala
             </div>
