@@ -3338,7 +3338,7 @@ FASE 12 — ROUND 6 QA COMPLETA (validação manual 2026-05-09):
      Modo Loop AUSENTE da UI — segmented control virou 2-pill (Auto/Manual) em algum
      bump posterior. T124 registrado pra restaurar. Backend possivelmente intacto.
 
-PROJETO: 10 tarefas pendentes (T127 sprites Safari + T129-T134, T136-T138 da auditoria backend + T139 Sprint 2 frontend). T120-T126, T128, T135, T139 Sprint 1 fechadas.
+PROJETO: 9 tarefas pendentes (T127 sprites Safari + T129-T134, T136-T138 da auditoria backend). T120-T126, T128, T135, T139 (Sprint 1 + Sprint 2), T140 fechadas. Validação real do T139+T140 em curso com cliente Pedro.
 
 ---
 
@@ -3504,19 +3504,43 @@ Cálculo hardcoded (`resp.usage.input_tokens * 3e-6 + ...`) em vez de usar `Cust
 - Fallback conservador (Otto+Aya) se IA não decidir
 - Smoke test 5 briefings: 4 acertos perfeitos, 1 com Heitor faltante em estética. Custo: $0.0014/decisão
 
-#### Sprint 2 — Frontend auto-run (pendente)
+#### Sprint 2 — Frontend auto-run ✓ commits 273bafe + 0c9ee55 (2026-05-26)
 
-- Tela inicial vira só input de briefing + botão Rodar (esconde pills OTTO/HEITOR/etc atrás de "modo expert")
-- Ao apertar Enter, backend chama `/sugerir_pipeline` → pega agentes → executa pipeline direto
-- Banner sutil "Usando: Otto, Salles, Aya ($0.25)" durante execução
-- Tratar lista vazia (briefing tipo "só me dá ideia" — front mostra "Sem agente — quer um chat livre?")
-- Refinar prompt do sugestor: forçar Heitor em conteúdo de saúde/estética (regra de domínio)
-- Modo expert: toggle no header reabilita seleção manual de agentes
+Implementado:
+- Novo hook `useAutoRouter` chama `/sugerir_pipeline`
+- `AutoModeToggle` no header (pill Auto/Expert, default Auto, localStorage)
+- Modo Auto esconde pills OTTO/HEITOR/etc; ChatPanel mostra "🤖 Descreva seu pedido / a IA escolhe os agentes" no vazio
+- `handleSend` intercepta envio em Auto: chama sugestor → toast "🤖 IA escolheu: X · Y · Z (~$0.25)" → popula inMeeting → dispara pipeline
+- Lista vazia (`motivo_vazio`) mostra toast warning amigável, não dispara
+- Modo Expert preserva 100% do fluxo antigo (pills, seleção manual)
 
-**Critério de aceite Sprint 2:**
-- [ ] Cliente novo consegue gerar conteúdo sem entender o que é "Otto/Heitor/etc"
-- [ ] Manual `§3` documenta o modo automático como padrão
-- [ ] Modo expert preserva fluxo antigo intacto
+Refinos do sugestor (commit 0c9ee55):
+- Regra hardcoded: Aya sempre no fim quando há 2+ agentes (cliente espera sempre dossiê)
+- Prompt do sugestor reforçado com exemplos de conjuntos mínimos ("campanha completa" → 5 agentes) e instrução pra usar julgamento mesmo sem todo contexto (antes ficava conservador demais)
+
+### T140 — Resiliência: WS cai em aba background ✓ commits 273bafe + 0c9ee55 (2026-05-26)
+
+**Severidade:** crítica · **Origem:** descoberto no smoke test do T139 com pipeline real.
+
+**Problema:** Chrome fecha WebSocket em abas em background pra economizar bateria. Antes:
+1. Cliente envia briefing, pipeline começa
+2. Cliente muda de aba (ler email, etc)
+3. Chrome fecha WS após uns segundos
+4. Backend tenta `ws.send_json(...)` → `RuntimeError("Cannot call send once close message sent")` → **pipeline crash no meio, sessão NEM salva no histórico**
+5. Cliente volta, frontend vazio, sem nenhum traço da sessão
+
+**Fix backend (`api/ws_chat.py`):** monkey-patch tolerante no `ws.send_json` no início do handler — silencia RuntimeError de close, deixa pipeline rodar até o fim e salvar sessão normalmente.
+
+**Fix frontend (`lib/useChat.ts`):**
+- `messages` e `sessionId` movidos pra `useLocalStorage` (sobrevivem a refresh, mudança de aba, qualquer reset do React state)
+- `useLocalStorage` estendido pra aceitar setter funcional (`setMessages(prev => ...)`)
+- Novo visibilitychange listener: ao voltar foco com `isRunning=true` e WS fechado, faz polling do `/historico` até achar a sessão (criada após `sessionStartTime`) e carrega via `loadSession`. Retry 3min × 4s.
+
+**Crítério de aceite:**
+- [x] Backend não crasha mais com WS fechado
+- [x] Sessão é salva no histórico mesmo se cliente sair
+- [x] Frontend recupera estado ao voltar pra aba
+- [ ] Validado em uso real pelo Pedro (cliente final)
 
 ### T138 — 🟢 BAIXA: Sem endpoint `/health` para instalador
 
