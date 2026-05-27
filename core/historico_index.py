@@ -7,10 +7,14 @@ Mantém historico/_index.json sincronizado com os arquivos JSON do dashboard.
   reconstrução automática.
 - reconstruir() faz rebuild completo relendo todos os arquivos JSON.
 """
+import fcntl
 import json
 import logging
+import os
 import time
+from contextlib import contextmanager
 from pathlib import Path
+from typing import Callable
 
 from core.config import HISTORICO_DIR
 
@@ -19,6 +23,46 @@ _log = logging.getLogger("lemmon.index")
 INDEX_PATH = HISTORICO_DIR / "_index.json"
 DASHBOARD_DIR = HISTORICO_DIR / "dashboard"
 _VERSAO = 1
+
+
+# --------------------------------------------------------------------------- #
+# T130 — concorrência: lock exclusivo + rename atômico                         #
+# --------------------------------------------------------------------------- #
+
+@contextmanager
+def _file_lock(target: Path):
+    """Lock exclusivo via flock(LOCK_EX) num .lock dedicado ao target.
+
+    Bloqueia até obter — duas requests simultâneas serializam.
+    Lock no arquivo paralelo (não no target) pra não interferir com rename.
+    """
+    lockpath = target.with_suffix(target.suffix + ".lock")
+    lockpath.parent.mkdir(parents=True, exist_ok=True)
+    with open(lockpath, "w") as fh:
+        try:
+            fcntl.flock(fh.fileno(), fcntl.LOCK_EX)
+            yield
+        finally:
+            fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
+
+
+def _update_json_atomic(path: Path, mutate: Callable[[dict], None]) -> bool:
+    """Read → mutate → write atômico com lock. Evita corrida de favoritar+tags.
+
+    Sequência: flock exclusivo → ler JSON → callback `mutate(dados)` muta in-place
+    → grava em .tmp → os.replace (rename atômico) → libera lock.
+
+    Retorna False se path não existe. Erros de IO propagam.
+    """
+    if not path.exists():
+        return False
+    with _file_lock(path):
+        dados = json.loads(path.read_text(encoding="utf-8"))
+        mutate(dados)
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        tmp.write_text(json.dumps(dados, ensure_ascii=False, indent=2), encoding="utf-8")
+        os.replace(tmp, path)
+    return True
 
 
 # --------------------------------------------------------------------------- #
@@ -104,16 +148,17 @@ def marcar_favorito(session_id: str, favorito: bool) -> None:
     """Define o status favorito de uma sessão no índice e no JSON de sessão.
 
     Idempotente: pode ser chamada múltiplas vezes com o mesmo valor.
+    Concorrência: lock exclusivo + rename atômico (T130) — duas requests
+    simultâneas em /favoritar e /tags na mesma sessão serializam sem perder
+    nenhuma escrita.
     """
     session_dir = HISTORICO_DIR / "dashboard"
     path = session_dir / f"{session_id}.json"
-    if not path.exists():
-        _log.warning("marcar_favorito: sessão não encontrada %s", session_id)
-        return
     try:
-        dados = json.loads(path.read_text(encoding="utf-8"))
-        dados["favorito"] = favorito
-        path.write_text(json.dumps(dados, ensure_ascii=False, indent=2), encoding="utf-8")
+        ok = _update_json_atomic(path, lambda d: d.update({"favorito": favorito}))
+        if not ok:
+            _log.warning("marcar_favorito: sessão não encontrada %s", session_id)
+            return
         atualizar_entrada(session_id, {"favorito": favorito})
     except Exception as exc:
         _log.error("Erro ao marcar_favorito %s: %s", session_id, exc)

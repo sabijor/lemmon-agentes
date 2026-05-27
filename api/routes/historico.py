@@ -1,5 +1,7 @@
 """Rotas de histórico de sessões."""
 import json
+import re
+from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Query
 
@@ -8,10 +10,31 @@ from api.deps import (
 )
 from fastapi.responses import JSONResponse
 from api.schemas import AvaliacaoPayload, FavoritarPayload, TagsPayload
-from core.historico_index import atualizar_entrada, marcar_favorito, reconstruir
+from core.historico_index import _update_json_atomic, atualizar_entrada, marcar_favorito, reconstruir
 from core.similaridade import buscar_historico_similar
 
 router = APIRouter()
+
+# T129 — formato dos session_ids reais: yyyyMMdd_HHmmss(_sessao|_reuniao)?
+# Validação anti path-traversal: rejeita qualquer coisa fora desse formato.
+_SESSION_ID_RE = re.compile(r"^[0-9]{8}_[0-9]{6}(_sessao|_reuniao)?$")
+
+
+def _path_da_sessao(session_id: str) -> Path:
+    """Valida session_id e retorna o Path. Levanta HTTPException 400 se inválido.
+
+    Defesa em profundidade: além do regex, confirma que o path resolvido continua
+    dentro do diretório de sessões (proteção contra qualquer bypass do regex).
+    """
+    if not _SESSION_ID_RE.match(session_id):
+        raise HTTPException(status_code=400, detail="session_id inválido")
+    session_dir = (HISTORICO_DIR / "dashboard").resolve()
+    path = (session_dir / f"{session_id}.json").resolve()
+    try:
+        path.relative_to(session_dir)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="session_id inválido")
+    return path
 
 
 @router.get("/historico")
@@ -70,8 +93,7 @@ async def historico_similar(briefing: str, n: int = 3):
 
 @router.get("/historico/{session_id}")
 async def detalhe_historico(session_id: str):
-    session_dir = HISTORICO_DIR / "dashboard"
-    path = session_dir / f"{session_id}.json"
+    path = _path_da_sessao(session_id)
     if not path.exists():
         raise HTTPException(status_code=404, detail="Sessão não encontrada")
     dados = json.loads(path.read_text(encoding="utf-8"))
@@ -82,8 +104,7 @@ async def detalhe_historico(session_id: str):
 @router.post("/favoritar")
 async def favoritar(payload: FavoritarPayload):
     """Define o status favorito de uma sessão (idempotente)."""
-    session_dir = HISTORICO_DIR / "dashboard"
-    path = session_dir / f"{payload.session_id}.json"
+    path = _path_da_sessao(payload.session_id)
     if not path.exists():
         raise HTTPException(status_code=404, detail="Sessão não encontrada")
     marcar_favorito(payload.session_id, payload.favorito)
@@ -101,14 +122,15 @@ async def avaliar(payload: AvaliacaoPayload):
 
 @router.post("/tags")
 async def salvar_tags(payload: TagsPayload):
-    """Persiste tags aceitas pelo operador, sem exigir avaliação."""
-    session_dir = HISTORICO_DIR / "dashboard"
-    path = session_dir / f"{payload.session_id}.json"
-    if not path.exists():
+    """Persiste tags aceitas pelo operador, sem exigir avaliação.
+
+    T130: usa _update_json_atomic (flock + rename) — convive bem com requests
+    simultâneas em /favoritar sem perder nenhuma das escritas.
+    """
+    path = _path_da_sessao(payload.session_id)
+    ok = _update_json_atomic(path, lambda d: d.update({"tags": payload.tags}))
+    if not ok:
         raise HTTPException(status_code=404, detail="Sessão não encontrada")
-    dados = json.loads(path.read_text(encoding="utf-8"))
-    dados["tags"] = payload.tags
-    path.write_text(json.dumps(dados, ensure_ascii=False, indent=2), encoding="utf-8")
     return {"ok": True}
 
 
