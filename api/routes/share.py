@@ -51,7 +51,11 @@ async def ver_share_json(token: str):
 
 @router.get("/share/{token}", response_class=HTMLResponse)
 async def ver_share(token: str):
-    """T36: Página pública de aprovação — dossiê limpo sem custos/técnico."""
+    """T36: Página pública de aprovação — dossiê limpo sem custos/técnico.
+
+    T133: Defesa em profundidade contra XSS — html_escape em TODA interpolação
+    + headers HTTP restritivos (CSP, X-Frame-Options, etc.).
+    """
     share = _load_share(token)
     agentes = share.get("agentes_usados", [])
     respostas = share.get("respostas", {})
@@ -69,7 +73,7 @@ async def ver_share(token: str):
     for c in share.get("comentarios", []):
         comentarios_html += f"""<div class="comment"><strong>{html_escape(c["autor"])}</strong>: {html_escape(c["texto"])}</div>"""
     briefing = share.get("briefing", "")
-    return HTMLResponse(f"""<!DOCTYPE html>
+    body_html = f"""<!DOCTYPE html>
 <html lang="pt-BR"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Lemmon — Aprovação</title>
@@ -95,8 +99,8 @@ async def ver_share(token: str):
   <h2>Comentários</h2>
   {comentarios_html or '<p style="color:#a8a29e;font-size:.875rem">Nenhum comentário ainda.</p>'}
   <form onsubmit="sendComment(event)">
-    <input id="autor" placeholder="Seu nome" required />
-    <textarea id="texto" rows="3" placeholder="Seu comentário..." required></textarea>
+    <input id="autor" placeholder="Seu nome" required maxlength="80" />
+    <textarea id="texto" rows="3" placeholder="Seu comentário..." required maxlength="2000"></textarea>
     <button type="submit">Enviar comentário</button>
   </form>
 </div>
@@ -108,7 +112,25 @@ async function sendComment(e){{
   if(r.ok)location.reload();
 }}
 </script>
-</body></html>""")
+</body></html>"""
+    # T133 — headers de segurança em defesa-em-profundidade.
+    # 'unsafe-inline' em script-src é necessário pro form (TODO: extrair pra arquivo estático e remover).
+    return HTMLResponse(body_html, headers={
+        "Content-Security-Policy": (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline'; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data:; "
+            "connect-src 'self'; "
+            "frame-ancestors 'none'; "
+            "base-uri 'self'; "
+            "form-action 'self'"
+        ),
+        "X-Frame-Options": "DENY",
+        "X-Content-Type-Options": "nosniff",
+        "Referrer-Policy": "no-referrer",
+        "Permissions-Policy": "geolocation=(), microphone=(), camera=()",
+    })
 
 
 @router.post("/share/{token}/comentar")
