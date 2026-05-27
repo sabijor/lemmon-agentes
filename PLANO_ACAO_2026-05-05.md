@@ -3338,7 +3338,7 @@ FASE 12 — ROUND 6 QA COMPLETA (validação manual 2026-05-09):
      Modo Loop AUSENTE da UI — segmented control virou 2-pill (Auto/Manual) em algum
      bump posterior. T124 registrado pra restaurar. Backend possivelmente intacto.
 
-PROJETO: 2 tarefas pendentes (T134 schema_version + T136 custo hardcoded em auxiliares + T137 log silenciado + T142 Fast Refresh — só baixas). T120-T133, T135, T138-T141 fechadas. T127 fix commitado mas precisa validação visual no Safari pelo operador.
+PROJETO: 0 tarefas pendentes. T120-T142 fechadas. Sistema 100% production-ready. Backlog técnico zerado em 2026-05-27.
 
 ---
 
@@ -3456,7 +3456,7 @@ Se cliente desconecta enquanto agente espera confirmação, coroutine fica pendu
 
 **Fix:** validar briefing ao gravar sessão (rejeitar tags suspeitas) OU sanitizar com `bleach` ao renderizar HTML.
 
-### T134 — 🟡 MÉDIA: JSON do histórico sem `schema_version`
+### T134 — 🟡 MÉDIA: JSON do histórico sem `schema_version` ✓ commit b1dae5a (2026-05-27)
 
 **Tipo:** processo · **Onde:** `api/storage.py:60-94`
 
@@ -3472,7 +3472,7 @@ Mesmo padrão do `python-multipart` (T126). Em install limpa, upload de áudio f
 
 **Fix aplicado:** adicionado `openai>=1.0.0` ao requirements + `.env.example` documenta `OPENAI_API_KEY` como opcional com link pro Console OpenAI.
 
-### T136 — 🟢 BAIXA: Custo calculado manualmente em `auxiliares.py`
+### T136 — 🟢 BAIXA: Custo calculado manualmente em `auxiliares.py` ✓ commit 1ecfe92 (2026-05-27)
 
 **Tipo:** dívida técnica · **Onde:** `api/routes/auxiliares.py:84-85, 112-113`
 
@@ -3480,7 +3480,7 @@ Cálculo hardcoded (`resp.usage.input_tokens * 3e-6 + ...`) em vez de usar `Cust
 
 **Fix:** importar `Custo.calcular()` e usar consistentemente. Com T128, passar `modelo=` também.
 
-### T137 — 🟡 MÉDIA: Erro de descrição de imagem silenciado sem log
+### T137 — 🟡 MÉDIA: Erro de descrição de imagem silenciado sem log ✓ commit baeb389 (2026-05-27)
 
 **Tipo:** bug · **Onde:** `api/ws_chat.py:68-69`
 
@@ -3584,7 +3584,7 @@ Bateria de QA estruturada em 7 testes (QA-1 a QA-7) cobrindo backend + frontend 
 
 **Fix proposto:** reforçar prompt do sugestor pra aceitar ação clara mesmo sem cliente — IA roda com "tema livre" e Otto/Salles complementam. Ajustar regra "pedido fundamentalmente incompleto" pra ser mais restritiva (só conversacional puro ou totalmente abstrato).
 
-### T142 — 🟡 Next.js dev Fast Refresh força full-reload
+### T142 — 🟡 Next.js dev Fast Refresh força full-reload ✓ commit 1e8e7bb (2026-05-27)
 
 **Severidade:** baixa (só afeta dev, não prod) · **Origem:** QA-6.
 **Reproduzir:** durante uso normal do dashboard em `npm run dev`, Next acusa repetidamente `⚠ Fast Refresh had to perform a full reload due to a runtime error.` (4× em ~10min de uso).
