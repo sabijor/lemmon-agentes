@@ -11,7 +11,7 @@ export default function CharacterSprite({ id, size = 1, speaking, walking, sitti
 
     // ─── Otto — Analítico: camisa social azul, óculos finos, cabelo penteado, tablet
     otto: (
-      <svg width={W * size} height={H * size} viewBox="0 0 40 72" fill="none" className={cls}>
+      <svg width={W * size} height={H * size} viewBox="0 0 40 72" fill="none" className={cls} style={{ display: 'block', flexShrink: 0, width: W * size, height: H * size }} preserveAspectRatio="xMidYMid meet">
         {/* Cabelo penteado para trás */}
         <rect x="10" y="4" width="20" height="9" rx="4" fill="#1c1307"/>
         <rect x="10" y="4" width="20" height="5" rx="3" fill="#292010"/>
@@ -68,7 +68,7 @@ export default function CharacterSprite({ id, size = 1, speaking, walking, sitti
 
     // ─── Heitor — Cauteloso: suéter tricô verde-musgo, óculos redondos, pasta
     heitor: (
-      <svg width={W * size} height={H * size} viewBox="0 0 40 72" fill="none" className={cls}>
+      <svg width={W * size} height={H * size} viewBox="0 0 40 72" fill="none" className={cls} style={{ display: 'block', flexShrink: 0, width: W * size, height: H * size }} preserveAspectRatio="xMidYMid meet">
         {/* Cabelo grisalho desalinhado */}
         <rect x="9" y="4" width="22" height="10" rx="5" fill="#9ca3af"/>
         <rect x="9" y="4" width="7" height="8" rx="3" fill="#6b7280"/>
@@ -127,7 +127,7 @@ export default function CharacterSprite({ id, size = 1, speaking, walking, sitti
 
     // ─── Salles — Boêmio: BARBA GRANDE, cabelo despenteado, camisa aberta, caneca
     salles: (
-      <svg width={W * size} height={H * size} viewBox="0 0 40 72" fill="none" className={cls}>
+      <svg width={W * size} height={H * size} viewBox="0 0 40 72" fill="none" className={cls} style={{ display: 'block', flexShrink: 0, width: W * size, height: H * size }} preserveAspectRatio="xMidYMid meet">
         {/* Cabelo despenteado marrom */}
         <rect x="9" y="3" width="22" height="10" rx="5" fill="#92400e"/>
         <rect x="8" y="5" width="6" height="9" rx="3" fill="#78350f"/>
@@ -194,7 +194,7 @@ export default function CharacterSprite({ id, size = 1, speaking, walking, sitti
 
     // ─── Sônia — Energética: blazer roxo, fone sem fio, cabelo moderno, laptop c/ gráfico
     sonia: (
-      <svg width={W * size} height={H * size} viewBox="0 0 40 72" fill="none" className={cls}>
+      <svg width={W * size} height={H * size} viewBox="0 0 40 72" fill="none" className={cls} style={{ display: 'block', flexShrink: 0, width: W * size, height: H * size }} preserveAspectRatio="xMidYMid meet">
         {/* Cabelo moderno */}
         <rect x="9" y="4" width="22" height="10" rx="5" fill="#1c1917"/>
         <rect x="9" y="4" width="22" height="6" rx="4" fill="#292524"/>
@@ -250,7 +250,7 @@ export default function CharacterSprite({ id, size = 1, speaking, walking, sitti
 
     // ─── Pedro Abrahão — Médico consultor: jaleco branco, cabelo castanho, estetoscópio
     pedro_abrahao: (
-      <svg width={W * size} height={H * size} viewBox="0 0 40 72" fill="none" className={cls}>
+      <svg width={W * size} height={H * size} viewBox="0 0 40 72" fill="none" className={cls} style={{ display: 'block', flexShrink: 0, width: W * size, height: H * size }} preserveAspectRatio="xMidYMid meet">
         {/* Cabelo castanho curto */}
         <rect x="10" y="4" width="20" height="9" rx="4" fill="#6b3d1e"/>
         <rect x="10" y="4" width="20" height="5" rx="3" fill="#7c4a24"/>
@@ -311,7 +311,7 @@ export default function CharacterSprite({ id, size = 1, speaking, walking, sitti
 
     // ─── Aya — Elegante: preto/branco minimalista, mecha azul, tablet holográfico
     aya: (
-      <svg width={W * size} height={H * size} viewBox="0 0 40 72" fill="none" className={cls}>
+      <svg width={W * size} height={H * size} viewBox="0 0 40 72" fill="none" className={cls} style={{ display: 'block', flexShrink: 0, width: W * size, height: H * size }} preserveAspectRatio="xMidYMid meet">
         {/* Cabelo alinhado preto */}
         <rect x="9" y="4" width="22" height="11" rx="5" fill="#1c1917"/>
         <rect x="9" y="4" width="22" height="7" rx="4" fill="#292524"/>
@@ -378,7 +378,7 @@ export default function CharacterSprite({ id, size = 1, speaking, walking, sitti
 
     // ─── Renata — Social Media: roupa coral, prancheta com post-its, cabelo solto
     renata: (
-      <svg width={W * size} height={H * size} viewBox="0 0 40 72" fill="none" className={cls}>
+      <svg width={W * size} height={H * size} viewBox="0 0 40 72" fill="none" className={cls} style={{ display: 'block', flexShrink: 0, width: W * size, height: H * size }} preserveAspectRatio="xMidYMid meet">
         {/* Cabelo longo solto — castanho */}
         <rect x="8" y="3" width="24" height="16" rx="6" fill="#7c3d12"/>
         <rect x="6" y="10" width="5" height="20" rx="2.5" fill="#7c3d12"/>
