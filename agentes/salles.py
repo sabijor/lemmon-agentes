@@ -237,8 +237,10 @@ class Salles(AgenteBase):
             self.logger.info("Chamando Otto pra produzir análise estratégica...")
             resultado_otto = self.otto.executar(briefing, modo_visual="completo")
             analise_otto = resultado_otto["output_tecnico"]
-            breakdown_custo["otto_inicial_usd"] = resultado_otto["custo"]["usd"]
-            custo_total += resultado_otto["custo"]["usd"]
+            # T131: usa o float canônico custo_total_usd (não o dict aninhado "custo")
+            otto_cost = resultado_otto.get("custo_total_usd", 0.0)
+            breakdown_custo["otto_inicial_usd"] = otto_cost
+            custo_total += otto_cost
 
         self.logger.info(f"Salles iniciando | formato={formato} | tags={tags}")
 

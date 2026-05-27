@@ -153,6 +153,9 @@ class Otto(AgenteBase):
             "output_humano": analise["output_humano"],
             "modo_solicitado": modo_visual,
             "modo_efetivo": analise["metadata"]["modo_recomendado"] if modo_visual == "auto" else modo_visual,
+            # T131: "custo" dict é breakdown legado — `custo_total_usd` (float)
+            # é o campo canônico que TODOS os consumidores usam. Mantido pra
+            # backward-compat com exports antigos. Não adicionar novos leitores.
             "custo": {
                 "tokens_input": custo.tokens_input,
                 "tokens_output": custo.tokens_output,

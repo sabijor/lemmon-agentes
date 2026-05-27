@@ -114,7 +114,7 @@ def main():
         print(f"❌ Otto falhou: {e}", file=sys.stderr)
         sys.exit(1)
 
-    custo_otto = resultado_otto["custo"]["usd"]
+    custo_otto = resultado_otto.get("custo_total_usd", 0.0)  # T131: float canônico
     custo_acumulado += custo_otto
     breakdown_pipeline["otto_usd"] = custo_otto
 
