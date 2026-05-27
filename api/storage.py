@@ -6,6 +6,11 @@ from pathlib import Path
 from core.config import HISTORICO_DIR
 from core.historico_index import adicionar_entrada
 
+# T134 — Versão do schema do JSON de sessão. Incrementar quando o formato mudar
+# (ex: renomear/remover campo). Leitores podem usar esse número pra disparar
+# migrations. JSONs antigos sem o campo são considerados v0 (compatível).
+SCHEMA_VERSION = 1
+
 
 def _salvar_sessao_reuniao(
     session_id: str | None,
@@ -37,6 +42,7 @@ def _salvar_sessao_reuniao(
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     origem = "sandbox" if sandbox else "reuniao"
     registro = {
+        "schema_version": SCHEMA_VERSION,
         "timestamp": datetime.now().isoformat(),
         "origem": origem,
         "briefing": briefing,
@@ -73,6 +79,7 @@ def _salvar_sessao(
 
     origem = "sandbox" if sandbox else "dashboard"
     registro = {
+        "schema_version": SCHEMA_VERSION,
         "timestamp": datetime.now().isoformat(),
         "origem": origem,
         "briefing": briefing,
