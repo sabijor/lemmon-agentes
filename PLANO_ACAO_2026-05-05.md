@@ -3338,7 +3338,7 @@ FASE 12 — ROUND 6 QA COMPLETA (validação manual 2026-05-09):
      Modo Loop AUSENTE da UI — segmented control virou 2-pill (Auto/Manual) em algum
      bump posterior. T124 registrado pra restaurar. Backend possivelmente intacto.
 
-PROJETO: 5 tarefas pendentes (T131-T134, T136-T137 médias/baixas da auditoria backend + T142 baixa Fast Refresh). T120-T130, T135, T138, T139 (Sprint 1 + Sprint 2), T140, T141 fechadas. T127 fix commitado mas precisa validação visual no Safari pelo operador.
+PROJETO: 2 tarefas pendentes (T134 schema_version + T136 custo hardcoded em auxiliares + T137 log silenciado + T142 Fast Refresh — só baixas). T120-T133, T135, T138-T141 fechadas. T127 fix commitado mas precisa validação visual no Safari pelo operador.
 
 ---
 
@@ -3432,7 +3432,7 @@ Duas requests simultâneas em `POST /favoritar` e `POST /tags` podem ler o mesmo
 
 **Fix:** `fcntl.flock()` ou write-to-temp + rename atômico ao gravar JSON de sessão.
 
-### T131 — 🟡 MÉDIA: `custo_total_usd` mal tipado (dict vs float)
+### T131 — 🟡 MÉDIA: `custo_total_usd` mal tipado (dict vs float) ✓ commit c8fdf51 (2026-05-27)
 
 **Tipo:** bug · **Onde:** `api/ws_chat.py:415-417` e Otto retornando dict
 
@@ -3440,7 +3440,7 @@ Duas requests simultâneas em `POST /favoritar` e `POST /tags` podem ler o mesmo
 
 **Fix:** Otto retorna `float` direto. Remover branch dict do agregador.
 
-### T132 — 🟡 MÉDIA: Callback de confirmação trava executor por 5min em desconexão
+### T132 — 🟡 MÉDIA: Callback de confirmação trava executor por 5min em desconexão ✓ commit 3b2500f (2026-05-27)
 
 **Tipo:** bug · **Onde:** `api/ws_helpers.py:28-42`
 
@@ -3448,7 +3448,7 @@ Se cliente desconecta enquanto agente espera confirmação, coroutine fica pendu
 
 **Fix:** detectar `WebSocketDisconnect` em `receive_json()` do callback ou usar timeout menor (30s) com retry.
 
-### T133 — 🟡 MÉDIA: XSS via briefing no `/share/{token}` (escape parcial)
+### T133 — 🟡 MÉDIA: XSS via briefing no `/share/{token}` (escape parcial) ✓ commit 42ea012 (2026-05-27)
 
 **Tipo:** bug de segurança · **Onde:** `api/routes/share.py:52-111`
 
