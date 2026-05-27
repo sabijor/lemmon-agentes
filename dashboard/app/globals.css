@@ -12,6 +12,21 @@
 body { background: #fafaf9; color: #1c1917; overflow: hidden; font-family: 'Inter', sans-serif; }
 .dark body { background: #0c0a09; color: #fafaf9; }
 
+/* T127 — Safari/SVG compat:
+   Safari, em SVGs inline com transform via CSS, usa o origin do viewport SVG
+   (canto superior esquerdo) e não respeita o box do elemento. Resultado: o SVG
+   inteiro fica deslocado/esticado. Chrome usa fill-box por padrão.
+   Forçar transform-box+origin normaliza o comportamento entre browsers. */
+svg.animate-float,
+svg.animate-walk,
+svg.animate-seated,
+svg.animate-celebrate,
+svg.animate-error,
+svg.animate-talk-bob {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
 /* Isometric office floor */
 .iso-tile {
   width: 72px; height: 36px;
