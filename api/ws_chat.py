@@ -84,8 +84,18 @@ async def chat(ws: WebSocket):
                         f"{descricao}\n"
                         f"[FIM DO CONTEXTO VISUAL]"
                     )
-                except Exception:
-                    pass  # não bloqueia se a visão falhar
+                except Exception as _img_err:
+                    # T137: não bloqueia o pipeline se a visão falhar, mas LOGA —
+                    # antes silenciava sem rastro (operador não sabia que o contexto
+                    # visual foi ignorado).
+                    _log.warning("Falha ao descrever imagem: %s", _img_err)
+                    try:
+                        await ws.send_json({
+                            "type": "warning",
+                            "message": "Imagem anexada não pôde ser descrita pela IA. Pipeline segue sem o contexto visual."
+                        })
+                    except Exception:
+                        pass
 
             manual_mode: bool = data.get("manual_mode", False)
             fast_track: bool = data.get("fast_track", False)
