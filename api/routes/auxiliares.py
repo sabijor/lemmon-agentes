@@ -15,6 +15,7 @@ from api.deps import (
     formatar_erro_anthropic,
 )
 from api.schemas import BriefingReversoPayload, CortesProntosPayload
+from core.custo import Custo
 
 router = APIRouter()
 
@@ -145,7 +146,10 @@ async def analisar_briefing_reverso(payload: BriefingReversoPayload):
     except (APIError, APIConnectionError, AuthenticationError, RateLimitError) as e:
         raise HTTPException(status_code=503, detail=formatar_erro_anthropic(e))
     texto = next((b.text for b in resp.content if hasattr(b, "text")), "")
-    custo = (resp.usage.input_tokens * 3e-6 + resp.usage.output_tokens * 1.5e-5)
+    # T136: usa Custo.calcular() centralizado (passa modelo via T128 — preços ficam
+    # corretos automaticamente se trocar pra Opus/Haiku, e fica numa fonte só).
+    custo = Custo.calcular(resp.usage.input_tokens, resp.usage.output_tokens,
+                            modelo=LEMMON_MODELO_PADRAO).custo_usd
     return {"resultado": texto, "custo_total_usd": round(custo, 6)}
 
 
@@ -173,5 +177,8 @@ async def gerar_cortes_prontos(payload: CortesProntosPayload):
     except (APIError, APIConnectionError, AuthenticationError, RateLimitError) as e:
         raise HTTPException(status_code=503, detail=formatar_erro_anthropic(e))
     texto = next((b.text for b in resp.content if hasattr(b, "text")), "")
-    custo = (resp.usage.input_tokens * 3e-6 + resp.usage.output_tokens * 1.5e-5)
+    # T136: usa Custo.calcular() centralizado (passa modelo via T128 — preços ficam
+    # corretos automaticamente se trocar pra Opus/Haiku, e fica numa fonte só).
+    custo = Custo.calcular(resp.usage.input_tokens, resp.usage.output_tokens,
+                            modelo=LEMMON_MODELO_PADRAO).custo_usd
     return {"cortes": texto, "custo_total_usd": round(custo, 6)}
