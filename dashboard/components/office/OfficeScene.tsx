@@ -550,24 +550,18 @@ export default function OfficeScene({ inMeeting, agentStatus, onToggleAgent, onC
                       fill="none" stroke={agent.color} strokeWidth="2.2" opacity="0.75" />
                   )}
 
-                  {/* Sprite — T127: foreignObject tem bug no Safari (não respeita
-                     dimensões/viewBox do SVG filho, renderiza como prisma esticado).
-                     Hack: xmlns explícito no div + style block no SVG via wrapper. */}
-                  <foreignObject x={0} y={0} width={46} height={76} style={{ overflow: 'visible' }}>
-                    <div
-                      {...({ xmlns: 'http://www.w3.org/1999/xhtml' } as { xmlns?: string })}
-                      style={{ width: 46, height: 76, overflow: 'visible', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', lineHeight: 0 }}
-                    >
-                      <CharacterSprite id={agent.id}
-                        speaking={status === 'speaking'}
-                        thinking={status === 'thinking'}
-                        walking={ms.walking && !isIn}
-                        sitting={isSitting}
-                        done={status === 'done'}
-                        error={status === 'error'}
-                      />
-                    </div>
-                  </foreignObject>
+                  {/* Sprite — T127: SVG aninhado (nested SVG) em vez de foreignObject.
+                     foreignObject tinha bug no Safari (sprite virava prisma vertical).
+                     SVG nested funciona nativamente em todos os browsers. x=3 y=4
+                     centraliza o sprite 40x72 dentro da célula 46x76 do escritório. */}
+                  <CharacterSprite id={agent.id} x={3} y={4}
+                    speaking={status === 'speaking'}
+                    thinking={status === 'thinking'}
+                    walking={ms.walking && !isIn}
+                    sitting={isSitting}
+                    done={status === 'done'}
+                    error={status === 'error'}
+                  />
 
                   {/* Name + role tag */}
                   <g transform="translate(22,90)">
