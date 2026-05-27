@@ -18,6 +18,16 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Lemmon Dashboard API", lifespan=lifespan)
+
+
+@app.get("/health")
+async def health():
+    """T138 — health-check pro instalador validar que backend subiu corretamente.
+
+    Não toca em I/O nem chama LLM — só confirma que o app está rodando.
+    """
+    return {"status": "ok", "service": "lemmon-agentes", "version": "1.36"}
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
