@@ -104,7 +104,7 @@ FERRAMENTA_ANALISE = {
 
 class Otto(AgenteBase):
     nome = "otto"
-    versao_prompt = "v3"
+    versao_prompt = "v4"
     papel_curto = "Estrategista — decodifica briefing em tese criativa"
     quando_usar = [
         "briefing novo ou aberto",
