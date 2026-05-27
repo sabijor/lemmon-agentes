@@ -3338,7 +3338,7 @@ FASE 12 — ROUND 6 QA COMPLETA (validação manual 2026-05-09):
      Modo Loop AUSENTE da UI — segmented control virou 2-pill (Auto/Manual) em algum
      bump posterior. T124 registrado pra restaurar. Backend possivelmente intacto.
 
-PROJETO: 9 tarefas pendentes (T127 sprites Safari + T129-T134, T136-T138 da auditoria backend). T120-T126, T128, T135, T139 (Sprint 1 + Sprint 2), T140 fechadas. Validação real do T139+T140 em curso com cliente Pedro.
+PROJETO: 11 tarefas pendentes (T127 sprites Safari + T129-T134, T136-T138 da auditoria backend + T141 sugestor conservador + T142 Fast Refresh). T120-T126, T128, T135, T139 (Sprint 1 + Sprint 2), T140 fechadas. Sistema production-ready confirmado por QA de 7 testes (FASE 15).
 
 ---
 
@@ -3566,6 +3566,35 @@ Lista curta, sem detalhamento — cada um vira tarefa numerada quando for atacad
 - **P-D.** `_formatar_historico_reuniao` defensivo: se primeiro item não for `user`, normalizar.
 - **P-E.** Reconexão automática do WS no client (1 retry após 2s, com toast).
 - **P-F.** `respostas` na reunião → renomear para `ultima_resposta` (ou virar lista) — fonte de verdade fica sendo `historico`.
+
+---
+
+# FASE 15 — QA AUTOMATIZADO PÓS-SPRINT 2 (2026-05-26)
+
+Bateria de QA estruturada em 7 testes (QA-1 a QA-7) cobrindo backend + frontend pós-T139/T140. Resultado: 8 OK · 2 com achado ⚠️ · 0 bug crítico. Sistema production-ready.
+
+### T141 — 🟡 Sugestor conservador demais com pedidos curtos diretos
+
+**Severidade:** média de UX · **Origem:** QA-3.
+**Reproduzir:** `GET /sugerir_pipeline?briefing=faça um roteiro de 15s pra story` → retorna `agentes=[]` com `motivo_vazio: "preciso de (1) tema/assunto, (2) cliente/marca"`.
+
+**Por que é problema:** cliente leigo espera o sistema aceitar pedidos diretos. Comparação:
+- "estratégia pra marca de café" → ✅ otto+aya
+- "roteiro de 15s pra story" → ❌ vazio (inconsistente — também não tem cliente nominal mas o anterior aceita)
+
+**Fix proposto:** reforçar prompt do sugestor pra aceitar ação clara mesmo sem cliente — IA roda com "tema livre" e Otto/Salles complementam. Ajustar regra "pedido fundamentalmente incompleto" pra ser mais restritiva (só conversacional puro ou totalmente abstrato).
+
+### T142 — 🟡 Next.js dev Fast Refresh força full-reload
+
+**Severidade:** baixa (só afeta dev, não prod) · **Origem:** QA-6.
+**Reproduzir:** durante uso normal do dashboard em `npm run dev`, Next acusa repetidamente `⚠ Fast Refresh had to perform a full reload due to a runtime error.` (4× em ~10min de uso).
+
+**Hipóteses:** algum throw no client durante state change. Suspeitos:
+- `useLocalStorage` estendido com setter funcional (commit 273bafe)
+- `useAutoRouter` (novo hook)
+- Hidratação SSR/CSR de `messages` (que agora vem de localStorage)
+
+**Plano de ataque:** abrir Cmd+Option+J no Chrome com sistema rodando, reproduzir reload, capturar stack trace específico no console.
 
 ---
 
