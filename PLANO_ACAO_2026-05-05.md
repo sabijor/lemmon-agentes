@@ -3338,7 +3338,7 @@ FASE 12 — ROUND 6 QA COMPLETA (validação manual 2026-05-09):
      Modo Loop AUSENTE da UI — segmented control virou 2-pill (Auto/Manual) em algum
      bump posterior. T124 registrado pra restaurar. Backend possivelmente intacto.
 
-PROJETO: 11 tarefas pendentes (T127 sprites Safari + T129-T134, T136-T138 da auditoria backend + T141 sugestor conservador + T142 Fast Refresh). T120-T126, T128, T135, T139 (Sprint 1 + Sprint 2), T140 fechadas. Sistema production-ready confirmado por QA de 7 testes (FASE 15).
+PROJETO: 5 tarefas pendentes (T131-T134, T136-T137 médias/baixas da auditoria backend + T142 baixa Fast Refresh). T120-T130, T135, T138, T139 (Sprint 1 + Sprint 2), T140, T141 fechadas. T127 fix commitado mas precisa validação visual no Safari pelo operador.
 
 ---
 
@@ -3362,7 +3362,7 @@ Bugs descobertos durante teste do instalador `.command` em Mac limpo (1280×800)
 
 **Fix:** adicionada linha `python-multipart>=0.0.9` em requirements.txt.
 
-### T127 — 🟡 Sprites SVG quebrados no Safari (Chrome OK)
+### T127 — 🟡 Sprites SVG quebrados no Safari (Chrome OK) ✓ commit 244ebb6 (validação Safari pendente)
 
 **Severidade:** média · **Onde:** `dashboard/components/office/CharacterSprite.tsx` + tailwind.config.js
 
@@ -3416,7 +3416,7 @@ Outros bugs:               registrar conforme aparecerem
 
 Achados de varredura focada em backend Python (core/, agentes/, api/, scripts/) — buscando bugs reais, dívida estrutural e problemas de processo. Front intencionalmente fora do escopo (em trabalho paralelo).
 
-### T129 — 🔴 ALTA: Path traversal em `/historico/{session_id}`
+### T129 — 🔴 ALTA: Path traversal em `/historico/{session_id}` ✓ commit f43edc2 (2026-05-27)
 
 **Tipo:** bug de segurança · **Onde:** `api/routes/historico.py:72-79`
 
@@ -3424,7 +3424,7 @@ Endpoint não valida `session_id` antes de construir caminho do arquivo. Cliente
 
 **Fix:** validar com regex `^[0-9]{8}_[0-9]{6}` (formato timestamp dos session_ids reais) e rejeitar com 400 se não corresponder.
 
-### T130 — 🔴 ALTA: Race condition em favoritar/tags simultâneos
+### T130 — 🔴 ALTA: Race condition em favoritar/tags simultâneos ✓ commit f43edc2 (2026-05-27)
 
 **Tipo:** bug · **Onde:** `core/historico_index.py:103-119` + `core/historico.py:109-111`
 
@@ -3542,7 +3542,7 @@ Refinos do sugestor (commit 0c9ee55):
 - [x] Frontend recupera estado ao voltar pra aba
 - [ ] Validado em uso real pelo Pedro (cliente final)
 
-### T138 — 🟢 BAIXA: Sem endpoint `/health` para instalador
+### T138 — 🟢 BAIXA: Sem endpoint `/health` para instalador ✓ commit df248b9 (2026-05-27)
 
 **Tipo:** processo · **Onde:** `api/main.py`
 
@@ -3573,7 +3573,7 @@ Lista curta, sem detalhamento — cada um vira tarefa numerada quando for atacad
 
 Bateria de QA estruturada em 7 testes (QA-1 a QA-7) cobrindo backend + frontend pós-T139/T140. Resultado: 8 OK · 2 com achado ⚠️ · 0 bug crítico. Sistema production-ready.
 
-### T141 — 🟡 Sugestor conservador demais com pedidos curtos diretos
+### T141 — 🟡 Sugestor conservador demais com pedidos curtos diretos ✓ commit ec44bbe (2026-05-27)
 
 **Severidade:** média de UX · **Origem:** QA-3.
 **Reproduzir:** `GET /sugerir_pipeline?briefing=faça um roteiro de 15s pra story` → retorna `agentes=[]` com `motivo_vazio: "preciso de (1) tema/assunto, (2) cliente/marca"`.
