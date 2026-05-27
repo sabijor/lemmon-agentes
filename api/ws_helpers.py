@@ -1,7 +1,8 @@
 """Helpers de WebSocket compartilhados entre ws_chat, ws_reuniao e ws_mesa."""
 import asyncio
 
-from fastapi import WebSocket
+from fastapi import WebSocket, WebSocketDisconnect
+from starlette.websockets import WebSocketState
 
 
 async def _stream(ws: WebSocket, agent: str, text: str):
@@ -26,10 +27,22 @@ def _make_on_token(ws_conn, event_loop, agent_name: str):
 
 
 def _make_confirmacao_callback(ws_conn, event_loop, agent_name: str):
-    """Cria callback síncrono que envia aviso via WS e aguarda confirmação do operador."""
+    """Cria callback síncrono que envia aviso via WS e aguarda confirmação do operador.
+
+    T132: detecta desconexão antes de bloquear no receive_json (Chrome fecha WS
+    em aba background). Antes, se o cliente fechava enquanto o callback estava
+    pendurado, ele esperava o timeout de 300s segurando o executor. Agora:
+    - Se WS já não está CONNECTED → retorna False imediatamente (skip).
+    - Se desconecta durante a espera → WebSocketDisconnect é capturada → False.
+    """
     async def _ask(mensagem: str) -> bool:
-        await ws_conn.send_json({"type": "confirmar", "agent": agent_name, "mensagem": mensagem})
-        ctrl = await ws_conn.receive_json()
+        if ws_conn.client_state != WebSocketState.CONNECTED:
+            return False
+        try:
+            await ws_conn.send_json({"type": "confirmar", "agent": agent_name, "mensagem": mensagem})
+            ctrl = await ws_conn.receive_json()
+        except WebSocketDisconnect:
+            return False
         return ctrl.get("type") == "confirmar_sim"
 
     def callback(mensagem: str = "") -> bool:
