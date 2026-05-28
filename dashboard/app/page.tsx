@@ -116,11 +116,18 @@ export default function Home() {
   const handleSend = async (msg: string, image?: ImageData) => {
     if (autoMode) {
       // T139 Sprint 2 — auto-roteador escolhe os agentes pela IA antes de rodar
-      const sugestao = await sugerirPipeline(msg)
-      if (!sugestao) {
-        notify.error('Não consegui consultar o roteador. Tente de novo.')
+      const result = await sugerirPipeline(msg)
+      if (!result) return  // briefing vazio, silencioso
+      if (!result.ok) {
+        // T156 — mensagem adaptada ao tipo de erro
+        if (result.kind === 'network') {
+          notify.error(result.message)
+        } else {
+          notify.error(`Erro ao consultar o roteador: ${result.message}`)
+        }
         return
       }
+      const sugestao = result.sugestao
       if (sugestao.agentes.length === 0) {
         notify.warning(sugestao.motivo_vazio || 'Pedido muito vago — adicione mais contexto e tente de novo.')
         return
