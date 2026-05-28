@@ -205,6 +205,91 @@ function ReceptionSofa({ gx, gy }: { gx: number; gy: number }) {
   )
 }
 
+// ─── Corredor de ligação entre Estúdio Criativo e Escritório Hator ────
+// T175: cria sensação de "mesmo edifício" — sai do estúdio Lemmon e
+// caminha até a porta do escritório administrativo da Hator.
+export function CorridorBackground() {
+  // O corredor vai entre o fim do work room (~OX 880) e início do admin (1100).
+  // ~3 tiles de largura, 2 de profundidade. Coord própria pra ficar isolado.
+  const CORR_OX = 880, CORR_OY = 200
+  const csx = (gx: number, gy: number) => CORR_OX + (gx - gy) * (TW / 2)
+  const csy = (gx: number, gy: number) => CORR_OY + (gx + gy) * (TH / 2)
+
+  function CTile({ gx, gy, fill }: { gx: number; gy: number; fill: string }) {
+    const x = csx(gx, gy), y = csy(gx, gy)
+    return (
+      <polygon
+        points={`${x},${y} ${x + TW / 2},${y + TH / 2} ${x},${y + TH} ${x - TW / 2},${y + TH / 2}`}
+        fill={fill}
+        stroke={P.floorGrid}
+        strokeWidth={0.3}
+      />
+    )
+  }
+
+  function CWall({ wall, g1, g2, h1, h2, fill }: {
+    wall: 'left' | 'right'; g1: number; g2: number; h1: number; h2: number; fill: string
+  }) {
+    const pts = wall === 'left'
+      ? [[csx(0, g1), csy(0, g1) - h2], [csx(0, g2), csy(0, g2) - h2],
+        [csx(0, g2), csy(0, g2) - h1], [csx(0, g1), csy(0, g1) - h1]]
+      : [[csx(g1, 0), csy(g1, 0) - h2], [csx(g2, 0), csy(g2, 0) - h2],
+        [csx(g2, 0), csy(g2, 0) - h1], [csx(g1, 0), csy(g1, 0) - h1]]
+    return <polygon points={pts.map(p => p.join(',')).join(' ')} fill={fill} />
+  }
+
+  const CORR_COLS = 3, CORR_ROWS = 3
+  const tiles: React.ReactNode[] = []
+  for (let gy = 0; gy < CORR_ROWS; gy++) {
+    for (let gx = 0; gx < CORR_COLS; gx++) {
+      // gradiente de cor de transição: do marrom claro (sala criativa) ao azul-acinzentado (admin)
+      const mix = gx / CORR_COLS
+      const r = Math.round(0xe0 + mix * (0xcb - 0xe0))
+      const g = Math.round(0xd8 + mix * (0xd9 - 0xd8))
+      const b = Math.round(0xb0 + mix * (0xe0 - 0xb0))
+      const fill = `rgb(${r},${g},${b})`
+      tiles.push(<CTile key={`c-${gx}-${gy}`} gx={gx} gy={gy} fill={fill} />)
+    }
+  }
+
+  return (
+    <g>
+      {/* piso de transição */}
+      {tiles}
+      {/* tapete central — toque de design */}
+      <polygon
+        points={`
+          ${csx(0.3, 0.8)},${csy(0.3, 0.8) + TH / 2}
+          ${csx(CORR_COLS - 0.3, 0.8)},${csy(CORR_COLS - 0.3, 0.8) + TH / 2}
+          ${csx(CORR_COLS - 0.3, 2.2)},${csy(CORR_COLS - 0.3, 2.2) + TH / 2}
+          ${csx(0.3, 2.2)},${csy(0.3, 2.2) + TH / 2}
+        `}
+        fill={P.accent}
+        opacity={0.3}
+      />
+      {/* paredes laterais */}
+      <CWall wall="left" g1={0} g2={CORR_ROWS} h1={0} h2={100} fill={P.wallLeft} />
+      <CWall wall="right" g1={0} g2={CORR_COLS} h1={0} h2={100} fill={P.wallRight} />
+      {/* placa "ESCRITÓRIO HATOR" no fim do corredor */}
+      <g transform={`translate(${csx(CORR_COLS - 0.3, 0.5)}, ${csy(CORR_COLS - 0.3, 0.5) - 80})`}>
+        <rect x={-32} y={-12} width={64} height={20} rx={2} fill={P.textInk} />
+        <text x={0} y={2} fontSize={7} fill={P.paperWhite}
+          fontFamily="JetBrains Mono, monospace" fontWeight="bold" textAnchor="middle">
+          ESCRITÓRIO HATOR →
+        </text>
+      </g>
+      {/* placa "ESTÚDIO LEMMON" no início do corredor */}
+      <g transform={`translate(${csx(0.3, 0.5)}, ${csy(0.3, 0.5) - 80})`}>
+        <rect x={-32} y={-12} width={64} height={20} rx={2} fill="#1c1917" />
+        <text x={0} y={2} fontSize={7} fill="#fbbf24"
+          fontFamily="JetBrains Mono, monospace" fontWeight="bold" textAnchor="middle">
+          ← ESTÚDIO LEMMON
+        </text>
+      </g>
+    </g>
+  )
+}
+
 // ─── Background da sala (piso + paredes) ──────────────────────────────
 export function AdminRoomBackground() {
   const tiles: React.ReactNode[] = []

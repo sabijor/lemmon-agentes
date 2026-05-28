@@ -1,6 +1,6 @@
 # LEMMON AGENTES — Manual do Sistema
 
-**Versão atual:** v1.42
+**Versão atual:** v1.43
 **Última atualização:** 2026-05-28
 **Mantido por:** Calebe Alves / Lemmon Produções
 
@@ -11,6 +11,61 @@
 ## Histórico de versões
 
 > **Convenção:** versões mais novas no topo. Cada release lista o que mudou em relação à anterior, mantendo histórico completo.
+
+### v1.43 — 2026-05-28
+
+**Escritório único — sprites admin na sala correta + corredor de ligação (T175-T176).**
+
+Resposta direta a 2 críticas do Calebe:
+1. *"os agentes do admin não estão na sala deles"*
+2. *"as salas estão muito distantes, não está profissional... eu quero que seja um escritório real, e não um monte de sala na pqp de uma pra outra"*
+
+#### 🪑 Sprites admin na sala correta
+
+`AgentConfig` ganha campo opcional `room: 'creative' | 'admin'` (default `'creative'`). Os 4 admin (Ana Maria, Prichina, Caíto, Kelly) marcados como `'admin'`.
+
+`OfficeScene` agora detecta a sala do agente e usa as coords apropriadas:
+- Agentes criativos → `charX/charY` (coords `sx/sy` da work room)
+- Agentes admin → **novas** `charAdminX/charAdminY` (coords `asx/asy` da admin room)
+- Reunião/Recepção continuam como antes
+
+DESK_POS e ROUTINE_DESTS dos 4 admin reposicionados pra coords (0-9, 0-9) dentro da sala admin, alinhados com as mesas em `AdminRoomFurniture`:
+- Ana Maria → mesa CFO em (1.6, 2.3)
+- Prichina → mesa Admin/RH em (4.4, 2.3)
+- Kelly → mesa contábil em (1.6, 5.3)
+- Caíto → sala fechada do COO em (7.6, 4.4)
+
+#### 🚪 Salas aproximadas + corredor de ligação
+
+Antes: salas em offsets enormes (work=420, meeting=1560, admin=2580) — câmera "teleportava" entre elas.
+
+Agora:
+- `ADMIN_OX: 2580 → 1100` (logo após o work room)
+- `MEET_OX: 1560 → 2100` (movida pra depois do admin)
+- `CAMERA_ADMIN: 2128 → 740` / `CAMERA_MEETING: 1128 → 1668`
+
+Resultado: quando a câmera está na admin room, **a sala criativa fica visível no canto esquerdo do viewport**. Primeira vez que as duas aparecem simultaneamente.
+
+#### 🌉 Corredor visual entre as salas
+
+Novo componente `CorridorBackground` em `AdminRoom.tsx`:
+- 3 tiles × 3 tiles de transição entre work room (X=868) e admin (X=1100)
+- Piso com **gradiente** do marrom claro (Lemmon) ao azul-acinzentado (Hator)
+- Paredes laterais off-white em ambos os lados
+- Tapete central com toque verde-água (identidade Hator)
+- **Placas direcionais**:
+  - ◄ ESTÚDIO LEMMON (placa preta com texto dourado, lado esquerdo)
+  - ESCRITÓRIO HATOR ► (placa cinza-grafite com texto branco, lado direito)
+
+Sensação final: **um único edifício** com duas alas conectadas, em vez de salas isoladas.
+
+#### 🚧 Polimento futuro
+
+- Redesign da sala criativa em clusters temáticos (Estratégia, Produção, Performance, Compilação)
+- Integração Google Drive pros agentes admin lerem planilhas Hator atualizadas diariamente
+- Possível: animação de personagem caminhando do corredor quando você alterna salas
+
+---
 
 ### v1.42 — 2026-05-28
 

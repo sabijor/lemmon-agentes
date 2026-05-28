@@ -8,7 +8,7 @@ import SpeechBubble from './SpeechBubble'
 import { RoomBackground } from './WorkRoom'
 import { MeetingRoomBackground } from './MeetingRoom'
 import { ReceptionBackground } from './ReceptionRoom'
-import { AdminRoomBackground, AdminRoomFurniture } from './AdminRoom'
+import { AdminRoomBackground, AdminRoomFurniture, CorridorBackground } from './AdminRoom'
 import { sx, sy, msx, msy, rsx, rsy, asx, asy, CAMERA_MEETING, CAMERA_RECEP, CAMERA_ADMIN, ROLES, IDLE_QUOTES, getMeetingTheme } from './constants'
 
 // ─── Character positions ──────────────────────────────────────────────
@@ -474,7 +474,9 @@ export default function OfficeScene({ inMeeting, agentStatus, onToggleAgent, onC
             <ReceptionBackground />
             <RoomBackground onDoorClick={() => setForceShowMeeting(true)} whiteBoardFill={whiteBoardFill} whiteBoardColor={activeSpeakingAgent?.color} />
             <MeetingRoomBackground theme={meetingTheme} />
-            {/* T171 — Sala administrativa da Hator (paralela, deslocada à direita) */}
+            {/* T175 — Corredor de ligação entre Estúdio Lemmon e Escritório Hator */}
+            <CorridorBackground />
+            {/* T171 — Sala administrativa da Hator */}
             <AdminRoomBackground />
             <AdminRoomFurniture />
 
