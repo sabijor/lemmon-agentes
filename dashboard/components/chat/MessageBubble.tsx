@@ -52,7 +52,7 @@ export function UserMessage({ msg }: { msg: Message }) {
   )
 }
 
-export function AgentMessage({ msg }: { msg: Message }) {
+export function AgentMessage({ msg, progress }: { msg: Message; progress?: number }) {
   const agent = AGENT_MAP[msg.role as AgentId] ?? AGENT_MAP[msg.role.replace(/_v\d+$/, '') as AgentId]
   if (!agent) return null
   return (
@@ -82,8 +82,15 @@ export function AgentMessage({ msg }: { msg: Message }) {
           {msg.error ? (
             <p className="text-red-600 text-xs font-mono">{msg.error}</p>
           ) : (
-            <p className={`text-sm font-mono leading-relaxed whitespace-pre-wrap text-stone-800 dark:text-stone-900 ${!msg.done ? 'typing-cursor' : ''}`}>
-              {msg.content || <span className="text-stone-400 dark:text-stone-500 animate-pulse">processando...</span>}
+            <p className={`text-sm font-mono leading-relaxed whitespace-pre-wrap text-stone-800 dark:text-stone-100 ${!msg.done ? 'typing-cursor' : ''}`}>
+              {msg.content || (
+                /* T153 — feedback mais informativo enquanto agente trabalha */
+                <span className="text-stone-400 dark:text-stone-500 animate-pulse">
+                  {agent.name.toLowerCase()} {progress !== undefined && progress > 0
+                    ? `pensando · ${Math.round(progress * 100)}%`
+                    : 'pensando...'}
+                </span>
+              )}
             </p>
           )}
         </div>

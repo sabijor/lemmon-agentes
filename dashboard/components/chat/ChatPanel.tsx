@@ -87,6 +87,8 @@ interface Props {
   tagsSugeridas?: string[]
   /** T139 Sprint 2 — em modo Auto, IA escolhe agentes ao enviar; UI desbloqueada mesmo com inMeeting vazio. */
   autoMode?: boolean
+  /** T150 — esconde toggles avançados (fast-track, sandbox) em sessão 1 pra reduzir ruído cognitivo do leigo. */
+  hideAdvancedToggles?: boolean
 }
 
 // ─── Main panel ──────────────────────────────────────────────────────
@@ -103,7 +105,7 @@ export default function ChatPanel({
   loopMode, onSetLoopMode, loopMaxTurnos, onSetLoopMaxTurnos, loopCustoCap, onSetLoopCustoCap,
   loopActive, loopTurn, loopCost, loopStatus, onLoopStop,
   onExportar, onClose, onSetInMeeting,
-  tagsSugeridas = [], autoMode = false,
+  tagsSugeridas = [], autoMode = false, hideAdvancedToggles = false,
 }: Props) {
   // Mode-aware aliases
   const activeMessages    = mode === 'reuniao' ? reunMessages    : messages
@@ -140,7 +142,7 @@ export default function ChatPanel({
     prevIsRunningRef.current = isRunning
     if (justFinished && activeMessages.some(m => m.role === 'aya' && m.done)) {
       setDossiePronto(true)
-      const t = setTimeout(() => setDossiePronto(false), 8000)
+      const t = setTimeout(() => setDossiePronto(false), 12000)  // T151: +tempo pra ler/clicar CTA
       return () => clearTimeout(t)
     }
   }, [isRunning, activeMessages])
@@ -509,15 +511,59 @@ export default function ChatPanel({
         </div>
       )}
 
-      {/* Dossiê pronto — toast 8s */}
+      {/* T151 — Dossiê pronto + CTA imediato (Compartilhar/Exportar). 12s ou dismiss. */}
       {dossiePronto && (
-        <div className="absolute top-14 right-4 z-40 flex items-center gap-2 px-3 py-2 rounded-xl bg-stone-900 border border-stone-700 shadow-lg pointer-events-none">
-          <span className="text-sm">📄</span>
-          <span className="text-[10px] font-mono text-stone-100 font-semibold">Dossiê pronto!</span>
-          <button
-            className="ml-1 text-stone-400 hover:text-stone-100 transition-colors pointer-events-auto"
-            onClick={() => setDossiePronto(false)}
-          >×</button>
+        <div className="absolute top-14 right-4 z-40 flex flex-col gap-2 px-3 py-2.5 rounded-xl bg-stone-900 border border-emerald-500/40 shadow-xl shadow-emerald-500/10 max-w-[260px]">
+          <div className="flex items-center gap-2">
+            <span className="text-base">🎉</span>
+            <span className="text-[11px] font-mono text-stone-100 font-semibold flex-1">Dossiê pronto!</span>
+            <button
+              className="text-stone-400 hover:text-stone-100 transition-colors text-sm leading-none"
+              onClick={() => setDossiePronto(false)}
+              title="Fechar"
+            >×</button>
+          </div>
+          <p className="text-[10px] font-mono text-stone-400 leading-relaxed">
+            Sessão salva no histórico. Compartilhe ou exporte abaixo.
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={async () => {
+                if (!sessionId) return
+                try {
+                  const r = await fetch(`${API_URL}/share`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: sessionId }),
+                  })
+                  const { token } = await r.json()
+                  window.open(`${API_URL}/share/${token}`, '_blank')
+                  setDossiePronto(false)
+                } catch {
+                  /* silencioso — botão sem efeito */
+                }
+              }}
+              className="flex-1 text-[10px] font-mono uppercase tracking-wider px-2.5 py-1.5 rounded-lg bg-stone-800 hover:bg-stone-700 border border-stone-700 text-stone-200 transition-colors"
+              title="Gera link público pra mostrar ao cliente"
+            >
+              🔗 Compartilhar
+            </button>
+            <button
+              onClick={async () => {
+                if (!sessionId || !onExportar) return
+                try {
+                  await onExportar(sessionId, 'aya')
+                  setDossiePronto(false)
+                } catch {
+                  /* silencioso */
+                }
+              }}
+              className="flex-1 text-[10px] font-mono uppercase tracking-wider px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
+              title="Baixa o dossiê em PDF"
+            >
+              ↓ Exportar
+            </button>
+          </div>
         </div>
       )}
 
@@ -571,6 +617,30 @@ export default function ChatPanel({
               }`}>
               {mode === 'reuniao' ? '💬 conv.' : '▶▶ pipeline'}
             </button>
+            {/* T152 — Widget de custo acumulado em tempo real. Tranquiliza
+                cliente leigo sobre o quanto está gastando enquanto agentes rodam. */}
+            {(() => {
+              const totalSessao = activeMessages
+                .filter(m => typeof m.cost === 'number')
+                .reduce((acc, m) => acc + (m.cost || 0), 0)
+              if (totalSessao === 0 && !activeIsRunning) return null
+              const pctCap = custoCap ? totalSessao / custoCap : null
+              const corCap = pctCap === null ? 'text-stone-500 dark:text-stone-400 border-stone-200 dark:border-stone-700'
+                : pctCap >= 1 ? 'text-red-700 dark:text-red-400 border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-950/30'
+                : pctCap >= 0.8 ? 'text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30'
+                : 'text-emerald-700 dark:text-emerald-400 border-emerald-300 dark:border-emerald-700'
+              return (
+                <span
+                  className={`px-2 py-0.5 rounded-md text-[9px] font-mono border ${corCap}`}
+                  title={custoCap ? `Cap: $${custoCap.toFixed(2)}` : 'Defina um cap em Configurações se quiser limite máximo'}
+                >
+                  ${totalSessao.toFixed(2)}
+                  {custoCap !== null && custoCap !== undefined && (
+                    <span className="opacity-60"> / ${custoCap.toFixed(2)}</span>
+                  )}
+                </span>
+              )
+            })()}
           </div>
 
           <div className="flex items-center gap-2">
@@ -648,8 +718,8 @@ export default function ChatPanel({
               <span>{manualMode ? 'manual' : 'auto'}</span>
             </button>}
 
-            {/* Fast-track — pipeline only */}
-            {mode === 'pipeline' && <button onClick={onToggleFastTrack} disabled={isRunning}
+            {/* T150 — Fast-track e Sandbox escondem na 1ª sessão pra leigo. */}
+            {!hideAdvancedToggles && mode === 'pipeline' && <button onClick={onToggleFastTrack} disabled={isRunning}
               title="Fast-track: Otto resumido, Heitor pulado — resultado em <3 min"
               className={`flex items-center gap-1 px-2 py-1 rounded-md text-[9px] font-mono uppercase tracking-widest border transition-all disabled:opacity-30 ${
                 fastTrack
@@ -660,7 +730,7 @@ export default function ChatPanel({
             </button>}
 
             {/* Sandbox — pipeline only */}
-            {mode === 'pipeline' && <button onClick={onToggleSandbox} disabled={isRunning}
+            {!hideAdvancedToggles && mode === 'pipeline' && <button onClick={onToggleSandbox} disabled={isRunning}
               title="Sandbox: sessão não salva no histórico"
               className={`flex items-center gap-1 px-2 py-1 rounded-md text-[9px] font-mono uppercase tracking-widest border transition-all disabled:opacity-30 ${
                 sandbox
@@ -804,13 +874,23 @@ export default function ChatPanel({
             </motion.div>
           )}
           {activeMessages.length === 0 && inMeeting.size === 0 && (
-            <div className="h-full flex flex-col items-center justify-center text-center gap-3">
+            <div className="h-full flex flex-col items-center justify-center text-center gap-3 px-6">
               <span className="text-4xl">{autoMode && mode === 'pipeline' ? '🤖' : (mode === 'reuniao' ? '💬' : '⚔️')}</span>
-              <p className="text-xs font-mono text-stone-400 uppercase tracking-widest leading-relaxed">
-                {autoMode && mode === 'pipeline'
-                  ? <>Descreva seu pedido<br />a IA escolhe os agentes</>
-                  : <>Convoque agentes ao escritório<br />para iniciar uma sessão</>}
-              </p>
+              {autoMode && mode === 'pipeline' ? (
+                <p className="text-xs font-mono text-stone-400 uppercase tracking-widest leading-relaxed">
+                  Descreva seu pedido<br />a IA escolhe os agentes
+                </p>
+              ) : (
+                /* T149 — em Modo Expert, dar caminho concreto pra leigo */
+                <div className="space-y-3">
+                  <p className="text-xs font-mono text-stone-400 uppercase tracking-widest leading-relaxed">
+                    Nenhum agente na sala
+                  </p>
+                  <p className="text-[11px] font-mono text-stone-500 dark:text-stone-400 normal-case tracking-normal leading-relaxed max-w-[280px]">
+                    Convoque clicando nas pills do topo (<span className="text-stone-700 dark:text-stone-200 font-semibold">OTTO</span>, <span className="text-stone-700 dark:text-stone-200 font-semibold">HEITOR</span>, etc.) ou ative o <span className="text-emerald-700 dark:text-emerald-300 font-semibold">🤖 Modo Auto</span> pra a IA escolher.
+                  </p>
+                </div>
+              )}
             </div>
           )}
           {activeMessages.length === 0 && inMeeting.size > 0 && (
@@ -844,7 +924,7 @@ export default function ChatPanel({
               const showBar = meta !== undefined && pct > 0
               return (
                 <div key={msg.id}>
-                  <AgentMessage msg={msg} />
+                  <AgentMessage msg={msg} progress={pct} />
                   {showBar && (
                     <ProgressBar
                       agentId={agentId}

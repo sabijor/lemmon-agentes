@@ -43,20 +43,28 @@ export function Clock() {
   return <div className="text-[10px] font-mono text-stone-400 uppercase tracking-widest hidden lg:block">{time}</div>
 }
 
-export function AutoModeToggle({ autoMode, setAutoMode, disabled }: { autoMode: boolean; setAutoMode: (v: boolean) => void; disabled?: boolean }) {
+export function AutoModeToggle({ autoMode, setAutoMode, disabled, showRecommended }: { autoMode: boolean; setAutoMode: (v: boolean) => void; disabled?: boolean; showRecommended?: boolean }) {
   return (
-    <button
-      onClick={() => !disabled && setAutoMode(!autoMode)}
-      disabled={disabled}
-      title={autoMode ? 'Modo Auto — IA escolhe os agentes' : 'Modo Expert — você escolhe manualmente'}
-      className={`flex items-center gap-1.5 h-8 px-3 rounded-lg border text-[10px] font-mono uppercase tracking-widest transition-all
-        ${autoMode
-          ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20'
-          : 'bg-amber-500/10 border-amber-500/40 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20'}
-        ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-    >
-      <span className="text-sm leading-none">{autoMode ? '🤖' : '🔧'}</span>
-      <span>{autoMode ? 'Auto' : 'Expert'}</span>
-    </button>
+    <div className="relative">
+      <button
+        onClick={() => !disabled && setAutoMode(!autoMode)}
+        disabled={disabled}
+        title={autoMode ? 'Modo Auto — IA escolhe os agentes' : 'Modo Expert — você escolhe manualmente'}
+        className={`flex items-center gap-1.5 h-8 px-3 rounded-lg border text-[10px] font-mono uppercase tracking-widest transition-all
+          ${autoMode
+            ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20'
+            : 'bg-amber-500/10 border-amber-500/40 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20'}
+          ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+      >
+        <span className="text-sm leading-none">{autoMode ? '🤖' : '🔧'}</span>
+        <span>{autoMode ? 'Auto' : 'Expert'}</span>
+      </button>
+      {/* T148 — badge "Recomendado" some quando cliente fez 1ª sessão */}
+      {showRecommended && autoMode && (
+        <span className="absolute -top-2 -right-2 text-[8px] font-mono uppercase tracking-wider bg-emerald-500 text-white px-1.5 py-0.5 rounded-full font-bold shadow-sm pointer-events-none whitespace-nowrap">
+          recomendado
+        </span>
+      )}
+    </div>
   )
 }

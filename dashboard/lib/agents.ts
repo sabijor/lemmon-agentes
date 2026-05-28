@@ -79,7 +79,7 @@ export const AGENTS: AgentConfig[] = [
     id: 'pedro_abrahao',
     name: 'Pedro',
     title: 'Consultor',
-    rpgClass: 'Cliente',
+    rpgClass: 'Consultor',
     color: '#0f766e',
     colorDim: '#ccfbf1',
     colorText: '#fff',

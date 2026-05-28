@@ -4,6 +4,7 @@ import type { AgentId } from './agents'
 import type { HistoryDetail } from './useHistory'
 import { API_URL, WS_URL } from './api'
 import { WATCHDOG_TIMEOUT_MIN, PROGRESS_CURVE_POWER } from './config'
+import { notify } from './toast'
 import { useLocalStorage } from './hooks/useLocalStorage'
 
 export type MessageRole = 'user' | AgentId
@@ -282,7 +283,7 @@ export function useChat() {
               setAgentStatus(prev => ({ ...prev, [agentId]: 'error' }))
               const msgId = currentMsgId.current[agentId]
               if (msgId) setMessages(prev => prev.map(m => m.id === msgId
-                ? { ...m, done: true, error: `Agente travou (timeout ${WATCHDOG_TIMEOUT_MIN}min). Provável overloaded da API. Tente reenviar.` }
+                ? { ...m, done: true, error: `Este agente demorou muito (mais de ${WATCHDOG_TIMEOUT_MIN}min). O servidor pode estar ocupado. Tente enviar seu pedido novamente em alguns minutos.` }
                 : m
               ))
             }, timeoutMs)
@@ -310,7 +311,7 @@ export function useChat() {
               setAgentStatus(prev => ({ ...prev, [agentId]: 'error' }))
               const msgId = currentMsgId.current[agentId]
               if (msgId) setMessages(prev => prev.map(m => m.id === msgId
-                ? { ...m, done: true, error: `Agente travou (timeout ${WATCHDOG_TIMEOUT_MIN}min). Provável overloaded da API. Tente reenviar.` }
+                ? { ...m, done: true, error: `Este agente demorou muito (mais de ${WATCHDOG_TIMEOUT_MIN}min). O servidor pode estar ocupado. Tente enviar seu pedido novamente em alguns minutos.` }
                 : m
               ))
             }, timeoutMs2)
@@ -411,6 +412,9 @@ export function useChat() {
     }
 
     ws.onerror = () => {
+      // T145 — antes silenciava o erro: cliente via bolinha vermelha sem entender.
+      // Agora avisa em linguagem amigável.
+      notify.error('Conexão perdida com o servidor. Verifique sua chave de API ou tente novamente.')
       setIsRunning(false)
       setAwaitingApproval(null)
       setAgentStatus(prev => {

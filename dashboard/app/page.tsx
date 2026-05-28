@@ -13,6 +13,7 @@ import OfficeScene from '@/components/office/OfficeScene'
 import ChatPanel from '@/components/chat/ChatPanel'
 import HistoryPanel from '@/components/history/HistoryPanel'
 import { ThemeToggle, Clock, AutoModeToggle } from '@/components/header/HeaderControls'
+import WelcomeModal from '@/components/onboarding/WelcomeModal'
 
 export default function Home() {
   const [inMeeting, setInMeeting] = useState<Set<AgentId>>(new Set())
@@ -24,6 +25,8 @@ export default function Home() {
   // Modo Expert: cliente avançado convoca manualmente (pills no header).
   const [autoMode, setAutoMode] = useLocalStorage<boolean>('lemmon-auto-mode', true)
   const { sugerir: sugerirPipeline } = useAutoRouter()
+  // T148 — flag pra mostrar "recomendado" no Auto Mode até 1ª sessão concluir
+  const [hasCompletedFirstSession, setHasCompletedFirstSession] = useLocalStorage<boolean>('lemmon-first-session-done', false)
   const { messages, agentStatus, isRunning, sessionId, favoritado, resumedFrom, manualMode, fastTrack, sandbox, custoCap, custoCapAtingido, custoAviso, awaitingApproval, agentConfig, tagsSugeridas, agentProgress, agentProgressMeta, send, approve, abort, toggleManualMode, toggleFastTrack, toggleSandbox, setCustoCap, autorizarCusto, recusarCustoExtra, updateConfig, favoritar, exportar, reset, loadSession } = useChat()
   const {
     messages: reunMessages, agentStatus: reunAgentStatus, isRunning: reunIsRunning,
@@ -88,6 +91,13 @@ export default function Home() {
     }
     prevMsgLen.current = messages.length
   }, [messages, chatOpen])
+
+  // T148 — marca primeira sessão concluída quando recebemos sessionId + isRunning false
+  useEffect(() => {
+    if (sessionId && !isRunning && !hasCompletedFirstSession) {
+      setHasCompletedFirstSession(true)
+    }
+  }, [sessionId, isRunning, hasCompletedFirstSession, setHasCompletedFirstSession])
 
   const openChat = () => { setChatOpen(true); setUnreadCount(0) }
 
@@ -154,6 +164,8 @@ export default function Home() {
 
   return (
     <div className="h-screen w-screen flex flex-col overflow-hidden bg-stone-50 dark:bg-stone-950">
+      {/* T147 — modal de boas-vindas na 1ª visita; quando clica "experimentar", já manda o briefing exemplo */}
+      <WelcomeModal onTryExample={(b) => { handleSend(b) }} />
       {/* Top nav */}
       <header className="flex-shrink-0 h-12 flex items-center justify-between px-6 glass border-b border-stone-200/60 dark:border-stone-800/60 z-50">
         <div className="flex items-center gap-3">
@@ -197,7 +209,12 @@ export default function Home() {
               )
             })}
           </div>
-          <AutoModeToggle autoMode={autoMode} setAutoMode={setAutoMode} disabled={isRunning || reunIsRunning} />
+          <AutoModeToggle
+            autoMode={autoMode}
+            setAutoMode={setAutoMode}
+            disabled={isRunning || reunIsRunning}
+            showRecommended={!hasCompletedFirstSession}
+          />
           <Clock />
           <Link href="/saude" title="Dashboard de Saúde"
             className="w-8 h-8 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 flex items-center justify-center hover:bg-stone-50 dark:hover:bg-stone-800 hover:border-stone-400 dark:hover:border-stone-500 transition-all text-stone-500 dark:text-stone-400">
@@ -288,6 +305,7 @@ export default function Home() {
             agentConfig={agentConfig}
             dragControls={dragControls}
             autoMode={autoMode}
+            hideAdvancedToggles={!hasCompletedFirstSession}
             onSend={handleSend}
             onReset={reset}
             onFavoritar={favoritar}
