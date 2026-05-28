@@ -1,6 +1,6 @@
 # LEMMON AGENTES — Manual do Sistema
 
-**Versão atual:** v1.37
+**Versão atual:** v1.38
 **Última atualização:** 2026-05-28
 **Mantido por:** Calebe Alves / Lemmon Produções
 
@@ -11,6 +11,34 @@
 ## Histórico de versões
 
 > **Convenção:** versões mais novas no topo. Cada release lista o que mudou em relação à anterior, mantendo histórico completo.
+
+### v1.38 — 2026-05-28
+
+**Sprint UX pós-auditoria — 11 melhorias pra cliente leigo (T143-T154).**
+
+Auditoria de UX revelou que o sistema estava polido tecnicamente mas intimidador pra cliente recém-instalado. Atacamos os 4 grupos de fricção:
+
+**Onboarding (T147 + T148 + T150):**
+- **Modal de boas-vindas** na primeira visita — 3 passos + briefing de exemplo pronto pra usar ("Quero lançar uma marca de café especial..."). Persiste em `lemmon-onboarded`.
+- **Badge "Recomendado"** no toggle Modo Auto até a primeira sessão concluir.
+- **Toggles avançados** (Fast-track, Sandbox) **escondidos** na primeira sessão — reduz ruído cognitivo pro leigo.
+
+**Erros e feedback (T143 + T145 + T146 + T149 + T151):**
+- **Dark mode legível** — texto das respostas dos agentes era `stone-900` (preto) sobre fundo claro do agente, ficava ilegível. Trocado pra `stone-100`.
+- **WS onerror não-silencioso** — antes, backend caindo ou chave API inválida só pintava bolinha vermelha sem aviso. Agora dispara `notify.error("Conexão perdida com o servidor. Verifique sua chave de API ou tente novamente.")`.
+- **Microcopy do timeout** sem jargão — "Provável overloaded da API" virou "Este agente demorou muito (mais de 10min). O servidor pode estar ocupado. Tente novamente em alguns minutos."
+- **Empty state com CTA concreta** — quando sala vazia em modo Expert, mostra "Clique nas pills OTTO, HEITOR, etc. ou ative o 🤖 Modo Auto pra a IA escolher" em vez de só "Convoque agentes ao escritório".
+- **Banner "Dossiê pronto" interativo** — toast estático virou banner com 2 botões inline (🔗 Compartilhar + ↓ Exportar). 12s em vez de 8s pra dar tempo de ler e clicar.
+
+**Custo e progresso visível (T152 + T153):**
+- **Pill de custo acumulado em tempo real** no header do ChatPanel. Atualiza a cada agente concluído. Cores adaptativas: emerald → amber (80% do cap) → red (100%+). Cliente vê o que está gastando enquanto agentes rodam — reduz ansiedade.
+- **Progresso por agente na bolha** — `"processando..."` genérico virou `"otto pensando · 45%"` quando há porcentagem disponível, mostrando que o sistema está trabalhando ativamente.
+
+**Backend (T144 + T154):**
+- **Pedro como "Consultor"** em vez de "Cliente" — leigo ficava confuso ("mas cliente sou EU"). `rpgClass` ajustado em `agents.ts`.
+- **Regra do Heitor reforçada** — antes, "clínica estética", "Pedro Abrahão", "próteses" não disparavam Heitor (só termos técnicos como "lipo enzimática"). Prompt do sugestor agora cobre saúde nominal (clínica, consultório, paciente, prótese, harmonização, etc.) E qualquer cliente do nicho saúde por nome.
+
+---
 
 ### v1.37 — 2026-05-28
 
