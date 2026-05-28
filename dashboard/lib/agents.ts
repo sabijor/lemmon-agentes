@@ -12,6 +12,8 @@ export interface AgentConfig {
   meetingPosition: { x: number; y: number }
   idleQuote: string
   reuniaoOnly?: boolean
+  /** T175 — em qual sala o agente tem mesa. Default 'creative'. */
+  room?: 'creative' | 'admin'
 }
 
 export const AGENTS: AgentConfig[] = [
@@ -124,6 +126,7 @@ export const AGENTS: AgentConfig[] = [
     deskPosition: { x: 460, y: 80 },
     meetingPosition: { x: 540, y: 220 },
     idleQuote: 'Fluxo de caixa positivo.',
+    room: 'admin',
   },
   {
     id: 'prichina',
@@ -136,6 +139,7 @@ export const AGENTS: AgentConfig[] = [
     deskPosition: { x: 540, y: 80 },
     meetingPosition: { x: 560, y: 240 },
     idleQuote: 'Conferindo ponto da semana...',
+    room: 'admin',
   },
   {
     id: 'caito',
@@ -148,6 +152,7 @@ export const AGENTS: AgentConfig[] = [
     deskPosition: { x: 500, y: 200 },
     meetingPosition: { x: 530, y: 260 },
     idleQuote: 'Apagando fogo. Qual área?',
+    room: 'admin',
   },
   {
     id: 'kelly',
@@ -160,6 +165,7 @@ export const AGENTS: AgentConfig[] = [
     deskPosition: { x: 580, y: 200 },
     meetingPosition: { x: 580, y: 260 },
     idleQuote: 'Manobra legal, art. 9.249.',
+    room: 'admin',
   },
 ]
 

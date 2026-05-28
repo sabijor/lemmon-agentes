@@ -9,7 +9,7 @@ import { RoomBackground } from './WorkRoom'
 import { MeetingRoomBackground } from './MeetingRoom'
 import { ReceptionBackground } from './ReceptionRoom'
 import { AdminRoomBackground, AdminRoomFurniture } from './AdminRoom'
-import { sx, sy, msx, msy, rsx, rsy, CAMERA_MEETING, CAMERA_RECEP, CAMERA_ADMIN, ROLES, IDLE_QUOTES, getMeetingTheme } from './constants'
+import { sx, sy, msx, msy, rsx, rsy, asx, asy, CAMERA_MEETING, CAMERA_RECEP, CAMERA_ADMIN, ROLES, IDLE_QUOTES, getMeetingTheme } from './constants'
 
 // ─── Character positions ──────────────────────────────────────────────
 const DESK_POS: Record<AgentId, { gx: number; gy: number }> = {
@@ -21,11 +21,11 @@ const DESK_POS: Record<AgentId, { gx: number; gy: number }> = {
   aya:           { gx: 7.2,  gy: 2.45 },
   pedro_abrahao: { gx: 5.5,  gy: 2.0  },
   renata:        { gx: 4.2,  gy: 5.45 },
-  // Administrativo Hator — cluster no canto direito (T166-T170)
-  ana_maria:     { gx: 11.5, gy: 5.0 },
-  prichina:      { gx: 12.5, gy: 5.5 },
-  caito:         { gx: 11.5, gy: 6.0 },
-  kelly:         { gx: 12.5, gy: 6.5 },
+  // T175 — Admin Hator: posições em coords da sala admin (0-9), alinhadas com as mesas em AdminRoom.tsx
+  ana_maria:     { gx: 1.6,  gy: 2.3 },  // sentada na mesa CFO (HatorDesk gx=1 gy=1.5)
+  prichina:      { gx: 4.4,  gy: 2.3 },  // mesa Admin/RH
+  kelly:         { gx: 1.6,  gy: 5.3 },  // mesa contábil (HatorDesk gx=1 gy=4.5)
+  caito:         { gx: 7.6,  gy: 4.4 },  // sala fechada do COO (HatorDesk gx=7 gy=3.5)
 }
 
 const MEET_CHAR_POS: Record<AgentId, { gx: number; gy: number }> = {
@@ -52,6 +52,9 @@ function charMeetX(gx: number, gy: number) { return msx(gx, gy) - 22 }
 function charMeetY(gx: number, gy: number) { return msy(gx, gy) - 70 }
 function charRecepX(gx: number, gy: number) { return rsx(gx, gy) - 22 }
 function charRecepY(gx: number, gy: number) { return rsy(gx, gy) - 70 }
+// T175 — admin: agentes da sala administrativa Hator usam asx/asy
+function charAdminX(gx: number, gy: number) { return asx(gx, gy) - 22 }
+function charAdminY(gx: number, gy: number) { return asy(gx, gy) - 70 }
 
 // ─── Move state ──────────────────────────────────────────────────────────
 interface AgentMoveState {
@@ -88,10 +91,11 @@ const ROUTINE_DESTS: Record<AgentId, { gx: number; gy: number }[]> = {
   aya:           [{ gx: 7.2,  gy: 2.45 }, { gx: 5.8, gy: 4.2 }, { gx: 9.5, gy: 4.8 }, { gx: 5.0, gy: 6.2 }, { gx: 7.2, gy: 2.45 }],
   pedro_abrahao: [{ gx: 5.5, gy: 2.0 }, { gx: 4.8, gy: 3.5 }, { gx: 6.0, gy: 1.5 }, { gx: 5.5, gy: 2.0 }],
   renata:        [{ gx: 4.2, gy: 5.45 }, { gx: 6.5, gy: 4.8 }, { gx: 3.8, gy: 7.0 }, { gx: 4.2, gy: 5.45 }],
-  ana_maria:     [{ gx: 11.5, gy: 5.0 }, { gx: 12.0, gy: 5.5 }, { gx: 11.5, gy: 5.0 }],
-  prichina:      [{ gx: 12.5, gy: 5.5 }, { gx: 12.5, gy: 4.5 }, { gx: 12.5, gy: 5.5 }],
-  caito:         [{ gx: 11.5, gy: 6.0 }, { gx: 8.0, gy: 5.5 }, { gx: 11.5, gy: 6.0 }],
-  kelly:         [{ gx: 12.5, gy: 6.5 }, { gx: 12.0, gy: 7.0 }, { gx: 12.5, gy: 6.5 }],
+  // T175 — coords admin dentro de 0-9 (ADMIN_COLS x ADMIN_ROWS)
+  ana_maria:     [{ gx: 1.6, gy: 2.3 }, { gx: 4.4, gy: 2.3 }, { gx: 1.6, gy: 5.3 }, { gx: 1.6, gy: 2.3 }],
+  prichina:      [{ gx: 4.4, gy: 2.3 }, { gx: 4.4, gy: 5.0 }, { gx: 1.6, gy: 2.3 }, { gx: 4.4, gy: 2.3 }],
+  kelly:         [{ gx: 1.6, gy: 5.3 }, { gx: 4.4, gy: 5.3 }, { gx: 1.6, gy: 2.3 }, { gx: 1.6, gy: 5.3 }],
+  caito:         [{ gx: 7.6, gy: 4.4 }, { gx: 8.0, gy: 6.5 }, { gx: 7.6, gy: 4.4 }],
 }
 
 // ─── Pair conversations ──────────────────────────────────────────────────
@@ -480,15 +484,21 @@ export default function OfficeScene({ inMeeting, agentStatus, onToggleAgent, onC
               const status = agentStatus[agent.id]
 
               const isRecepAgent = !!agent.reuniaoOnly && !isIn
+              // T175 — agentes admin moram na sala administrativa (asx/asy)
+              const isAdmin = agent.room === 'admin' && !isIn
               const cx = isIn
                 ? charMeetX(MEET_CHAR_POS[agent.id].gx, MEET_CHAR_POS[agent.id].gy)
                 : isRecepAgent
                 ? charRecepX(ms.gx, ms.gy)
+                : isAdmin
+                ? charAdminX(ms.gx, ms.gy)
                 : charX(ms.gx, ms.gy)
               const cy = isIn
                 ? charMeetY(MEET_CHAR_POS[agent.id].gx, MEET_CHAR_POS[agent.id].gy)
                 : isRecepAgent
                 ? charRecepY(ms.gx, ms.gy)
+                : isAdmin
+                ? charAdminY(ms.gx, ms.gy)
                 : charY(ms.gx, ms.gy)
 
               const desk = DESK_POS[agent.id]

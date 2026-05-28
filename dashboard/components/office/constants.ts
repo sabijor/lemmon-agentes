@@ -28,12 +28,12 @@ export const COLS = 14, ROWS = 10
 export const sx = (gx: number, gy: number) => OX + (gx - gy) * (TW / 2)
 export const sy = (gx: number, gy: number) => OY + (gx + gy) * (TH / 2)
 
-// ─── Meeting room constants ────────────────────────────────────────────
-export const MEET_OX = 1560, MEET_OY = 120
+// ─── Meeting room constants — T175: deslocada pra dar lugar ao admin ───
+export const MEET_OX = 2100, MEET_OY = 120
 export const MEET_COLS = 12, MEET_ROWS = 9
 export const msx = (gx: number, gy: number) => MEET_OX + (gx - gy) * (TW / 2)
 export const msy = (gx: number, gy: number) => MEET_OY + (gx + gy) * (TH / 2)
-export const CAMERA_MEETING = 1128
+export const CAMERA_MEETING = 1668
 
 // ─── Reception room constants ─────────────────────────────────────────
 export const RECEP_OX = -480, RECEP_OY = 180
@@ -42,13 +42,17 @@ export const rsx = (gx: number, gy: number) => RECEP_OX + (gx - gy) * (TW / 2)
 export const rsy = (gx: number, gy: number) => RECEP_OY + (gx + gy) * (TH / 2)
 export const CAMERA_RECEP = -944
 
-// ─── Admin room (Hator office) constants — T171 ───────────────────────
-// Posicionada à DIREITA do meeting room, conectada pelo slide-toggle.
-export const ADMIN_OX = 2580, ADMIN_OY = 130
-export const ADMIN_COLS = 10, ADMIN_ROWS = 9
+// ─── Admin room (Hator office) constants — T171 + T175 ───────────────
+// Posicionada LOGO À DIREITA do work room, conectada por um corredor visual.
+// Antes era muito distante (OX=2580); agora 1100 dá sensação de mesmo edifício.
+export const ADMIN_OX = 1100, ADMIN_OY = 120
+export const ADMIN_COLS = 9, ADMIN_ROWS = 9
 export const asx = (gx: number, gy: number) => ADMIN_OX + (gx - gy) * (TW / 2)
 export const asy = (gx: number, gy: number) => ADMIN_OY + (gx + gy) * (TH / 2)
-export const CAMERA_ADMIN = 2128
+export const CAMERA_ADMIN = 740
+
+// ─── Meeting room re-posicionada — fica DEPOIS do admin no eixo X ─────
+// (era 1560, vira 2100 pra manter ordem visual: criativo → admin → reunião)
 
 // ─── Paleta clínica (Hator) ───────────────────────────────────────────
 export const HATOR_PALETTE = {
