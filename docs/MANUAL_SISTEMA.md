@@ -1,7 +1,7 @@
 # LEMMON AGENTES — Manual do Sistema
 
-**Versão atual:** v1.36
-**Última atualização:** 2026-05-18
+**Versão atual:** v1.37
+**Última atualização:** 2026-05-28
 **Mantido por:** Calebe Alves / Lemmon Produções
 
 > Este é o documento de referência viva do sistema Lemmon Agentes. Sempre que uma função nova for implementada ou um épico fechar, este manual deve ser atualizado e uma nova versão de PDF gerada em `docs/releases/`.
@@ -11,6 +11,79 @@
 ## Histórico de versões
 
 > **Convenção:** versões mais novas no topo. Cada release lista o que mudou em relação à anterior, mantendo histórico completo.
+
+### v1.37 — 2026-05-28
+
+**Marco de produto** — Auto-roteador IA, Otto v4 (inteligência de distribuição) e resiliência operacional. Sistema fica utilizável por cliente leigo sem expertise técnica.
+
+#### 🎯 Auto-roteador IA (T139)
+
+Antes: cliente precisava convocar manualmente quais agentes (Otto, Heitor, Salles, Sônia, Aya, Renata, Pedro) ele queria rodar — exigia entender o papel de cada um. Inviável pra leigo, ainda mais com 30+ agentes no roadmap.
+
+Agora: cliente abre o sistema em **modo Auto (default)**, digita o pedido em linguagem natural e a IA (Haiku) decide o conjunto de agentes apropriado. Modo Expert continua disponível pra operador avançado via toggle no header.
+
+- **Catálogo de metadados** (`/agentes/catalogo`): cada agente declara `papel_curto`, `quando_usar`, `quando_nao_usar`, `categoria`, `custo_medio_usd`. Adicionar agente novo = criar classe com metadados; sugestor passa a considerar automaticamente.
+- **Endpoint `/sugerir_pipeline`**: monta prompt dinamicamente a partir do catálogo, com regras de ouro (Heitor obrigatório em saúde/estética/ad pago, Aya sempre no fim quando há 2+ agentes, lista vazia só pra pedido fundamentalmente vago).
+- **Toggle Auto/Expert no header**: persistido em localStorage. Em Auto, esconde pills dos agentes; em Expert, comportamento clássico.
+- **Hook `useAutoRouter`** + integração em `handleSend`: ao apertar Enter, dispara `/sugerir_pipeline`, mostra toast com `🤖 IA escolheu: X · Y · Z (~$0.25)` e roda o pipeline já com a seleção.
+- **Fallback amigável**: pedido tipo "oi tudo bem" ou "me dá uma ideia" → IA retorna `motivo_vazio` explicando o que falta; UI mostra warning sem rodar nada.
+
+#### 🧠 Otto v4 — inteligência de distribuição (2025-2026)
+
+Otto agora entrega estratégia **distribuível**, não só conceitual. Nova seção `INTELIGÊNCIA DE DISTRIBUIÇÃO — ALGORITMO META` no prompt cobre:
+
+- **Vetores de cada formato**: Reels (alcance pra não-seguidores, watch time decide), Carrossel (saves > likes, profundidade), Stories (ativação de quem já segue, sticker interativo prioriza)
+- **Semanas temáticas conectadas**: programação mensal onde semana N deixa lacuna que só N+1 fecha. Otto compõe estrutura ÂNCORA → PROFUNDIDADE → PROVA → CONVERSÃO.
+- **Quiz Stories como funil orgânico**: sticker interativo → última tela captura nome+WhatsApp → lead qualificado sem parecer captação.
+- **Reel cinematográfico Lemmon vs Reel orgânico operador**: Otto mapeia em `traducao_pratica` quais entregas exigem captação Lemmon (alta produção) e quais o cliente executa autonomamente (celular, trend). Informa o calendário de captação do operador.
+
+Output do Otto agora chega no Salles/Sônia/Renata já com programação mensal definida, em vez de só conceito abstrato. QA validado em briefing real ("café especial pra Instagram") — todas as 4 features aparecem no output.
+
+#### ⚙️ Modelo configurável por agente (T128)
+
+Cada agente pode usar modelo diferente da Anthropic via env var (`LEMMON_MODELO_OTTO=claude-opus-4-7`, etc.) com fallback para `LEMMON_MODELO_PADRAO`. Custo é calculado com a tabela de preço correta por modelo (Opus 4.7: $15/$75, Sonnet 4.6: $3/$15, Haiku 4.5: $0.80/$4).
+
+Recomendação: Opus pros "pensadores" (Otto, Salles) — eleva qualidade de tese e roteiro. Sonnet (default) pros operacionais (Heitor compliance, Aya compilação, Renata calendário, Sônia performance). Custo extra: ~$0.05-0.15 por sessão vs ~$1 se trocar tudo pra Opus.
+
+#### 🔄 Resiliência operacional (T140)
+
+Chrome fecha WebSocket em abas em background. Antes: pipeline morria silenciosamente, sessão se perdia. Agora:
+
+- **Backend tolerante a WS fechado**: `ws.send_json` monkey-patched pra silenciar `RuntimeError` de send-after-close. Pipeline roda até salvar a sessão mesmo sem cliente conectado.
+- **Frontend reconcilia via histórico**: `visibilitychange` listener detecta WS caído ao voltar foco, faz polling de `/historico` por até 3min e carrega a sessão completa.
+- **Persistência de `messages` e `sessionId`** em localStorage: se algum motivo zerar o React state, restaura automaticamente.
+- **Callback de aprovação não trava 5min** (T132): `WebSocketDisconnect` capturado + pre-check de `client_state`. Cliente offline → callback retorna False (skip), pipeline segue sem ação destrutiva.
+
+#### 🛡️ Segurança
+
+- **T129 — Path traversal em `/historico/{id}`**: validador regex (`^[0-9]{8}_[0-9]{6}(_sessao|_reuniao)?$`) + verificação `path.relative_to(session_dir)` em todos os endpoints que recebem `session_id`.
+- **T130 — Race condition em favoritar/tags**: lock atômico via `fcntl.flock` ao gravar JSON de sessão. Requisições simultâneas não mais sobrescrevem uma à outra.
+- **T133 — Headers de segurança no `/share/{token}`**: CSP restritiva (default-src 'self', frame-ancestors 'none'), X-Frame-Options: DENY, X-Content-Type-Options, Referrer-Policy, Permissions-Policy. Defesa em profundidade — o `html_escape` em todas as interpolações já bloqueava XSS clássico.
+
+#### 🐛 Bugs corrigidos
+
+- **T125 — ChatPanel sumia em telas <1620px**: clamp da posição salva no localStorage + listener de `resize`. Painel sempre cabe na viewport.
+- **T126 — Backend crashava em install limpa**: `python-multipart` faltava no `requirements.txt` (FastAPI exige pra `UploadFile`).
+- **T127 — Sprites SVG quebrados no Safari**: causa raiz era `foreignObject` (bug histórico em Safari). Refatorado para SVG aninhado nativo (`<svg x={3} y={4}>` direto dentro do `<svg>` do escritório). Funciona em todos os browsers.
+- **T131 — `custo_total_usd` mal tipado**: 2 leitores legados (`agentes/salles.py`, `pipeline_completo.py`) ainda usavam `resultado_otto["custo"]["usd"]`. Padronizados pro float `custo_total_usd`.
+- **T135 — `openai` SDK faltando no requirements**: rota `/transcrever` (T34) usa OpenAI Whisper mas dependência nunca era declarada. Cliente novo que tentasse usar áudio quebrava.
+- **T141 — Sugestor conservador demais**: ajuste no prompt do Haiku — pedidos com ação clara (faz/cria/roda X) ativam agentes mesmo sem todo contexto. Lista vazia só pra pedido genuinamente incompleto.
+
+#### 🔧 Manutenção e polimento
+
+- **T134 — `schema_version` no JSON de sessão**: sessões novas carimbam `schema_version=1`. Quando o formato mudar, sistema pode disparar migrations sem quebrar JSONs antigos.
+- **T136 — `Custo.calcular()` em `auxiliares.py`**: 2 cálculos manuais hardcoded substituídos pela função centralizada. Se preços Anthropic mudarem, atualizar num lugar só.
+- **T137 — Log ao falhar descrição de imagem**: `try/except: pass` virou `logger.warning(...)` + `ws.send_json({"type": "warning"})`. Operador agora sabe quando o contexto visual foi ignorado.
+- **T138 — Endpoint `/health`**: `GET /health` retorna `{status, service, version}`. Instalador e load balancers podem confirmar backend antes de declarar sucesso.
+- **T142 — Fast Refresh do Next**: `ThemeToggle`, `Clock` e `AutoModeToggle` extraídos de `app/page.tsx` para `components/header/HeaderControls.tsx`. Resolve "forced full reload" causado por components não-exportados misturados com `export default`.
+
+#### 📦 Distribuição
+
+- **`Atualizar.command` v2** (no instalador): self-healing — mata processos antigos via `pkill`, faz `git clone`, sincroniza com `rsync` preservando `.env`/histórico/inputs, valida prompts vs `versao_prompt` (auto-fix se inconsistente), reabre o sistema sozinho. Cliente leigo dá duplo-clique e segue a vida.
+- **Repositório GitHub público**: `https://github.com/sabijor/lemmon-agentes` — permite que `Atualizar.command` faça clone anônimo.
+- **Backend via `preview_start`**: configurado em `.claude/launch.json` usando Python global do brew (sandbox do MCP Preview bloqueia `pyvenv.cfg`).
+
+---
 
 ### v1.36 — 2026-05-18
 
