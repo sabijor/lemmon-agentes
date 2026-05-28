@@ -6,11 +6,15 @@ agrupado por categoria e auto-marcar pills.
 """
 from fastapi import APIRouter
 
+from agentes.ana_maria import AnaMaria
 from agentes.aya import Aya
+from agentes.caito import Caito
 from agentes.carlos import Carlos
 from agentes.heitor import Heitor
+from agentes.kelly import Kelly
 from agentes.otto import Otto
 from agentes.pedro_abrahao import PedroAbrahao
+from agentes.prichina import Prichina
 from agentes.renata import Renata
 from agentes.salles import Salles
 from agentes.sonia import Sonia
@@ -20,6 +24,7 @@ router = APIRouter()
 # Lista de fábricas. Pra adicionar agente novo: 1 linha aqui + classe com metadados.
 # (Não instanciar aqui no module-level — exige ANTHROPIC_API_KEY mesmo só pra listar.)
 _FABRICAS = [
+    # ── Estúdio Criativo (Lemmon) ──────────────────────────────────────
     ("otto",          Otto),
     ("heitor",        Heitor),
     ("salles",        Salles),
@@ -28,6 +33,11 @@ _FABRICAS = [
     ("aya",           Aya),
     ("renata",        Renata),
     ("pedro_abrahao", PedroAbrahao),
+    # ── Escritório Administrativo (Hator Clinic) — T166 ────────────────
+    ("ana_maria",     AnaMaria),
+    ("prichina",      Prichina),
+    ("caito",         Caito),
+    ("kelly",         Kelly),
 ]
 
 

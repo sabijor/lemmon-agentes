@@ -1,6 +1,6 @@
 # LEMMON AGENTES — Manual do Sistema
 
-**Versão atual:** v1.40
+**Versão atual:** v1.41
 **Última atualização:** 2026-05-28
 **Mantido por:** Calebe Alves / Lemmon Produções
 
@@ -11,6 +11,63 @@
 ## Histórico de versões
 
 > **Convenção:** versões mais novas no topo. Cada release lista o que mudou em relação à anterior, mantendo histórico completo.
+
+### v1.41 — 2026-05-28
+
+**Frente administrativa Hator — 4 agentes novos (T166-T170).**
+
+Sistema cresce de 8 → **12 agentes** com a primeira leva da frente administrativa da Hator Clinic. Os agentes criativos cuidam de conteúdo; os administrativos cuidam da gestão do negócio. Default: domínios separados, com **exceção controlada de cross-talk** (Caíto + Otto em decisão estratégica que cruza negócio e marketing).
+
+#### 🏥 Contexto Hator embutido em todos os 4 prompts
+
+Pesquisa via BrasilAPI sobre o CNPJ 45.453.223/0001-42 carimbou nos prompts:
+- **HATOR CLINIC SERVICOS MEDICOS LTDA** — Americana/SP
+- **Microempresa**, **Lucro Presumido** (não optante Simples)
+- **CNAE principal** 8610-1/01 — atendimento hospitalar
+- **CNAEs secundários:** cirúrgico, exames, consultas, laboratório, nutrição, estética
+- **Início:** 25/02/2022 (~4 anos)
+
+Tabela tributária do Lucro Presumido com atividade médico-hospitalar está dentro do prompt do Kelly: presunção reduzida 8% IRPJ / 12% CSLL (Lei 9.249/95), PIS 0,65%, COFINS 3%, ISS Americana 2-5%. Carga combinada ~13-16% sobre receita bruta.
+
+#### 🧑‍💼 Os 4 agentes administrativos
+
+| Agente | Papel | Quando entra |
+|---|---|---|
+| **Ana Maria** (`ana_maria`) | CFO — contas a pagar/receber, análise de planilha, fluxo de caixa, margem, agenda de pagamentos | "preciso pagar X amanhã, posso?", "analisa minha planilha", "qual minha margem" |
+| **Prichina** (`prichina`) | Administrativo — contabilidade fiscal cotidiana (NF, retenção, obrigação acessória) + RH operacional (ponto, férias, hora extra, atestado) | "atestado de 5 dias, posso descontar?", "minha NF está certa?", "DCTFWeb venceu" |
+| **Caíto** (`caito`) | COO/Conselheiro — visão cruzada que costura financeiro + RH + operação. "Otto do administrativo" | "como está a saúde da clínica?", "vale contratar?", "vou expandir, por onde?", "paciente reclamou, o que faço?" |
+| **Kelly** (`kelly`) | Contábil-Tributária — mestre dos impostos do Lucro Presumido, manobras legais (elisão), retenções, pró-labore vs distribuição | "qual ISS Americana?", "qual presunção pra meu CNAE?", "vale otimizar tributo?" |
+
+Todos com prompt próprio (`prompts/{nome}_system_v1.md`), classe Python (`agentes/{nome}.py`) e base compartilhada (`core/agente_admin_base.py`) que simplifica chamada API simples (sem tool_use).
+
+#### 🔀 Cross-talk admin↔criativo controlado
+
+Default: pedido administrativo **NÃO** chama criativos e vice-versa. Aya (compiladora criativa) **NÃO** entra em pedido administrativo puro — seu dossiê é estratégico-criativo, não tem sentido em pergunta de financeiro.
+
+Exceção: **Caíto pode entrar com Otto** quando a decisão estratégica cruza negócio Hator + estratégia de conteúdo (ex: "vou lançar protocolo X, como divulgar?"). Caíto traz viabilidade operacional; Otto traz tese criativa.
+
+Validação real: 5/5 cenários ✓
+- "pagar fornecedor amanhã" → Ana Maria sozinha
+- "qual ISS de Americana?" → Kelly sozinha
+- "atestado de 5 dias" → Prichina sozinha
+- "lançar protocolo novo, como divulgar?" → **Caíto + Otto + Aya** (cross-talk OK)
+- "reel solo do dono da marca de café" → Otto + Carlos + Sônia + Aya (criativos)
+
+#### 🎨 Visual
+
+- 4 sprites SVG próprios no `CharacterSprite.tsx`: Ana Maria (blazer cinza-escuro com laptop verde), Prichina (blazer amarelo com prancheta de checkboxes RH), Caíto (terno marrom claro com gravata + pasta de relatórios), Kelly (blazer roxo com livro de leis tributário).
+- Cluster posicionado no canto direito do escritório isométrico.
+- Pills no header: ANA MARIA · PRICHINA · CAÍTO · KELLY.
+- Idle quotes próprias ("Fluxo positivo.", "Atestado conferido.", "Apagando fogo.", "Presunção 8%.").
+
+#### 🚧 Próximos passos (Sprint Admin-B)
+
+Pra próxima sessão:
+- Sala administrativa visual **separada** com toggle "🎬 Criativo / 📊 Administrativo" no header
+- Integração **Google Drive** (planilhas da Hator atualizadas manualmente todo dia)
+- Cliente vira esses agentes muito mais úteis quando consomem o Drive direto
+
+---
 
 ### v1.40 — 2026-05-28
 

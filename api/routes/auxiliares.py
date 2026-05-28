@@ -41,12 +41,24 @@ def _construir_prompt_sugestor(briefing: str, catalogo: list[dict]) -> str:
         "REGRAS:\n"
         "- Escolha o MENOR conjunto suficiente. Não inclua agente irrelevante só pra dar volume.\n"
         "- Ordem importa: cada agente recebe contexto dos anteriores. Coloque estratégia antes de roteiro, roteiro antes de performance.\n"
-        "- Aya (compilação) só faz sentido se houver 2+ agentes antes dela.\n"
+        "- Aya (compilação) só faz sentido se houver 2+ agentes CRIATIVOS antes dela. NÃO compile pedido administrativo.\n"
         "- Espelhos de cliente entram quando o briefing menciona o cliente específico.\n"
         "- CARLOS e SALLES são EXCLUSIVOS — escolha UM, nunca ambos:\n"
         "    • SALLES: entrevista documental, captação de set, personagem real (médico, especialista, depoimento), Calebe dirige conversa.\n"
         "    • CARLOS: conteúdo solo do cliente, ad pago, narração/voiceover, fala literal pra gravar sozinho, post de marca com texto pronto.\n"
-        "    • Default na dúvida → CARLOS (mais comum em cliente leigo). Salles só quando briefing diz claramente 'entrevista', 'documentário', 'captação', 'depoimento', 'gravar com [pessoa]'.\n\n"
+        "    • Default na dúvida → CARLOS (mais comum em cliente leigo). Salles só quando briefing diz claramente 'entrevista', 'documentário', 'captação', 'depoimento', 'gravar com [pessoa]'.\n"
+        "\n"
+        "REGRAS PRA AGENTES ADMINISTRATIVOS (Hator Clinic):\n"
+        "- ana_maria, prichina, caito, kelly são CFO/admin/COO/contábil da Hator Clinic (CNPJ 45.453.223/0001-42).\n"
+        "- Pedido ADMINISTRATIVO (financeiro, contas, RH, tributos, gestão da clínica): NÃO chame agentes CRIATIVOS (otto/heitor/salles/carlos/sonia/renata/aya/pedro_abrahao). Use SÓ os admin.\n"
+        "- Pedido CRIATIVO (conteúdo, roteiro, estratégia de marca, ad): NÃO chame admin. Use SÓ os criativos.\n"
+        "- EXCEÇÃO — cross-talk só pra CAÍTO: ele pode entrar com Otto quando a decisão estratégica cruza negócio Hator + estratégia de conteúdo (ex: 'vou lançar protocolo X, como divulgar?'). Caito traz visão de viabilidade operacional; Otto traz tese criativa.\n"
+        "- Distinção entre os admin:\n"
+        "    • ana_maria: contas a pagar/receber, planilha financeira, fluxo de caixa, agenda de pagamentos, margem\n"
+        "    • prichina: NF cotidiana, RH operacional (ponto, férias, hora extra, atestado), obrigação acessória\n"
+        "    • kelly: tributos específicos (IRPJ, CSLL, PIS, COFINS, ISS), planejamento tributário, alíquotas, manobra legal\n"
+        "    • caito: pergunta ampla que cruza áreas, decisão estratégica de operação, 'saúde da clínica', expansão, reclamação grave\n"
+        "- Se pedido é 1 área isolada → chama 1 agente. Se é amplo → caito (que pode pedir input dos outros internamente).\n\n"
         "REGRAS DE OURO (não-negociáveis):\n"
         "- HEITOR SEMPRE em pedidos que envolvem saúde/cuidado pessoal — termos como: saúde, medicina, médico, dentista, dental, odonto, prótese, clínica, consultório, paciente, tratamento, procedimento, estética, harmonização, lipo, emagrecimento, suplemento, dermato, plástica, ortodontia, cirurgia, beleza.\n"
         "- HEITOR SEMPRE quando o pedido cita um cliente que atua em saúde (ex: 'pra clínica X', 'pro Dr. Y', 'pro Pedro Abrahão') — mesmo que o tema parecer seguro, anúncio na Meta exige compliance.\n"
@@ -109,14 +121,22 @@ async def sugerir_pipeline(briefing: str):
     if not agentes and not motivo_vazio:
         agentes = [a for a in ["otto"] if a in ids_validos]
 
-    # REGRA DE OURO: Aya é compiladora — SEMPRE entra no fim quando há outros agentes.
-    # Cliente espera SEMPRE um dossiê final. Exceção: agente único de compliance puro
-    # (Heitor sozinho — pedido tipo "valida esse texto" não precisa de dossiê).
-    if agentes and agentes != ["heitor"] and "aya" not in agentes and "aya" in ids_validos:
+    # REGRA DE OURO: Aya é compiladora CRIATIVA — entra no fim quando há OUTROS
+    # agentes criativos. Pedido administrativo (Hator) não passa pela Aya: o
+    # dossiê dela é estratégico-criativo, não faz sentido em pergunta de
+    # financeiro/RH/tributos.
+    AGENTES_ADMIN = {"ana_maria", "prichina", "caito", "kelly"}
+    AGENTES_CRIATIVOS = {"otto", "heitor", "salles", "carlos", "sonia", "renata", "pedro_abrahao"}
+    tem_criativo = any(a in AGENTES_CRIATIVOS for a in agentes)
+    so_admin = agentes and all(a in AGENTES_ADMIN for a in agentes)
+    if tem_criativo and agentes != ["heitor"] and "aya" not in agentes and "aya" in ids_validos:
         agentes.append("aya")
     # Garante Aya na última posição (a IA pode ter colocado no meio)
-    if "aya" in agentes:
+    if "aya" in agentes and not so_admin:
         agentes = [a for a in agentes if a != "aya"] + ["aya"]
+    # Se for SÓ admin e Aya entrou indevidamente, remove
+    if so_admin and "aya" in agentes:
+        agentes = [a for a in agentes if a != "aya"]
 
     return {
         "agentes": agentes,

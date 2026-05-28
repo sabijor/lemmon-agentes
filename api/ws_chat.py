@@ -10,7 +10,11 @@ from agentes.heitor import Heitor
 from agentes.otto import Otto
 from agentes.pedro_abrahao import PedroAbrahao
 from agentes.renata import Renata
+from agentes.ana_maria import AnaMaria
+from agentes.caito import Caito
 from agentes.carlos import Carlos
+from agentes.kelly import Kelly
+from agentes.prichina import Prichina
 from agentes.salles import Salles
 from agentes.sonia import Sonia
 from api.deps import _anthropic_client, _log
@@ -110,6 +114,9 @@ async def chat(ws: WebSocket):
             analise_otto = resume_context.get("analise_otto") or None
             diretrizes_heitor = resume_context.get("diretrizes_heitor") or None
             roteiro_salles = resume_context.get("roteiro_salles") or None
+            # T166-T168: outputs dos agentes administrativos da sessão atual.
+            # Usado pra alimentar Caíto com visão cruzada dos outros admin.
+            admin_outputs: dict[str, str] = {}
 
             # Herda respostas anteriores para que a sessão salva fique completa
             respostas: dict[str, str] = dict(resume_context.get("respostas", {}))
@@ -225,6 +232,55 @@ async def chat(ws: WebSocket):
                     # Carlos também pode alimentar Sônia (mesma posição do Salles)
                     roteiro_salles = res.get("output_humano", "")
                     return roteiro_salles, res.get("custo_total_usd", 0)
+
+                # ─── Agentes administrativos Hator (T166-T168) ────────────────
+                elif name == "ana_maria":
+                    ag = AnaMaria()
+                    res = await loop.run_in_executor(
+                        None, lambda: ag.executar(briefing=briefing),
+                    )
+                    out = res.get("output_humano", "")
+                    admin_outputs["ana_maria"] = out
+                    return out, res.get("custo_total_usd", 0)
+
+                elif name == "prichina":
+                    ag = Prichina()
+                    res = await loop.run_in_executor(
+                        None, lambda: ag.executar(briefing=briefing),
+                    )
+                    out = res.get("output_humano", "")
+                    admin_outputs["prichina"] = out
+                    return out, res.get("custo_total_usd", 0)
+
+                elif name == "kelly":
+                    ag = Kelly()
+                    res = await loop.run_in_executor(
+                        None, lambda: ag.executar(briefing=briefing),
+                    )
+                    out = res.get("output_humano", "")
+                    admin_outputs["kelly"] = out
+                    return out, res.get("custo_total_usd", 0)
+
+                elif name == "caito":
+                    # Caíto recebe outputs dos outros admin se rodaram antes na sessão.
+                    # Também recebe Otto quando há cross-talk (decisão estratégica de
+                    # negócio + criativo).
+                    ag = Caito()
+                    contextos = {k: v for k, v in admin_outputs.items() if v}
+                    if isinstance(analise_otto, dict):
+                        otto_humano = analise_otto.get("output_humano", "")
+                        if otto_humano:
+                            contextos["otto"] = otto_humano
+                    res = await loop.run_in_executor(
+                        None,
+                        lambda: ag.executar(
+                            briefing=briefing,
+                            contextos_agentes=contextos or None,
+                        ),
+                    )
+                    out = res.get("output_humano", "")
+                    admin_outputs["caito"] = out
+                    return out, res.get("custo_total_usd", 0)
 
                 elif name == "sonia":
                     ag = Sonia()

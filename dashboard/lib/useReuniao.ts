@@ -7,10 +7,12 @@ import { WATCHDOG_TIMEOUT_MIN, PROGRESS_CURVE_POWER } from './config'
 
 const DEFAULT_STATUS = (): Record<AgentId, AgentStatus> => ({
   otto: 'idle', heitor: 'idle', salles: 'idle', carlos: 'idle', sonia: 'idle', aya: 'idle', pedro_abrahao: 'idle', renata: 'idle',
+  ana_maria: 'idle', prichina: 'idle', caito: 'idle', kelly: 'idle',
 })
 
 const FALLBACK_MEDIANAS: Record<AgentId, number> = {
   otto: 20, heitor: 40, salles: 30, carlos: 25, sonia: 30, aya: 15, pedro_abrahao: 25, renata: 30,
+  ana_maria: 20, prichina: 20, caito: 25, kelly: 22,
 }
 
 export interface LoopStatus {

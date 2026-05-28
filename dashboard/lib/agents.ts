@@ -1,4 +1,4 @@
-export type AgentId = 'otto' | 'heitor' | 'salles' | 'carlos' | 'sonia' | 'aya' | 'pedro_abrahao' | 'renata'
+export type AgentId = 'otto' | 'heitor' | 'salles' | 'carlos' | 'sonia' | 'aya' | 'pedro_abrahao' | 'renata' | 'ana_maria' | 'prichina' | 'caito' | 'kelly'
 
 export interface AgentConfig {
   id: AgentId
@@ -111,6 +111,55 @@ export const AGENTS: AgentConfig[] = [
     deskPosition: { x: 180, y: 140 },
     meetingPosition: { x: 510, y: 240 },
     idleQuote: 'Costurando narrativa em calendário...',
+  },
+  // ── Administrativo Hator (T166-T170) ──────────────────────────────────
+  {
+    id: 'ana_maria',
+    name: 'Ana Maria',
+    title: 'CFO',
+    rpgClass: 'Financeira',
+    color: '#047857',
+    colorDim: '#d1fae5',
+    colorText: '#fff',
+    deskPosition: { x: 460, y: 80 },
+    meetingPosition: { x: 540, y: 220 },
+    idleQuote: 'Fluxo de caixa positivo.',
+  },
+  {
+    id: 'prichina',
+    name: 'Prichina',
+    title: 'Administrativo',
+    rpgClass: 'RH',
+    color: '#a16207',
+    colorDim: '#fef3c7',
+    colorText: '#fff',
+    deskPosition: { x: 540, y: 80 },
+    meetingPosition: { x: 560, y: 240 },
+    idleQuote: 'Conferindo ponto da semana...',
+  },
+  {
+    id: 'caito',
+    name: 'Caíto',
+    title: 'COO',
+    rpgClass: 'Operações',
+    color: '#7c2d12',
+    colorDim: '#fed7aa',
+    colorText: '#fff',
+    deskPosition: { x: 500, y: 200 },
+    meetingPosition: { x: 530, y: 260 },
+    idleQuote: 'Apagando fogo. Qual área?',
+  },
+  {
+    id: 'kelly',
+    name: 'Kelly',
+    title: 'Contábil',
+    rpgClass: 'Tributarista',
+    color: '#6d28d9',
+    colorDim: '#ede9fe',
+    colorText: '#fff',
+    deskPosition: { x: 580, y: 200 },
+    meetingPosition: { x: 580, y: 260 },
+    idleQuote: 'Manobra legal, art. 9.249.',
   },
 ]
 

@@ -20,6 +20,11 @@ const DESK_POS: Record<AgentId, { gx: number; gy: number }> = {
   aya:           { gx: 7.2,  gy: 2.45 },
   pedro_abrahao: { gx: 5.5,  gy: 2.0  },
   renata:        { gx: 4.2,  gy: 5.45 },
+  // Administrativo Hator — cluster no canto direito (T166-T170)
+  ana_maria:     { gx: 11.5, gy: 5.0 },
+  prichina:      { gx: 12.5, gy: 5.5 },
+  caito:         { gx: 11.5, gy: 6.0 },
+  kelly:         { gx: 12.5, gy: 6.5 },
 }
 
 const MEET_CHAR_POS: Record<AgentId, { gx: number; gy: number }> = {
@@ -27,10 +32,14 @@ const MEET_CHAR_POS: Record<AgentId, { gx: number; gy: number }> = {
   otto:          { gx: 2.2, gy: 4.5 },
   heitor:        { gx: 9.3, gy: 4.5 },
   salles:        { gx: 3.5, gy: 7.5 },
-  carlos:        { gx: 4.8, gy: 7.5 },  // ao lado do Salles na sala de reunião
+  carlos:        { gx: 4.8, gy: 7.5 },
   sonia:         { gx: 8.1, gy: 7.5 },
   pedro_abrahao: { gx: 7.5, gy: 2.0 },
   renata:        { gx: 6.3, gy: 6.0 },
+  ana_maria:     { gx: 2.0, gy: 6.0 },
+  prichina:      { gx: 3.0, gy: 6.5 },
+  caito:         { gx: 9.0, gy: 6.0 },
+  kelly:         { gx: 10.0, gy: 6.5 },
 }
 
 // charY: sprite hip (~y=49 of 72 sprite, local offset=53) should sit on chair seat (h=13)
@@ -78,6 +87,10 @@ const ROUTINE_DESTS: Record<AgentId, { gx: number; gy: number }[]> = {
   aya:           [{ gx: 7.2,  gy: 2.45 }, { gx: 5.8, gy: 4.2 }, { gx: 9.5, gy: 4.8 }, { gx: 5.0, gy: 6.2 }, { gx: 7.2, gy: 2.45 }],
   pedro_abrahao: [{ gx: 5.5, gy: 2.0 }, { gx: 4.8, gy: 3.5 }, { gx: 6.0, gy: 1.5 }, { gx: 5.5, gy: 2.0 }],
   renata:        [{ gx: 4.2, gy: 5.45 }, { gx: 6.5, gy: 4.8 }, { gx: 3.8, gy: 7.0 }, { gx: 4.2, gy: 5.45 }],
+  ana_maria:     [{ gx: 11.5, gy: 5.0 }, { gx: 12.0, gy: 5.5 }, { gx: 11.5, gy: 5.0 }],
+  prichina:      [{ gx: 12.5, gy: 5.5 }, { gx: 12.5, gy: 4.5 }, { gx: 12.5, gy: 5.5 }],
+  caito:         [{ gx: 11.5, gy: 6.0 }, { gx: 8.0, gy: 5.5 }, { gx: 11.5, gy: 6.0 }],
+  kelly:         [{ gx: 12.5, gy: 6.5 }, { gx: 12.0, gy: 7.0 }, { gx: 12.5, gy: 6.5 }],
 }
 
 // ─── Pair conversations ──────────────────────────────────────────────────

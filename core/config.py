@@ -215,6 +215,21 @@ AYA_PDF_MAX_SIZE_MB = 10
 # ============================================================================
 
 # ============================================================================
+# LIMITES DOS AGENTES ADMINISTRATIVOS HATOR — T166
+# ============================================================================
+# Ana Maria (CFO), Prichina (admin+RH), Caíto (COO), Kelly (contábil-tributária).
+# Padrão simples: chamada API única, output markdown. Sem tool_use forçado.
+
+ADMIN_BRIEFING_MAX_CHARS = 15000
+ADMIN_CONTEXTO_MAX_CHARS = 20000
+ADMIN_OUTPUT_MAX_TOKENS = 4096
+
+# Faixas de custo — todos rodam Sonnet 4.6, similar custo
+ADMIN_PREVISAO_RANGE_USD = (0.05, 0.20)
+ADMIN_AVISO_AMARELO_USD = 0.25
+ADMIN_AVISO_VERMELHO_USD = 0.40
+
+# ============================================================================
 # LIMITES DO CARLOS (ROTEIRISTA PUBLICITÁRIO — T161)
 # ============================================================================
 

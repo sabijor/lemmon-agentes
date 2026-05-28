@@ -48,6 +48,7 @@ export interface ProgressMeta {
 
 const FALLBACK_MEDIANAS: Record<AgentId, number> = {
   otto: 20, heitor: 40, salles: 30, carlos: 25, sonia: 30, aya: 15, pedro_abrahao: 25, renata: 30,
+  ana_maria: 20, prichina: 20, caito: 25, kelly: 22,
 }
 
 export interface AgentConfig {
@@ -75,6 +76,7 @@ export function useChat() {
   const [messages, setMessages] = useLocalStorage<Message[]>('lemmon-last-messages', [])
   const [agentStatus, setAgentStatus] = useState<Record<AgentId, AgentStatus>>({
     otto: 'idle', heitor: 'idle', salles: 'idle', carlos: 'idle', sonia: 'idle', aya: 'idle', pedro_abrahao: 'idle', renata: 'idle',
+    ana_maria: 'idle', prichina: 'idle', caito: 'idle', kelly: 'idle',
   })
   const [isRunning, setIsRunning] = useState(false)
   const [sessionId, setSessionId] = useLocalStorage<string | null>('lemmon-last-session-id', null)
@@ -192,7 +194,7 @@ export function useChat() {
     setFavoritado(detail.favorito ?? false)
     setIsRunning(false)
     setAwaitingApproval(null)
-    setAgentStatus({ otto: 'idle', heitor: 'idle', salles: 'idle', carlos: 'idle', sonia: 'idle', aya: 'idle', pedro_abrahao: 'idle', renata: 'idle' })
+    setAgentStatus({ otto: 'idle', heitor: 'idle', salles: 'idle', carlos: 'idle', sonia: 'idle', aya: 'idle', pedro_abrahao: 'idle', renata: 'idle', ana_maria: 'idle', prichina: 'idle', caito: 'idle', kelly: 'idle' })
     setResumedFrom(detail.session_id)
     currentMsgId.current = {}
     resumeContextRef.current = (detail as HistoryDetail & { contexto_tecnico?: Record<string, unknown> }).contexto_tecnico ?? {
@@ -508,7 +510,7 @@ export function useChat() {
   const reset = useCallback(() => {
     wsRef.current?.close()
     setMessages([])
-    setAgentStatus({ otto: 'idle', heitor: 'idle', salles: 'idle', carlos: 'idle', sonia: 'idle', aya: 'idle', pedro_abrahao: 'idle', renata: 'idle' })
+    setAgentStatus({ otto: 'idle', heitor: 'idle', salles: 'idle', carlos: 'idle', sonia: 'idle', aya: 'idle', pedro_abrahao: 'idle', renata: 'idle', ana_maria: 'idle', prichina: 'idle', caito: 'idle', kelly: 'idle' })
     setIsRunning(false)
     setSessionId(null)
     setFavoritado(false)

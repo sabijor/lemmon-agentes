@@ -513,6 +513,152 @@ export default function CharacterSprite({ id, size = 1, speaking, walking, sitti
         <rect x="20" y="64" width="13" height="1" rx="0.5" fill="#0369a1" opacity="0.6"/>
       </svg>
     ),
+
+    // ─── Ana Maria — CFO: blazer escuro, óculos discretos, laptop verde
+    ana_maria: (
+      <svg width={W * size} height={H * size} viewBox="0 0 40 72" fill="none" className={cls} style={{ display: 'block', flexShrink: 0, width: W * size, height: H * size }} preserveAspectRatio="xMidYMid meet" x={x} y={y}>
+        <rect x="9" y="3" width="22" height="12" rx="6" fill="#4a2f1a"/>
+        <rect x="8" y="11" width="24" height="6" rx="3" fill="#4a2f1a"/>
+        <ellipse cx="9.5" cy="20" rx="2.5" ry="3.5" fill="#f5d0a9"/>
+        <ellipse cx="20" cy="19" rx="11" ry="10.5" fill="#f5d0a9"/>
+        <rect x="11" y="14" width="7" height="5" rx="1.5" fill="none" stroke="#1c1917" strokeWidth="1.2"/>
+        <rect x="22" y="14" width="7" height="5" rx="1.5" fill="none" stroke="#1c1917" strokeWidth="1.2"/>
+        <line x1="18" y1="16.5" x2="22" y2="16.5" stroke="#1c1917" strokeWidth="1"/>
+        <rect x="12" y="14.8" width="4" height="3.2" rx="0.5" fill="#1c1917"/>
+        <rect x="23" y="14.8" width="4" height="3.2" rx="0.5" fill="#1c1917"/>
+        <circle cx="20" cy="23" r="1" fill="#c4845a"/>
+        <path d="M15 26 Q20 27.5 25 26" stroke="#b06040" strokeWidth="0.9" fill="none" strokeLinecap="round"/>
+        <rect x="14" y="28" width="12" height="4" rx="1" fill="#f1f5f9"/>
+        <rect x="8" y="30" width="24" height="20" rx="2" fill="#1f2937"/>
+        <path d="M14 30 L17 36 L14 50 Z" fill="#111827"/>
+        <path d="M26 30 L23 36 L26 50 Z" fill="#111827"/>
+        <rect x="1" y="31" width="8" height="14" rx="3" fill="#1f2937"/>
+        <rect x="31" y="31" width="8" height="14" rx="3" fill="#1f2937"/>
+        <ellipse cx="5" cy="47" rx="4.5" ry="3.5" fill="#f5d0a9"/>
+        <ellipse cx="35" cy="47" rx="4.5" ry="3.5" fill="#f5d0a9"/>
+        {/* Laptop verde — fluxo positivo */}
+        <rect x="29" y="42" width="11" height="8" rx="1" fill="#374151"/>
+        <rect x="30" y="43" width="9" height="6" rx="0.5" fill="#10b981"/>
+        <polyline points="30.5,48 33,46 35,47 38.5,44" stroke="#fff" strokeWidth="0.6" fill="none"/>
+        <rect x="9" y="49" width="9" height="14" rx="2" fill="#374151"/>
+        <rect x="22" y="49" width="9" height="14" rx="2" fill="#374151"/>
+        <rect x="7" y="61" width="13" height="9" rx="3" fill="#1c1917"/>
+        <rect x="20" y="61" width="13" height="9" rx="3" fill="#1c1917"/>
+      </svg>
+    ),
+
+    // ─── Prichina — Administrativo/RH: blusa amarela, prancheta com checkboxes
+    prichina: (
+      <svg width={W * size} height={H * size} viewBox="0 0 40 72" fill="none" className={cls} style={{ display: 'block', flexShrink: 0, width: W * size, height: H * size }} preserveAspectRatio="xMidYMid meet" x={x} y={y}>
+        <rect x="9" y="4" width="22" height="10" rx="5" fill="#451a03"/>
+        <rect x="11" y="3" width="18" height="4" rx="2" fill="#7c2d12"/>
+        <ellipse cx="9.5" cy="20" rx="2.5" ry="3.5" fill="#f5d0a9"/>
+        <ellipse cx="20" cy="19" rx="11" ry="10.5" fill="#f5d0a9"/>
+        <rect x="12.5" y="15" width="3.5" height="3" rx="0.5" fill="#1c1917"/>
+        <rect x="24" y="15" width="3.5" height="3" rx="0.5" fill="#1c1917"/>
+        <rect x="13" y="15.4" width="1.2" height="1.2" fill="white"/>
+        <rect x="24.5" y="15.4" width="1.2" height="1.2" fill="white"/>
+        <circle cx="20" cy="22" r="1" fill="#c4845a"/>
+        <path d="M16 25 Q20 26.5 24 25" stroke="#b06040" strokeWidth="0.9" fill="none" strokeLinecap="round"/>
+        <rect x="14" y="28" width="12" height="4" rx="1" fill="#f1f5f9"/>
+        <rect x="8" y="30" width="24" height="20" rx="2" fill="#a16207"/>
+        <rect x="1" y="31" width="8" height="14" rx="3" fill="#a16207"/>
+        <rect x="31" y="31" width="8" height="14" rx="3" fill="#a16207"/>
+        <ellipse cx="5" cy="47" rx="4.5" ry="3.5" fill="#f5d0a9"/>
+        <ellipse cx="35" cy="47" rx="4.5" ry="3.5" fill="#f5d0a9"/>
+        {/* Prancheta com checkboxes (RH) */}
+        <rect x="27" y="40" width="13" height="11" rx="1" fill="#fef3c7"/>
+        <rect x="31" y="39" width="5" height="2" rx="0.5" fill="#78350f"/>
+        <rect x="29" y="43" width="1" height="1" fill="#16a34a"/>
+        <line x1="30.5" y1="43.5" x2="38" y2="43.5" stroke="#92400e" strokeWidth="0.5"/>
+        <rect x="29" y="45" width="1" height="1" fill="#16a34a"/>
+        <line x1="30.5" y1="45.5" x2="37" y2="45.5" stroke="#92400e" strokeWidth="0.5"/>
+        <rect x="29" y="47" width="1" height="1" fill="none" stroke="#92400e" strokeWidth="0.4"/>
+        <line x1="30.5" y1="47.5" x2="37" y2="47.5" stroke="#92400e" strokeWidth="0.5"/>
+        <rect x="9" y="49" width="9" height="14" rx="2" fill="#451a03"/>
+        <rect x="22" y="49" width="9" height="14" rx="2" fill="#451a03"/>
+        <rect x="7" y="61" width="13" height="9" rx="3" fill="#1c1917"/>
+        <rect x="20" y="61" width="13" height="9" rx="3" fill="#1c1917"/>
+      </svg>
+    ),
+
+    // ─── Caíto — COO: terno marrom claro, gravata, postura de líder
+    caito: (
+      <svg width={W * size} height={H * size} viewBox="0 0 40 72" fill="none" className={cls} style={{ display: 'block', flexShrink: 0, width: W * size, height: H * size }} preserveAspectRatio="xMidYMid meet" x={x} y={y}>
+        <rect x="10" y="4" width="20" height="9" rx="4" fill="#1e1611"/>
+        <rect x="10" y="4" width="20" height="5" rx="3" fill="#2c1f17"/>
+        <ellipse cx="9.5" cy="20" rx="2.5" ry="3.5" fill="#d4a574"/>
+        <ellipse cx="20" cy="19" rx="11" ry="10.5" fill="#e8c096"/>
+        <rect x="12.5" y="15" width="3.5" height="3" rx="0.5" fill="#1c1917"/>
+        <rect x="24" y="15" width="3.5" height="3" rx="0.5" fill="#1c1917"/>
+        <rect x="13" y="15.4" width="1.3" height="1.3" fill="white"/>
+        <rect x="24.5" y="15.4" width="1.3" height="1.3" fill="white"/>
+        <rect x="13" y="13.5" width="4" height="0.8" rx="0.4" fill="#2c1f17"/>
+        <rect x="23" y="13.5" width="4" height="0.8" rx="0.4" fill="#2c1f17"/>
+        <circle cx="20" cy="22" r="1.1" fill="#b88860"/>
+        <path d="M16 25 Q20 27 24 25" stroke="#9a4533" strokeWidth="1" fill="none" strokeLinecap="round"/>
+        {/* Camisa branca + gravata */}
+        <rect x="14" y="28" width="12" height="5" rx="1" fill="#f8fafc"/>
+        <polygon points="19,32 21,32 20.5,38 19.5,38" fill="#7c2d12"/>
+        {/* Terno marrom claro */}
+        <rect x="8" y="30" width="24" height="20" rx="2" fill="#92400e"/>
+        <path d="M14 30 L17 36 L14 50 Z" fill="#7c2d12"/>
+        <path d="M26 30 L23 36 L26 50 Z" fill="#7c2d12"/>
+        <path d="M17 30 L20 36 L23 30 Z" fill="#f8fafc"/>
+        <rect x="1" y="31" width="8" height="14" rx="3" fill="#92400e"/>
+        <rect x="31" y="31" width="8" height="14" rx="3" fill="#92400e"/>
+        <ellipse cx="5" cy="47" rx="4.5" ry="3.5" fill="#e8c096"/>
+        <ellipse cx="35" cy="47" rx="4.5" ry="3.5" fill="#e8c096"/>
+        {/* Pasta de relatórios */}
+        <rect x="29" y="42" width="11" height="8" rx="0.5" fill="#451a03"/>
+        <rect x="30" y="43" width="9" height="1" fill="#fef3c7"/>
+        <rect x="30" y="45" width="9" height="1" fill="#fef3c7"/>
+        <rect x="30" y="47" width="6" height="1" fill="#fef3c7"/>
+        <rect x="9" y="49" width="9" height="14" rx="2" fill="#451a03"/>
+        <rect x="22" y="49" width="9" height="14" rx="2" fill="#451a03"/>
+        <rect x="7" y="61" width="13" height="9" rx="3" fill="#1c1917"/>
+        <rect x="20" y="61" width="13" height="9" rx="3" fill="#1c1917"/>
+      </svg>
+    ),
+
+    // ─── Kelly — Contábil-Tributária: blazer roxo, óculos sérios, livro de leis
+    kelly: (
+      <svg width={W * size} height={H * size} viewBox="0 0 40 72" fill="none" className={cls} style={{ display: 'block', flexShrink: 0, width: W * size, height: H * size }} preserveAspectRatio="xMidYMid meet" x={x} y={y}>
+        <rect x="9" y="3" width="22" height="11" rx="5" fill="#1f0033"/>
+        <rect x="8" y="9" width="24" height="8" rx="4" fill="#1f0033"/>
+        <ellipse cx="9.5" cy="20" rx="2.5" ry="3.5" fill="#f5d0a9"/>
+        <ellipse cx="20" cy="19" rx="11" ry="10.5" fill="#f5d0a9"/>
+        <rect x="11" y="14" width="7" height="5" rx="1.5" fill="none" stroke="#1c1917" strokeWidth="1.2"/>
+        <rect x="22" y="14" width="7" height="5" rx="1.5" fill="none" stroke="#1c1917" strokeWidth="1.2"/>
+        <line x1="18" y1="16.5" x2="22" y2="16.5" stroke="#1c1917" strokeWidth="1"/>
+        <rect x="12" y="14.8" width="4" height="3.2" rx="0.5" fill="#1c1917"/>
+        <rect x="23" y="14.8" width="4" height="3.2" rx="0.5" fill="#1c1917"/>
+        <rect x="12.5" y="15.2" width="1.4" height="1.4" fill="white"/>
+        <rect x="23.5" y="15.2" width="1.4" height="1.4" fill="white"/>
+        <circle cx="20" cy="22.5" r="1" fill="#c4845a"/>
+        <path d="M16 26 L24 26" stroke="#b06040" strokeWidth="0.9" strokeLinecap="round"/>
+        <rect x="14" y="28" width="12" height="4" rx="1" fill="#f1f5f9"/>
+        <rect x="8" y="30" width="24" height="20" rx="2" fill="#6d28d9"/>
+        <path d="M14 30 L17 36 L14 50 Z" fill="#4c1d95"/>
+        <path d="M26 30 L23 36 L26 50 Z" fill="#4c1d95"/>
+        <rect x="1" y="31" width="8" height="14" rx="3" fill="#6d28d9"/>
+        <rect x="31" y="31" width="8" height="14" rx="3" fill="#6d28d9"/>
+        <ellipse cx="5" cy="47" rx="4.5" ry="3.5" fill="#f5d0a9"/>
+        <ellipse cx="35" cy="47" rx="4.5" ry="3.5" fill="#f5d0a9"/>
+        {/* Livro de leis (tributário) */}
+        <rect x="28" y="40" width="12" height="10" rx="0.5" fill="#7f1d1d"/>
+        <rect x="29" y="41" width="10" height="8" rx="0.3" fill="#fef2f2"/>
+        <rect x="29" y="41" width="10" height="1.5" fill="#7f1d1d"/>
+        <text x="34" y="42.7" fontSize="1.5" fill="#fef2f2" textAnchor="middle" fontWeight="bold">LEI</text>
+        <line x1="30" y1="44.5" x2="38" y2="44.5" stroke="#7f1d1d" strokeWidth="0.3"/>
+        <line x1="30" y1="46" x2="37" y2="46" stroke="#7f1d1d" strokeWidth="0.3"/>
+        <line x1="30" y1="47.5" x2="38" y2="47.5" stroke="#7f1d1d" strokeWidth="0.3"/>
+        <rect x="9" y="49" width="9" height="14" rx="2" fill="#1f0033"/>
+        <rect x="22" y="49" width="9" height="14" rx="2" fill="#1f0033"/>
+        <rect x="7" y="61" width="13" height="9" rx="3" fill="#1c1917"/>
+        <rect x="20" y="61" width="13" height="9" rx="3" fill="#1c1917"/>
+      </svg>
+    ),
   }
 
   return <>{sprites[id]}</>
