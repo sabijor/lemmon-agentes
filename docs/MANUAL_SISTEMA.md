@@ -1,6 +1,6 @@
 # LEMMON AGENTES — Manual do Sistema
 
-**Versão atual:** v1.41
+**Versão atual:** v1.42
 **Última atualização:** 2026-05-28
 **Mantido por:** Calebe Alves / Lemmon Produções
 
@@ -11,6 +11,52 @@
 ## Histórico de versões
 
 > **Convenção:** versões mais novas no topo. Cada release lista o que mudou em relação à anterior, mantendo histórico completo.
+
+### v1.42 — 2026-05-28
+
+**Escritório Administrativo Hator — sala isométrica nova + toggle no header (T171-T174).**
+
+Os 4 agentes admin ganham casa própria. Sistema agora alterna entre 2 espaços visuais distintos via toggle `🎬 Criativo / 📊 Hator` no header.
+
+#### 🏥 Sala administrativa nova
+
+Componente `dashboard/components/office/AdminRoom.tsx` (~250 linhas). Layout corporativo de clínica real:
+
+- **Open space** com 3 mesas: Ana Maria (CFO) à esquerda, Prichina (Admin/RH) ao lado, Kelly (Contábil) na fila de baixo
+- **Sala fechada do COO** (Caíto) à direita, separada por parede de vidro semi-transparente — privacidade do executivo
+- **Decoração corporativa**: 2 plantas em vasos de madeira, sofá verde-água pra recepção informal, estante de livros tributários (Kelly)
+- **Decoração de parede**: painel financeiro "FATURAMENTO +12.4%" com gráfico de barras animado, 2 certificados (CNPJ + ANVISA)
+
+**Paleta clínica:**
+- Piso quadriculado off-white + azul-acinzentado
+- Tile de destaque verde-água (faixa de acolhimento — identidade Hator)
+- Paredes off-white
+- Móveis em madeira clara
+- Verde água (`#0f766e`) como toque de identidade
+
+#### 🔀 Toggle Criativo/Hator no header
+
+Pill segmentado de 2 estados (`RoomToggle` em `HeaderControls.tsx`):
+- 🎬 **Criativo** (amber) — mostra Estúdio Lemmon (8 agentes criativos)
+- 📊 **Hator** (teal) — mostra Escritório Hator (4 agentes admin)
+
+Persiste em `lemmon-active-room` no localStorage. Quando o usuário alterna:
+- **Pills do header re-filtram**: em criativo só vê Otto/Heitor/Salles/Carlos/Sônia/Aya/Pedro/Renata; em admin só vê Ana Maria/Prichina/Caíto/Kelly
+- **Câmera desliza horizontalmente** entre as salas via `spring animation` (já existia pro sistema reception↔work↔meeting; T173 só estendeu pra incluir admin)
+
+#### 🎨 Decisões de design
+
+- **Estilo híbrido**: sprites pixel art ficam (já são icônicos), ambiente fica mais detalhado
+- **Salas paralelas coexistindo no SVG**: cada uma em coordenadas próprias, câmera desliza
+- **Default criativo**: usuário sempre abre no Lemmon — admin é "ir ao escritório de gestão" intencional
+
+#### 🚧 Polimento pendente (próxima sessão)
+
+- **Sprites admin dentro da sala**: hoje os sprites ainda usam coordenadas da sala criativa. Visualmente a sala admin renderiza decoração + móveis mas sem personagens DENTRO dela. Conversar via chat funciona normalmente.
+- **Redesign sala criativa**: agrupar mesas em clusters temáticos (Estratégia, Produção, Performance, Compilação) com identidade de estúdio cinematográfico.
+- **Integração Google Drive**: planilhas da Hator atualizadas manualmente todo dia — agentes admin ficam muito mais úteis lendo dados de verdade.
+
+---
 
 ### v1.41 — 2026-05-28
 

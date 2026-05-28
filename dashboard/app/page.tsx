@@ -12,7 +12,7 @@ import Link from 'next/link'
 import OfficeScene from '@/components/office/OfficeScene'
 import ChatPanel from '@/components/chat/ChatPanel'
 import HistoryPanel from '@/components/history/HistoryPanel'
-import { ThemeToggle, Clock, AutoModeToggle, ComplianceToggle, type ComplianceMode } from '@/components/header/HeaderControls'
+import { ThemeToggle, Clock, AutoModeToggle, ComplianceToggle, RoomToggle, type ComplianceMode, type ActiveRoom } from '@/components/header/HeaderControls'
 import WelcomeModal from '@/components/onboarding/WelcomeModal'
 
 export default function Home() {
@@ -26,6 +26,8 @@ export default function Home() {
   const [autoMode, setAutoMode] = useLocalStorage<boolean>('lemmon-auto-mode', true)
   // T160 — Compliance mode: 'auto' (IA decide), 'sempre' (força Heitor), 'nunca' (remove Heitor).
   const [complianceMode, setComplianceMode] = useLocalStorage<ComplianceMode>('lemmon-compliance-mode', 'auto')
+  // T171-T173 — sala ativa: criativo (Lemmon) ou admin (Hator). Persistida.
+  const [activeRoom, setActiveRoom] = useLocalStorage<ActiveRoom>('lemmon-active-room', 'creative')
   const { sugerir: sugerirPipeline } = useAutoRouter()
   // T148 — flag pra mostrar "recomendado" no Auto Mode até 1ª sessão concluir
   const [hasCompletedFirstSession, setHasCompletedFirstSession] = useLocalStorage<boolean>('lemmon-first-session-done', false)
@@ -198,7 +200,12 @@ export default function Home() {
 
         <div className="flex items-center gap-6">
           <div className={`hidden md:flex items-center gap-2 transition-opacity ${autoMode ? 'opacity-0 pointer-events-none w-0 overflow-hidden' : 'opacity-100'}`}>
-            {AGENTS.map(agent => {
+            {AGENTS.filter(agent => {
+              // T172 — filtra pills pela sala ativa. Admin = só os 4 admin Hator;
+              // Criativo = todo o resto (criativos + espelhos cliente).
+              const ADMIN_IDS = new Set(['ana_maria', 'prichina', 'caito', 'kelly'])
+              return activeRoom === 'admin' ? ADMIN_IDS.has(agent.id) : !ADMIN_IDS.has(agent.id)
+            }).map(agent => {
               const status = agentStatus[agent.id]
               const isIn = inMeeting.has(agent.id)
               const isGuest = !!agent.reuniaoOnly
@@ -228,6 +235,11 @@ export default function Home() {
               )
             })}
           </div>
+          <RoomToggle
+            activeRoom={activeRoom}
+            setActiveRoom={setActiveRoom}
+            disabled={isRunning || reunIsRunning}
+          />
           <AutoModeToggle
             autoMode={autoMode}
             setAutoMode={setAutoMode}
@@ -286,6 +298,7 @@ export default function Home() {
           onExitMeeting={exitMeeting}
           isRunning={isRunning}
           messages={messages}
+          activeRoom={activeRoom}
         />
       </main>
 

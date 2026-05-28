@@ -42,6 +42,33 @@ export const rsx = (gx: number, gy: number) => RECEP_OX + (gx - gy) * (TW / 2)
 export const rsy = (gx: number, gy: number) => RECEP_OY + (gx + gy) * (TH / 2)
 export const CAMERA_RECEP = -944
 
+// ─── Admin room (Hator office) constants — T171 ───────────────────────
+// Posicionada à DIREITA do meeting room, conectada pelo slide-toggle.
+export const ADMIN_OX = 2580, ADMIN_OY = 130
+export const ADMIN_COLS = 10, ADMIN_ROWS = 9
+export const asx = (gx: number, gy: number) => ADMIN_OX + (gx - gy) * (TW / 2)
+export const asy = (gx: number, gy: number) => ADMIN_OY + (gx + gy) * (TH / 2)
+export const CAMERA_ADMIN = 2128
+
+// ─── Paleta clínica (Hator) ───────────────────────────────────────────
+export const HATOR_PALETTE = {
+  floorLight:   '#e0eaef',  // off-white com azul acinzentado
+  floorMid:     '#cbd9e0',
+  floorAccent:  '#b8c9d2',
+  floorGrid:    '#a4b5be',
+  wallTop:      '#f4f8fa',  // off-white quase puro
+  wallLeft:     '#dee7eb',
+  wallRight:    '#e8eef1',
+  woodLight:    '#d4b896',  // madeira clara
+  woodDark:     '#a08358',
+  glass:        '#bfdfe5',  // vidro com tom turquesa
+  glassEdge:    '#7ba7b1',
+  accent:       '#0f766e',  // verde água — toques de identidade Hator
+  accentDim:    '#a7f3d0',
+  paperWhite:   '#fafaf9',
+  textInk:      '#1f2937',
+}
+
 // ─── Roles ───────────────────────────────────────────────────────────
 export const ROLES: Record<AgentId, string> = {
   otto: 'Estrateg.',

@@ -8,7 +8,8 @@ import SpeechBubble from './SpeechBubble'
 import { RoomBackground } from './WorkRoom'
 import { MeetingRoomBackground } from './MeetingRoom'
 import { ReceptionBackground } from './ReceptionRoom'
-import { sx, sy, msx, msy, rsx, rsy, CAMERA_MEETING, CAMERA_RECEP, ROLES, IDLE_QUOTES, getMeetingTheme } from './constants'
+import { AdminRoomBackground, AdminRoomFurniture } from './AdminRoom'
+import { sx, sy, msx, msy, rsx, rsy, CAMERA_MEETING, CAMERA_RECEP, CAMERA_ADMIN, ROLES, IDLE_QUOTES, getMeetingTheme } from './constants'
 
 // ─── Character positions ──────────────────────────────────────────────
 const DESK_POS: Record<AgentId, { gx: number; gy: number }> = {
@@ -132,9 +133,11 @@ interface Props {
   onExitMeeting: () => void
   isRunning: boolean
   messages?: Message[]
+  /** T171-T173: 'creative' (default) = sala Lemmon; 'admin' = escritório Hator */
+  activeRoom?: 'creative' | 'admin'
 }
 
-export default function OfficeScene({ inMeeting, agentStatus, onToggleAgent, onCallAll, onExitMeeting, isRunning, messages = [] }: Props) {
+export default function OfficeScene({ inMeeting, agentStatus, onToggleAgent, onCallAll, onExitMeeting, isRunning, messages = [], activeRoom = 'creative' }: Props) {
   const svgRef = useRef<SVGSVGElement>(null)
   const moveStatesRef = useRef<Record<AgentId, AgentMoveState>>(initMoveStates())
   const [moveStates, setMoveStates] = useState<Record<AgentId, AgentMoveState>>(moveStatesRef.current)
@@ -206,8 +209,11 @@ export default function OfficeScene({ inMeeting, agentStatus, onToggleAgent, onC
 
   const showMeeting = inMeeting.size > 0 || forceShowMeeting
 
-  // ── ViewBox camera pan (work room ↔ meeting room ↔ reception) ────────
-  const cameraTarget = showMeeting ? CAMERA_MEETING : forceShowReception ? CAMERA_RECEP : 0
+  // ── ViewBox camera pan (work room ↔ meeting room ↔ reception ↔ admin) ──
+  // T171: admin tem prioridade sobre as outras quando ativo
+  const cameraTarget = activeRoom === 'admin'
+    ? CAMERA_ADMIN
+    : showMeeting ? CAMERA_MEETING : forceShowReception ? CAMERA_RECEP : 0
   useEffect(() => {
     // Reset pan and zoom when switching rooms
     userOffsetRef.current = { x: 0, y: 0 }
@@ -464,6 +470,9 @@ export default function OfficeScene({ inMeeting, agentStatus, onToggleAgent, onC
             <ReceptionBackground />
             <RoomBackground onDoorClick={() => setForceShowMeeting(true)} whiteBoardFill={whiteBoardFill} whiteBoardColor={activeSpeakingAgent?.color} />
             <MeetingRoomBackground theme={meetingTheme} />
+            {/* T171 — Sala administrativa da Hator (paralela, deslocada à direita) */}
+            <AdminRoomBackground />
+            <AdminRoomFurniture />
 
             {AGENTS.map(agent => {
               const isIn = inMeeting.has(agent.id)

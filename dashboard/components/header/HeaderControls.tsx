@@ -43,6 +43,42 @@ export function Clock() {
   return <div className="text-[10px] font-mono text-stone-400 uppercase tracking-widest hidden lg:block">{time}</div>
 }
 
+export type ActiveRoom = 'creative' | 'admin'
+
+export function RoomToggle({ activeRoom, setActiveRoom, disabled }: { activeRoom: ActiveRoom; setActiveRoom: (v: ActiveRoom) => void; disabled?: boolean }) {
+  const isCreative = activeRoom === 'creative'
+  return (
+    <div className="relative flex items-center bg-stone-100 dark:bg-stone-800 border border-stone-300 dark:border-stone-700 rounded-lg p-0.5">
+      <button
+        onClick={() => !disabled && setActiveRoom('creative')}
+        disabled={disabled}
+        title="Estúdio Criativo — Otto, Salles, Carlos e demais agentes da Lemmon"
+        className={`flex items-center gap-1 h-7 px-2.5 rounded-md text-[10px] font-mono uppercase tracking-widest transition-all ${
+          isCreative
+            ? 'bg-amber-500 text-white shadow-sm'
+            : 'text-stone-500 dark:text-stone-400 hover:text-stone-700 dark:hover:text-stone-200'
+        } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+      >
+        <span className="text-sm leading-none">🎬</span>
+        <span>Criativo</span>
+      </button>
+      <button
+        onClick={() => !disabled && setActiveRoom('admin')}
+        disabled={disabled}
+        title="Escritório Hator — Ana Maria (CFO), Prichina (Admin), Caíto (COO), Kelly (Contábil)"
+        className={`flex items-center gap-1 h-7 px-2.5 rounded-md text-[10px] font-mono uppercase tracking-widest transition-all ${
+          !isCreative
+            ? 'bg-teal-600 text-white shadow-sm'
+            : 'text-stone-500 dark:text-stone-400 hover:text-stone-700 dark:hover:text-stone-200'
+        } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+      >
+        <span className="text-sm leading-none">📊</span>
+        <span>Hator</span>
+      </button>
+    </div>
+  )
+}
+
 export type ComplianceMode = 'auto' | 'sempre' | 'nunca'
 
 export function ComplianceToggle({ value, setValue, disabled }: { value: ComplianceMode; setValue: (v: ComplianceMode) => void; disabled?: boolean }) {
