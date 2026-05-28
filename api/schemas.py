@@ -11,7 +11,11 @@ class AvaliacaoPayload(BaseModel):
 
 class ExportarPayload(BaseModel):
     session_id: str
-    agente: str = "aya"
+    agente: str = "aya"  # legado — usado quando agentes não informado
+    # T158: lista de agentes pra exportar combinado. Quando vazia, usa `agente`.
+    agentes: list[str] | None = None
+    # T159: 'completo' (padrão) ou 'resumo' (Haiku gera 1-pager executivo do dossiê)
+    modo: str = "completo"
 
 
 class FavoritarPayload(BaseModel):

@@ -43,6 +43,33 @@ export function Clock() {
   return <div className="text-[10px] font-mono text-stone-400 uppercase tracking-widest hidden lg:block">{time}</div>
 }
 
+export type ComplianceMode = 'auto' | 'sempre' | 'nunca'
+
+export function ComplianceToggle({ value, setValue, disabled }: { value: ComplianceMode; setValue: (v: ComplianceMode) => void; disabled?: boolean }) {
+  const labels: Record<ComplianceMode, { icon: string; text: string; title: string; classes: string }> = {
+    auto:   { icon: '🛡️', text: 'Auto',    title: 'Compliance: IA decide quando ativar (default).',
+              classes: 'bg-stone-100 dark:bg-stone-800 border-stone-300 dark:border-stone-700 text-stone-700 dark:text-stone-300' },
+    sempre: { icon: '🛡️', text: 'Sempre',  title: 'Compliance: sempre ativo. Heitor analisa todos os pedidos.',
+              classes: 'bg-emerald-500/10 border-emerald-500/40 text-emerald-700 dark:text-emerald-300' },
+    nunca:  { icon: '🚫', text: 'Pular',   title: 'Compliance: nunca ativa. Use com cuidado em pedidos de saúde ou ad pago.',
+              classes: 'bg-amber-500/10 border-amber-500/40 text-amber-700 dark:text-amber-300' },
+  }
+  const ciclo: ComplianceMode[] = ['auto', 'sempre', 'nunca']
+  const curr = labels[value]
+  const next = () => setValue(ciclo[(ciclo.indexOf(value) + 1) % ciclo.length])
+  return (
+    <button
+      onClick={() => !disabled && next()}
+      disabled={disabled}
+      title={curr.title + ' (clique pra alternar)'}
+      className={`flex items-center gap-1 h-8 px-2.5 rounded-lg border text-[10px] font-mono uppercase tracking-widest transition-all ${curr.classes} ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:brightness-105'}`}
+    >
+      <span className="text-sm leading-none">{curr.icon}</span>
+      <span>{curr.text}</span>
+    </button>
+  )
+}
+
 export function AutoModeToggle({ autoMode, setAutoMode, disabled, showRecommended }: { autoMode: boolean; setAutoMode: (v: boolean) => void; disabled?: boolean; showRecommended?: boolean }) {
   return (
     <div className="relative">

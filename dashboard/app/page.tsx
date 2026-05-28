@@ -12,7 +12,7 @@ import Link from 'next/link'
 import OfficeScene from '@/components/office/OfficeScene'
 import ChatPanel from '@/components/chat/ChatPanel'
 import HistoryPanel from '@/components/history/HistoryPanel'
-import { ThemeToggle, Clock, AutoModeToggle } from '@/components/header/HeaderControls'
+import { ThemeToggle, Clock, AutoModeToggle, ComplianceToggle, type ComplianceMode } from '@/components/header/HeaderControls'
 import WelcomeModal from '@/components/onboarding/WelcomeModal'
 
 export default function Home() {
@@ -24,6 +24,8 @@ export default function Home() {
   // T139 Sprint 2 — Modo Auto (default ligado): IA escolhe os agentes ao enviar briefing.
   // Modo Expert: cliente avançado convoca manualmente (pills no header).
   const [autoMode, setAutoMode] = useLocalStorage<boolean>('lemmon-auto-mode', true)
+  // T160 — Compliance mode: 'auto' (IA decide), 'sempre' (força Heitor), 'nunca' (remove Heitor).
+  const [complianceMode, setComplianceMode] = useLocalStorage<ComplianceMode>('lemmon-compliance-mode', 'auto')
   const { sugerir: sugerirPipeline } = useAutoRouter()
   // T148 — flag pra mostrar "recomendado" no Auto Mode até 1ª sessão concluir
   const [hasCompletedFirstSession, setHasCompletedFirstSession] = useLocalStorage<boolean>('lemmon-first-session-done', false)
@@ -132,7 +134,17 @@ export default function Home() {
         notify.warning(sugestao.motivo_vazio || 'Pedido muito vago — adicione mais contexto e tente de novo.')
         return
       }
-      const ids = sugestao.agentes.filter(id => !AGENTS.find(a => a.id === id)?.reuniaoOnly)
+      let ids = sugestao.agentes.filter(id => !AGENTS.find(a => a.id === id)?.reuniaoOnly)
+      // T160 — sobrepõe decisão do sugestor conforme toggle de compliance
+      if (complianceMode === 'sempre' && !ids.includes('heitor')) {
+        // Insere Heitor após Otto se estiver, ou no começo
+        const idx = ids.indexOf('otto')
+        ids = idx >= 0 ? [...ids.slice(0, idx + 1), 'heitor', ...ids.slice(idx + 1)] : ['heitor', ...ids]
+        notify.info('🛡️ Compliance forçado: Heitor adicionado.')
+      } else if (complianceMode === 'nunca' && ids.includes('heitor')) {
+        ids = ids.filter(id => id !== 'heitor')
+        notify.warning('🚫 Compliance pulado conforme sua preferência.')
+      }
       setInMeeting(new Set(ids))
       const nomes = ids.map(id => AGENTS.find(a => a.id === id)?.name ?? id).join(' · ')
       const custoTxt = sugestao.custo_estimado_usd != null
@@ -221,6 +233,11 @@ export default function Home() {
             setAutoMode={setAutoMode}
             disabled={isRunning || reunIsRunning}
             showRecommended={!hasCompletedFirstSession}
+          />
+          <ComplianceToggle
+            value={complianceMode}
+            setValue={setComplianceMode}
+            disabled={isRunning || reunIsRunning}
           />
           <Clock />
           <Link href="/saude" title="Dashboard de Saúde"

@@ -1,6 +1,6 @@
 # LEMMON AGENTES — Manual do Sistema
 
-**Versão atual:** v1.38
+**Versão atual:** v1.39
 **Última atualização:** 2026-05-28
 **Mantido por:** Calebe Alves / Lemmon Produções
 
@@ -11,6 +11,56 @@
 ## Histórico de versões
 
 > **Convenção:** versões mais novas no topo. Cada release lista o que mudou em relação à anterior, mantendo histórico completo.
+
+### v1.39 — 2026-05-28
+
+**Export granular + controle de compliance (T157-T160).**
+
+Cliente passou a ter controle fino sobre o que exportar e quando ativar o agente de compliance.
+
+#### 📦 Export granular (T158 + T159)
+
+Antes: 2 botões fixos ("↓ Dossiê" Aya, "↓ Editorial" Renata) — cliente baixava tudo ou nada.
+
+Agora: **menu unificado** com checkboxes pra cliente escolher exatamente o que quer:
+- 🧠 **Estratégia** (output do Otto isolado)
+- 🎬 **Roteiros** (output do Salles)
+- 📅 **Cronograma** (output da Renata)
+- 🛡️ **Compliance** (output do Heitor)
+- 📈 **Performance** (output da Sônia)
+- 📋 **Dossiê completo** (Aya completa)
+- ⚡ **Resumo executivo** (Aya 1-page via Haiku, +$0.05) — NOVA categoria, gera no momento da exportação
+
+Marcando múltiplas opções, gera **UM PDF combinado** com headers de seção (`# Estratégia` → `# Roteiros` → etc.). Resumo executivo, quando marcado, gera arquivo separado porque envolve chamada extra ao Haiku.
+
+Backend: `POST /exportar` agora aceita `agentes: ["otto","salles"]` (lista) além do `agente` singular legado. Novo campo `modo: "resumo"` aciona o Haiku pra condensar o dossiê em ~500 palavras executivas. Endpoint `/download` ganhou query param `slug` (suporta caminhos como `otto+salles`).
+
+Componente novo: `dashboard/components/export/ExportMenu.tsx` — popover com checkboxes, botão "Gerar PDF" e download inline. Usado em SessionDetail (e fácil de plugar em ChatPanel depois).
+
+#### 🛡️ Toggle de Compliance (T160)
+
+Antes: IA do sugestor decidia automaticamente quando incluir Heitor (baseado em termos de risco). Cliente não tinha controle.
+
+Agora: **pill 3-estados no header** ao lado do toggle Auto/Expert:
+- **Auto** (default): IA decide quando ativar (comportamento clássico)
+- **Sempre**: força Heitor em toda sessão, mesmo se IA não detectou risco
+- **Pular**: nunca ativa Heitor, mesmo em pedidos de saúde/ad pago (modo "use por sua conta e risco")
+
+Persiste em `lemmon-compliance-mode` no localStorage. Quando o cliente envia briefing e a escolha sobrepõe a decisão do sugestor, aparece toast explicativo ("🛡️ Compliance forçado: Heitor adicionado" ou "🚫 Compliance pulado conforme sua preferência").
+
+#### 🐛 T157 — Falha ao exportar PDF / Gerar link de aprovação
+
+Backend funcionava perfeitamente nos 2 endpoints (`/exportar` e `/share` retornavam 200 OK). O bug era 100% no front: `catch {}` silenciava o erro real do backend e mostrava só "Falha ao exportar" — cliente não entendia o motivo.
+
+Causa observada: sessões antigas listam Aya em `agentes_usados` mas com `respostas.aya` vazia (pipeline interrompido antes da Aya rodar). Backend retornava 400 com `detail` útil, mas o front jogava no lixo.
+
+Fix: capturar `error.message` real e mostrar via `notify.error(detail)` em SessionDetail, ChatPanel.handleExportar e ChatPanel.compartilharAprovacao. Network error agora detecta `TypeError` e dá instrução acionável ("Verifique se a janela do Terminal está aberta").
+
+#### 🐛 T156 — Mensagem clara quando backend está offline
+
+`useAutoRouter.sugerir` agora retorna discriminated union (`{ ok: true, sugestao } | { ok: false, kind: 'network'|'http'|'unknown', message }`). Frontend distingue erro de rede (mostra instrução pra reabrir Terminal) de erro de aplicação.
+
+---
 
 ### v1.38 — 2026-05-28
 

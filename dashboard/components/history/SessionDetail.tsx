@@ -7,6 +7,7 @@ import { API_URL } from '@/lib/api'
 import CharacterSprite from '../office/CharacterSprite'
 import { favoritarSessao } from '@/lib/api-client'
 import { notify } from '@/lib/toast'
+import ExportMenu from '../export/ExportMenu'
 
 interface ExportResult {
   html_gerado: boolean
@@ -207,47 +208,8 @@ export function SessionDetail({
             </div>
           )}
 
-          {/* Export — Aya e Renata */}
-          {EXPORTAVEIS.filter(ag => detail.respostas[ag]).map(ag => {
-            const st = exportStates[ag] ?? 'idle'
-            const res = exportResults[ag]
-            const label = ag === 'aya' ? 'Dossiê' : 'Editorial'
-            return (
-              <div key={ag} className="flex items-center gap-0.5">
-                {st === 'idle' && (
-                  <button onClick={() => handleExportar(ag)}
-                    className="px-2 py-1 rounded-lg border border-stone-200 bg-white text-[8px] font-mono text-stone-500 hover:border-stone-400 hover:text-stone-700 transition-all">
-                    ↓ {label}
-                  </button>
-                )}
-                {st === 'loading' && (
-                  <span className="text-[8px] font-mono text-stone-400 px-1">gerando...</span>
-                )}
-                {st === 'error' && (
-                  <button onClick={() => handleExportar(ag)}
-                    className="px-2 py-1 rounded-lg border border-red-200 bg-red-50 text-[8px] font-mono text-red-500 hover:bg-red-100 transition-all">
-                    ↺ {label}
-                  </button>
-                )}
-                {st === 'done' && res && (
-                  <>
-                    {res.html_gerado && (
-                      <button onClick={() => handleDownload('html', ag)}
-                        className="px-2 py-1 rounded-lg border border-stone-200 bg-white text-[8px] font-mono text-stone-500 hover:border-stone-400 hover:text-stone-700 transition-all">
-                        html
-                      </button>
-                    )}
-                    {res.pdf_gerado && (
-                      <button onClick={() => handleDownload('pdf', ag)}
-                        className="px-2 py-1 rounded-lg border border-stone-200 bg-white text-[8px] font-mono text-stone-500 hover:border-stone-400 hover:text-stone-700 transition-all">
-                        pdf
-                      </button>
-                    )}
-                  </>
-                )}
-              </div>
-            )
-          })}
+          {/* T158 — menu unificado de exportação granular (substitui botões fixos por agente) */}
+          <ExportMenu sessionId={detail.session_id} respostas={detail.respostas} align="bottom" />
           <button onClick={onBack}
             className="w-7 h-7 rounded-lg border border-stone-200 bg-white flex items-center justify-center hover:bg-stone-50 hover:border-stone-400 transition-all">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#78716c" strokeWidth="2.5">
