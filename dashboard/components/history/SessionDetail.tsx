@@ -6,6 +6,7 @@ import { type HistoryDetail } from '@/lib/useHistory'
 import { API_URL } from '@/lib/api'
 import CharacterSprite from '../office/CharacterSprite'
 import { favoritarSessao } from '@/lib/api-client'
+import { notify } from '@/lib/toast'
 
 interface ExportResult {
   html_gerado: boolean
@@ -62,7 +63,14 @@ export function SessionDetail({
       const r: ExportResult = await res.json()
       setExportResults(prev => ({ ...prev, [agente]: r }))
       setExportStates(prev => ({ ...prev, [agente]: r.html_gerado || r.pdf_gerado ? 'done' : 'error' }))
-    } catch {
+      // T157: se backend retornou erros internos, mostra pro usuário em vez de silenciar
+      if (r.erros && r.erros.length > 0) {
+        notify.warning(`Exportar com avisos: ${r.erros.join(' · ')}`)
+      }
+    } catch (e: any) {
+      // T157: mostra a mensagem real do backend em vez de "Falha ao exportar" genérico
+      const msg = e?.message ?? 'Erro desconhecido ao exportar'
+      notify.error(`Não consegui exportar ${agente}: ${msg}`)
       setExportStates(prev => ({ ...prev, [agente]: 'error' }))
     }
   }

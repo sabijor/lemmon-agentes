@@ -17,6 +17,7 @@ import { useLocalStorage } from '@/lib/hooks/useLocalStorage'
 import { type Message, type AgentStatus, type ImageData, type ApprovalRequest, type AgentConfig, type ExportResult, type ProgressMeta } from '@/lib/useChat'
 import { type LoopStatus } from '@/lib/useReuniao'
 import { API_URL } from '@/lib/api'
+import { notify } from '@/lib/toast'
 import CharacterSprite from '../office/CharacterSprite'
 import { exportTxt, UserMessage, AgentMessage } from './MessageBubble'
 import { ConfigSidebar } from './ConfigSidebar'
@@ -225,7 +226,14 @@ export default function ChatPanel({
       const r = await onExportar(sessionId, agente)
       setExportResults(prev => ({ ...prev, [agente]: r }))
       setExportStates(prev => ({ ...prev, [agente]: r.erros.length > 0 && !r.html_gerado && !r.pdf_gerado ? 'error' : 'done' }))
-    } catch {
+      // T157: avisa de erros parciais que antes ficavam só no state
+      if (r.erros && r.erros.length > 0) {
+        notify.warning(`Exportar com avisos: ${r.erros.join(' · ')}`)
+      }
+    } catch (e: any) {
+      // T157: mostra detail real do backend em vez de só pintar o botão de vermelho
+      const msg = e?.message ?? 'Erro desconhecido'
+      notify.error(`Não consegui exportar ${agente}: ${msg}`)
       setExportStates(prev => ({ ...prev, [agente]: 'error' }))
       setExportResults(prev => ({ ...prev, [agente]: null }))
     }
@@ -332,7 +340,11 @@ export default function ChatPanel({
   }
 
   const compartilharAprovacao = async () => {
-    if (!sessionId) return
+    if (!sessionId) {
+      // T157: cliente vê o botão mas a sessão ainda não foi salva — informa
+      notify.warning('Sessão ainda não foi salva. Aguarde o pipeline terminar antes de compartilhar.')
+      return
+    }
     setSharingState('loading')
     setShareToken(null)
     try {
@@ -341,11 +353,17 @@ export default function ChatPanel({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ session_id: sessionId }),
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.detail ?? 'Erro ao gerar link')
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.detail ?? `Erro HTTP ${res.status}`)
       setShareToken(data.token)
       setSharingState('done')
-    } catch {
+    } catch (e: any) {
+      // T157: mostra detail real em vez de pintar botão de vermelho silenciosamente
+      const msg = e?.message ?? 'Erro desconhecido'
+      const isNetwork = e?.message?.includes('fetch') || e?.name === 'TypeError'
+      notify.error(isNetwork
+        ? 'Servidor fora do ar. Verifique se a janela do Terminal "Iniciar Agentes" ainda está aberta.'
+        : `Não consegui gerar o link: ${msg}`)
       setSharingState('error')
     }
   }
