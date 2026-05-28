@@ -443,6 +443,76 @@ export default function CharacterSprite({ id, size = 1, speaking, walking, sitti
         <rect x="20" y="61" width="12" height="2" rx="1" fill="#f43f5e" opacity="0.6"/>
       </svg>
     ),
+
+    // ─── Carlos — Roteirista publicitário: blazer azul casual, cabelo moderno, prancheta
+    carlos: (
+      <svg width={W * size} height={H * size} viewBox="0 0 40 72" fill="none" className={cls} style={{ display: 'block', flexShrink: 0, width: W * size, height: H * size }} preserveAspectRatio="xMidYMid meet" x={x} y={y}>
+        {/* Cabelo moderno com volume em cima */}
+        <rect x="10" y="3" width="20" height="11" rx="5" fill="#2c1810"/>
+        <rect x="11" y="2" width="18" height="6" rx="4" fill="#3d2418"/>
+        {/* Topetinho */}
+        <rect x="14" y="1" width="8" height="5" rx="3" fill="#1f1108"/>
+        {/* Ear */}
+        <ellipse cx="9.5" cy="20" rx="2.5" ry="3.5" fill="#d4a574"/>
+        {/* Head */}
+        <ellipse cx="20" cy="19" rx="11" ry="10.5" fill="#e8c096"/>
+        {/* Eyes */}
+        <rect x="13" y="15" width="3.5" height="3" rx="0.5" fill="#1c1917"/>
+        <rect x="23.5" y="15" width="3.5" height="3" rx="0.5" fill="#1c1917"/>
+        <rect x="13.5" y="15.4" width="1.3" height="1.3" fill="white"/>
+        <rect x="24" y="15.4" width="1.3" height="1.3" fill="white"/>
+        {/* Sobrancelhas marcadas */}
+        <rect x="12.5" y="13.5" width="4.5" height="1" rx="0.5" fill="#2c1810"/>
+        <rect x="23" y="13.5" width="4.5" height="1" rx="0.5" fill="#2c1810"/>
+        {/* Nariz */}
+        <circle cx="20" cy="22" r="1.2" fill="#b88860"/>
+        {/* Boca confiante (sorriso de canto) */}
+        <path d="M16 25 Q20 27 24 25.5" stroke="#9a4533" strokeWidth="1" fill="none" strokeLinecap="round"/>
+        {/* Barba por fazer (estética casual de copy) */}
+        <ellipse cx="20" cy="27" rx="6" ry="1.5" fill="#3d2418" opacity="0.25"/>
+        {/* Camiseta básica branca + blazer aberto */}
+        <rect x="14" y="28" width="12" height="5" rx="1" fill="#f8fafc"/>
+        {/* Blazer azul casual */}
+        <rect x="8" y="30" width="24" height="20" rx="2" fill="#0369a1"/>
+        {/* Lapela */}
+        <path d="M14 30 L17 36 L14 50 Z" fill="#075985"/>
+        <path d="M26 30 L23 36 L26 50 Z" fill="#075985"/>
+        {/* Decote (camiseta branca à mostra) */}
+        <path d="M17 30 L20 36 L23 30 Z" fill="#f8fafc"/>
+        {/* Left arm — blazer */}
+        <rect x="1" y="31" width="8" height="14" rx="3" fill="#0369a1"/>
+        {/* Right arm — segurando prancheta */}
+        <rect x="31" y="31" width="8" height="14" rx="3" fill="#0369a1"/>
+        {/* Left hand */}
+        <ellipse cx="5" cy="47" rx="4.5" ry="3.5" fill="#e8c096"/>
+        {/* Right hand */}
+        <ellipse cx="35" cy="47" rx="4.5" ry="3.5" fill="#e8c096"/>
+        {/* Prancheta (clipboard) na mão direita */}
+        <rect x="27" y="40" width="13" height="11" rx="1" fill="#fbbf24"/>
+        <rect x="28" y="41" width="11" height="9" rx="0.5" fill="#fff8e1"/>
+        {/* Clip do clipboard */}
+        <rect x="31" y="39.5" width="5" height="2" rx="0.5" fill="#78350f"/>
+        {/* Linhas do papel (sugerindo roteiro) */}
+        <line x1="29" y1="43" x2="38" y2="43" stroke="#92400e" strokeWidth="0.5"/>
+        <line x1="29" y1="45" x2="36" y2="45" stroke="#92400e" strokeWidth="0.5"/>
+        <line x1="29" y1="47" x2="37" y2="47" stroke="#92400e" strokeWidth="0.5"/>
+        {/* Calça jeans escura */}
+        <rect x="9" y="49" width="9" height="14" rx="2" fill="#1e3a5f"/>
+        <rect x="22" y="49" width="9" height="14" rx="2" fill="#1e3a5f"/>
+        {/* Costura do jeans */}
+        <line x1="13.5" y1="51" x2="13.5" y2="62" stroke="#0f1e3a" strokeWidth="0.5"/>
+        <line x1="26.5" y1="51" x2="26.5" y2="62" stroke="#0f1e3a" strokeWidth="0.5"/>
+        {/* Tênis branco casual */}
+        <rect x="7" y="61" width="13" height="9" rx="3" fill="#f8fafc"/>
+        <rect x="20" y="61" width="13" height="9" rx="3" fill="#f8fafc"/>
+        {/* Sola dos tênis */}
+        <rect x="7" y="67" width="13" height="3" rx="1.5" fill="#cbd5e1"/>
+        <rect x="20" y="67" width="13" height="3" rx="1.5" fill="#cbd5e1"/>
+        {/* Detalhe lateral azul do tênis */}
+        <rect x="7" y="64" width="13" height="1" rx="0.5" fill="#0369a1" opacity="0.6"/>
+        <rect x="20" y="64" width="13" height="1" rx="0.5" fill="#0369a1" opacity="0.6"/>
+      </svg>
+    ),
   }
 
   return <>{sprites[id]}</>

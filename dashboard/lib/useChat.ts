@@ -47,7 +47,7 @@ export interface ProgressMeta {
 }
 
 const FALLBACK_MEDIANAS: Record<AgentId, number> = {
-  otto: 20, heitor: 40, salles: 30, sonia: 30, aya: 15, pedro_abrahao: 25, renata: 30,
+  otto: 20, heitor: 40, salles: 30, carlos: 25, sonia: 30, aya: 15, pedro_abrahao: 25, renata: 30,
 }
 
 export interface AgentConfig {
@@ -74,7 +74,7 @@ export function useChat() {
   // cai ao mudar/recarregar e não dá pra retomar.
   const [messages, setMessages] = useLocalStorage<Message[]>('lemmon-last-messages', [])
   const [agentStatus, setAgentStatus] = useState<Record<AgentId, AgentStatus>>({
-    otto: 'idle', heitor: 'idle', salles: 'idle', sonia: 'idle', aya: 'idle', pedro_abrahao: 'idle', renata: 'idle',
+    otto: 'idle', heitor: 'idle', salles: 'idle', carlos: 'idle', sonia: 'idle', aya: 'idle', pedro_abrahao: 'idle', renata: 'idle',
   })
   const [isRunning, setIsRunning] = useState(false)
   const [sessionId, setSessionId] = useLocalStorage<string | null>('lemmon-last-session-id', null)
@@ -192,7 +192,7 @@ export function useChat() {
     setFavoritado(detail.favorito ?? false)
     setIsRunning(false)
     setAwaitingApproval(null)
-    setAgentStatus({ otto: 'idle', heitor: 'idle', salles: 'idle', sonia: 'idle', aya: 'idle', pedro_abrahao: 'idle', renata: 'idle' })
+    setAgentStatus({ otto: 'idle', heitor: 'idle', salles: 'idle', carlos: 'idle', sonia: 'idle', aya: 'idle', pedro_abrahao: 'idle', renata: 'idle' })
     setResumedFrom(detail.session_id)
     currentMsgId.current = {}
     resumeContextRef.current = (detail as HistoryDetail & { contexto_tecnico?: Record<string, unknown> }).contexto_tecnico ?? {
@@ -508,7 +508,7 @@ export function useChat() {
   const reset = useCallback(() => {
     wsRef.current?.close()
     setMessages([])
-    setAgentStatus({ otto: 'idle', heitor: 'idle', salles: 'idle', sonia: 'idle', aya: 'idle', pedro_abrahao: 'idle', renata: 'idle' })
+    setAgentStatus({ otto: 'idle', heitor: 'idle', salles: 'idle', carlos: 'idle', sonia: 'idle', aya: 'idle', pedro_abrahao: 'idle', renata: 'idle' })
     setIsRunning(false)
     setSessionId(null)
     setFavoritado(false)

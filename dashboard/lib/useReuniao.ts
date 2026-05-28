@@ -6,11 +6,11 @@ import { API_URL, WS_URL } from './api'
 import { WATCHDOG_TIMEOUT_MIN, PROGRESS_CURVE_POWER } from './config'
 
 const DEFAULT_STATUS = (): Record<AgentId, AgentStatus> => ({
-  otto: 'idle', heitor: 'idle', salles: 'idle', sonia: 'idle', aya: 'idle', pedro_abrahao: 'idle', renata: 'idle',
+  otto: 'idle', heitor: 'idle', salles: 'idle', carlos: 'idle', sonia: 'idle', aya: 'idle', pedro_abrahao: 'idle', renata: 'idle',
 })
 
 const FALLBACK_MEDIANAS: Record<AgentId, number> = {
-  otto: 20, heitor: 40, salles: 30, sonia: 30, aya: 15, pedro_abrahao: 25, renata: 30,
+  otto: 20, heitor: 40, salles: 30, carlos: 25, sonia: 30, aya: 15, pedro_abrahao: 25, renata: 30,
 }
 
 export interface LoopStatus {

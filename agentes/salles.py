@@ -168,20 +168,22 @@ FERRAMENTA_FORMATACAO = {
 class Salles(AgenteBase):
     nome = "salles"
     versao_prompt = "v1.2"
-    papel_curto = "Roteirista — transforma tese em roteiro filmável"
+    papel_curto = "Produtor documental — direção, captação e pré-produção de entrevista"
     quando_usar = [
-        "precisa de roteiro de vídeo (reels, shorts, stories, vídeo longo)",
-        "estrutura de cena, falas, indicações de ação",
-        "hook + corpo + CTA",
-        "adaptação de tese estratégica em script",
+        "entrevista documental com personagem real (médico, especialista, cliente, depoimento)",
+        "captação de set com direção de conversa (tom, espelhamento, momento de recuo)",
+        "vídeo institucional cinematográfico (mini-doc de marca, série episódica)",
+        "Calebe vai dirigir a captação pessoalmente",
     ]
     quando_nao_usar = [
-        "só análise estratégica, sem produzir conteúdo",
-        "só calendário editorial, sem roteirar nada",
-        "edição de copy de feed estático",
+        "conteúdo solo do cliente (use Carlos — roteirista publicitário)",
+        "ad pago com narração ou fala literal (use Carlos)",
+        "post de marca com texto literal pra gravar sozinho (use Carlos)",
+        "voiceover sobre b-roll (use Carlos)",
+        "só análise estratégica sem produzir conteúdo",
     ]
-    categoria = "conteudo"
-    custo_medio_usd = 0.10
+    categoria = "producao"
+    custo_medio_usd = 0.15
 
     def __init__(self):
         super().__init__()

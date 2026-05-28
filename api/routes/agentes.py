@@ -7,6 +7,7 @@ agrupado por categoria e auto-marcar pills.
 from fastapi import APIRouter
 
 from agentes.aya import Aya
+from agentes.carlos import Carlos
 from agentes.heitor import Heitor
 from agentes.otto import Otto
 from agentes.pedro_abrahao import PedroAbrahao
@@ -22,6 +23,7 @@ _FABRICAS = [
     ("otto",          Otto),
     ("heitor",        Heitor),
     ("salles",        Salles),
+    ("carlos",        Carlos),
     ("sonia",         Sonia),
     ("aya",           Aya),
     ("renata",        Renata),

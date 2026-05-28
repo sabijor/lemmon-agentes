@@ -15,6 +15,7 @@ const DESK_POS: Record<AgentId, { gx: number; gy: number }> = {
   otto:          { gx: 10.2, gy: 2.45 },
   heitor:        { gx: 12.7, gy: 2.45 },
   salles:        { gx: 2.2,  gy: 8.45 },
+  carlos:        { gx: 3.5,  gy: 8.45 },  // ao lado do Salles (são alternativos)
   sonia:         { gx: 11.2, gy: 7.45 },
   aya:           { gx: 7.2,  gy: 2.45 },
   pedro_abrahao: { gx: 5.5,  gy: 2.0  },
@@ -26,6 +27,7 @@ const MEET_CHAR_POS: Record<AgentId, { gx: number; gy: number }> = {
   otto:          { gx: 2.2, gy: 4.5 },
   heitor:        { gx: 9.3, gy: 4.5 },
   salles:        { gx: 3.5, gy: 7.5 },
+  carlos:        { gx: 4.8, gy: 7.5 },  // ao lado do Salles na sala de reunião
   sonia:         { gx: 8.1, gy: 7.5 },
   pedro_abrahao: { gx: 7.5, gy: 2.0 },
   renata:        { gx: 6.3, gy: 6.0 },
@@ -71,6 +73,7 @@ const ROUTINE_DESTS: Record<AgentId, { gx: number; gy: number }[]> = {
   otto:          [{ gx: 10.2, gy: 2.45 }, { gx: 5.8, gy: 4.2 }, { gx: 7.0, gy: 3.8 }, { gx: 10.2, gy: 2.45 }],
   heitor:        [{ gx: 12.7, gy: 2.45 }, { gx: 1.8, gy: 3.5 }, { gx: 2.5, gy: 5.0 }, { gx: 12.7, gy: 2.45 }],
   salles:        [{ gx: 2.2,  gy: 8.45 }, { gx: 3.0, gy: 6.5 }, { gx: 2.8, gy: 7.5 }, { gx: 3.5, gy: 2.5 }, { gx: 2.2, gy: 8.45 }],
+  carlos:        [{ gx: 3.5,  gy: 8.45 }, { gx: 5.0, gy: 7.0 }, { gx: 4.0, gy: 6.5 }, { gx: 6.5, gy: 5.5 }, { gx: 3.5,  gy: 8.45 }],
   sonia:         [{ gx: 11.2, gy: 7.45 }, { gx: 9.0, gy: 4.8 }, { gx: 6.5, gy: 5.2 }, { gx: 11.2, gy: 7.45 }],
   aya:           [{ gx: 7.2,  gy: 2.45 }, { gx: 5.8, gy: 4.2 }, { gx: 9.5, gy: 4.8 }, { gx: 5.0, gy: 6.2 }, { gx: 7.2, gy: 2.45 }],
   pedro_abrahao: [{ gx: 5.5, gy: 2.0 }, { gx: 4.8, gy: 3.5 }, { gx: 6.0, gy: 1.5 }, { gx: 5.5, gy: 2.0 }],

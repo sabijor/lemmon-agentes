@@ -1,4 +1,4 @@
-export type AgentId = 'otto' | 'heitor' | 'salles' | 'sonia' | 'aya' | 'pedro_abrahao' | 'renata'
+export type AgentId = 'otto' | 'heitor' | 'salles' | 'carlos' | 'sonia' | 'aya' | 'pedro_abrahao' | 'renata'
 
 export interface AgentConfig {
   id: AgentId
@@ -42,14 +42,26 @@ export const AGENTS: AgentConfig[] = [
   {
     id: 'salles',
     name: 'Salles',
-    title: 'Roteirista',
-    rpgClass: 'Criativo',
+    title: 'Produtor',
+    rpgClass: 'Diretor',
     color: '#9a3412',
     colorDim: '#ffedd5',
     colorText: '#fff',
     deskPosition: { x: 120, y: 200 },
     meetingPosition: { x: 480, y: 270 },
-    idleQuote: 'Transformando teses em roteiros...',
+    idleQuote: 'Dirigindo a captação...',
+  },
+  {
+    id: 'carlos',
+    name: 'Carlos',
+    title: 'Roteirista',
+    rpgClass: 'Copywriter',
+    color: '#0369a1',
+    colorDim: '#e0f2fe',
+    colorText: '#fff',
+    deskPosition: { x: 180, y: 220 },
+    meetingPosition: { x: 470, y: 280 },
+    idleQuote: 'Escrevendo o hook que prende em 3s...',
   },
   {
     id: 'sonia',

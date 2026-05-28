@@ -46,7 +46,8 @@ export const CAMERA_RECEP = -944
 export const ROLES: Record<AgentId, string> = {
   otto: 'Estrateg.',
   heitor: 'Complian.',
-  salles: 'Roteiri.',
+  salles: 'Produtor',
+  carlos: 'Roteiri.',
   sonia: 'Perform.',
   aya: 'Assistente',
   pedro_abrahao: 'Consultor',
@@ -57,7 +58,8 @@ export const ROLES: Record<AgentId, string> = {
 export const IDLE_QUOTES: Record<AgentId, string[]> = {
   otto:   ['Os dados indicam...', 'Hipótese validada.', 'Q3 up 18%.', 'Revisando briefing.'],
   heitor: ['Risco: amarelo.', 'Revisar antes de pub.', '⚠ Termo crítico.', 'Monitorando...'],
-  salles: ['Isso tem alma.', 'Mais tensão aqui.', 'E se abrirmos com...', '...mais café.'],
+  salles: ['Isso tem alma.', 'Direção: recuar.', 'Pausa antes da fala.', 'Captação no set.'],
+  carlos: ['Hook em 3s.', 'CTA direto.', 'Variação A/B.', 'Cola na primeira frase.'],
   sonia:  ['CTR +23%!', 'Novo criativo: GO!', 'ROI aprovado!', 'Métricas no verde!'],
   aya:    ['Compilando outputs.', 'Dossiê pronto.', 'Fluxos conectados.', 'Processando...'],
   pedro_abrahao: ['Faz sentido pra mim.', 'Como paciente...', 'Isso ressoa.', 'Autenticidade.'],

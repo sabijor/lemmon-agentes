@@ -10,6 +10,7 @@ from agentes.heitor import Heitor
 from agentes.otto import Otto
 from agentes.pedro_abrahao import PedroAbrahao
 from agentes.renata import Renata
+from agentes.carlos import Carlos
 from agentes.salles import Salles
 from agentes.sonia import Sonia
 from api.deps import _anthropic_client, _log
@@ -199,6 +200,29 @@ async def chat(ws: WebSocket):
                             formatos_permitidos=formatos_permitidos,
                         ),
                     )
+                    roteiro_salles = res.get("output_humano", "")
+                    return roteiro_salles, res.get("custo_total_usd", 0)
+
+                elif name == "carlos":
+                    # T161 — Carlos: roteirista publicitário (alternativo ao Salles).
+                    # Produz falas literais pra cliente solo, ad pago, narração.
+                    ag = Carlos()
+                    contexto_otto_humano = ""
+                    if isinstance(analise_otto, dict):
+                        contexto_otto_humano = analise_otto.get("output_humano", "") or ""
+                    contexto_heitor_humano = ""
+                    if isinstance(diretrizes_heitor, dict):
+                        contexto_heitor_humano = diretrizes_heitor.get("output_humano", "") or ""
+                    res = await loop.run_in_executor(
+                        None,
+                        lambda: ag.executar(
+                            briefing=briefing,
+                            contexto_otto=contexto_otto_humano or None,
+                            contexto_heitor=contexto_heitor_humano or None,
+                            formato="auto",
+                        ),
+                    )
+                    # Carlos também pode alimentar Sônia (mesma posição do Salles)
                     roteiro_salles = res.get("output_humano", "")
                     return roteiro_salles, res.get("custo_total_usd", 0)
 

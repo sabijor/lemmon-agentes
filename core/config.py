@@ -214,6 +214,27 @@ AYA_PDF_MAX_SIZE_MB = 10
 # LIMITES DA RENATA (DISTRIBUIÇÃO MULTI-PLATAFORMA)
 # ============================================================================
 
+# ============================================================================
+# LIMITES DO CARLOS (ROTEIRISTA PUBLICITÁRIO — T161)
+# ============================================================================
+
+CARLOS_PREVISAO_RANGE_USD = (0.05, 0.20)
+CARLOS_AVISO_AMARELO_USD = 0.25
+CARLOS_AVISO_VERMELHO_USD = 0.40
+CARLOS_PEDIR_CONFIRMACAO_ACIMA_USD = None
+
+# Limites de input (proteção contra prompt gigante)
+CARLOS_BRIEFING_MAX_CHARS = 15000
+CARLOS_CONTEXTO_OTTO_MAX_CHARS = 20000
+CARLOS_CONTEXTO_HEITOR_MAX_CHARS = 5000
+
+# Tamanho típico do output (markdown)
+CARLOS_OUTPUT_MAX_TOKENS = 4096
+
+# ============================================================================
+# LIMITES DA RENATA (DISTRIBUIÇÃO MULTI-PLATAFORMA)
+# ============================================================================
+
 RENATA_PREVISAO_RANGE_USD = (0.10, 0.25)
 RENATA_AVISO_AMARELO_USD = 0.30
 RENATA_AVISO_VERMELHO_USD = 0.50

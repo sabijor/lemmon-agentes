@@ -1,6 +1,6 @@
 # LEMMON AGENTES — Manual do Sistema
 
-**Versão atual:** v1.39
+**Versão atual:** v1.40
 **Última atualização:** 2026-05-28
 **Mantido por:** Calebe Alves / Lemmon Produções
 
@@ -11,6 +11,68 @@
 ## Histórico de versões
 
 > **Convenção:** versões mais novas no topo. Cada release lista o que mudou em relação à anterior, mantendo histórico completo.
+
+### v1.40 — 2026-05-28
+
+**Separação de papéis: Salles (Produtor documental) + Carlos (Roteirista publicitário) — T161-T165.**
+
+O Calebe identificou que o Salles, apesar de bem programado, **não entregava roteiro com falas literais** — entregava mapa de direção documental (pré-captação, gatilhos, espelhamento). Funciona perfeito quando o conteúdo é entrevista com personagem real, mas quebra quando é conteúdo solo do cliente (que precisa decorar uma fala) ou ad pago com narração.
+
+A correção foi estrutural: **separamos os papéis em dois agentes alternativos**:
+
+#### 🎥 Salles — agora Produtor documental
+
+- **Papel renovado:** "Produtor documental — direção, captação e pré-produção de entrevista"
+- **rpgClass:** Diretor (era Criativo)
+- **Categoria:** `producao` (era `conteudo`)
+- **Quando entra:** entrevista com personagem real, captação de set, mini-doc institucional, depoimento gravado com cliente
+- **O que entrega (mantido):** TOM INICIAL, PRÉ-CAPTAÇÃO, blocos com Objetivo + Gatilhos de direção, sinais de verdade, momento de recuo, função estratégica por bloco
+- **Prompt v1.2:** intocado — método Lemmon de direção continua a ser o forte dele
+
+#### ✍️ Carlos — novo agente (T161)
+
+- **Papel:** "Roteirista publicitário — falas literais com hook + CTA"
+- **rpgClass:** Copywriter
+- **Categoria:** `conteudo`
+- **Quando entra:** conteúdo solo (dono atua/narra), ad pago, voiceover sobre b-roll, post de marca com texto literal pronto
+- **O que entrega:**
+  1. **CONCEITO RÁPIDO** (2-4 linhas conectando ao Otto)
+  2. **ROTEIRO LITERAL** em cenas numeradas com `FALA:`, `AÇÃO:`, `B-ROLL:` — toda fala entre aspas, sem "fale sobre…"
+  3. **3 VARIAÇÕES DE HOOK** alternativas pra teste A/B
+- **Estrutura padrão:** Hook (0-3s) → Tensão (3-15s) → Virada (15-40s) → CTA (40-60s)
+- **Custo médio:** ~$0.10/sessão
+- **Prompt:** `prompts/carlos_system_v1.md` (140 linhas, com integração Heitor opcional)
+
+#### 🤖 Sugestor escolhe automaticamente (T163)
+
+Adicionada **regra de exclusão mútua** no prompt do `/sugerir_pipeline`: Carlos e Salles nunca entram juntos. IA escolhe baseado em palavras-chave:
+
+- "entrevista", "documentário", "captação", "depoimento", "gravar com [pessoa]" → **Salles**
+- Caso contrário → **Carlos** (default em cliente leigo)
+
+Bateria de 6 cenários testou a distinção: **6/6 acertos**.
+
+| Briefing | Agente escolhido |
+|---|---|
+| "reel solo do dono da marca de café falando da torra" | Carlos ✓ |
+| "entrevista documental com médico sobre lipedema" | Salles ✓ |
+| "ad pago com narração de 30s pro meu curso" | Carlos ✓ |
+| "mini-doc institucional pra estúdio de arquitetura" | Salles ✓ |
+| "voiceover de 60s sobre b-roll do produto" | Carlos ✓ |
+| "depoimento com cliente real sobre transformação" | Salles ✓ |
+
+#### 🎨 Visual no front (T164)
+
+- Carlos ganha sprite próprio no `CharacterSprite.tsx`: cabelo moderno com topetinho, blazer azul casual sobre camiseta branca, prancheta amarela com clipboard (cara de copywriter), tênis brancos. Posicionado ao lado do Salles (são alternativos).
+- Posições no escritório e na sala de reunião (`DESK_POS`, `MEET_CHAR_POS`, `ROUTINE_DESTS`) atualizadas.
+- Pill `CARLOS` aparece no header em modo Expert.
+- Idle quotes próprias: "Hook em 3s.", "CTA direto.", "Variação A/B.", "Cola na primeira frase."
+
+#### 📊 Total: 8 agentes no catálogo
+
+`/agentes/catalogo` agora retorna 8 agentes: Otto + Heitor + Salles + Carlos + Sônia + Aya + Renata + Pedro Abrahão.
+
+---
 
 ### v1.39 — 2026-05-28
 
