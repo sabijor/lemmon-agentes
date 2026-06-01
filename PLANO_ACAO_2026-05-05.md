@@ -3532,6 +3532,295 @@ Instalador não tem forma simples de validar que backend subiu. Hoje só dá pra
 
 ---
 
+# FASE 15 — OFFLINE-FIRST & PWA (2026-06-01)
+
+**Contexto:** Hoje o dashboard é 100% online — qualquer queda de rede, suspensão do laptop ou troca de Wi-Fi derruba o estado e força refresh. Sessões só existem no servidor (JSON em disco), comunicação é `fetch` puro + WebSocket, e o único uso de `localStorage` são escalares (custo_cap, posição do painel). Resultado: operador perde contexto, mutações pendentes (favoritar, tagear, comentar) somem se a rede cair no meio, e o app não é instalável.
+
+**Objetivo da fase:** dashboard utilizável offline (visualização de histórico cacheado), mutações que sobrevivem à perda de rede (queue + retry), backend preparado para sincronização incremental (ETag/updated_at/idempotência), e shell instalável como PWA.
+
+**Stack alvo:** sem dependências novas no front se possível — IndexedDB nativo via wrapper interno (não Workbox, não idb-keyval). Service Worker vanilla. Backend continua FastAPI + JSON em disco; nada de banco.
+
+**Decisão de escopo:** "Completo" — PWA + sync robusta. Fila com retry exponencial, ETag/updated_at no backend, conflito last-write-wins via `updated_at`. Quatro sprints, ordem importa (Sprint 2 viabiliza Sprint 3).
+
+**Branch:** `claude/offline-sync-behavior-Oxw97`.
+
+---
+
+#### Sprint 1 — Foundation (detecção + cache de leitura)
+
+Sprint mais barato e visível. Já entrega valor sozinho (operador vê status de rede e abre histórico cacheado mesmo sem servidor).
+
+### T140 — Hook `useOnlineStatus` + banner global
+
+**Severidade:** alta de UX · **Tipo:** feature · **Onde:** `dashboard/lib/hooks/useOnlineStatus.ts` (novo) + `dashboard/app/layout.tsx`
+
+Hoje, se a rede cai, o usuário só descobre quando uma ação falha. Sem feedback antecipado.
+
+**Implementação:**
+- Hook `useOnlineStatus()` lê `navigator.onLine` no mount e assina `window.addEventListener('online'|'offline')`.
+- SSR-safe (retorna `true` antes do mount, como `useLocalStorage`).
+- Componente `<OfflineBanner />` em `layout.tsx` que aparece como faixa sutil no topo quando offline, com texto "Sem conexão — algumas ações ficarão pendentes". Sumir suave (framer-motion) ao voltar.
+- Toast informativo via `sonner` quando alterna online↔offline (não bloqueante).
+
+**Critério de aceite:**
+- [ ] Desligar Wi-Fi mostra banner em < 1s
+- [ ] Religar esconde banner e dispara toast "Conexão restaurada"
+- [ ] Sem flicker no SSR (banner não aparece no primeiro paint server-side)
+
+### T141 — Wrapper IndexedDB interno (sem deps)
+
+**Tipo:** infra · **Onde:** `dashboard/lib/idb.ts` (novo)
+
+Antes de cachear qualquer coisa, precisamos de uma API simples sobre IndexedDB. Sem `idb-keyval` ou `workbox` — IndexedDB nativo já resolve, e adicionar dep só por isso polui o bundle.
+
+**Implementação:**
+- Função `openDB(name, version, upgrade)` que envolve `indexedDB.open` em Promise.
+- Helpers `idbGet<T>(store, key)`, `idbPut(store, key, value)`, `idbDelete(store, key)`, `idbAll<T>(store)`.
+- DB único `lemmon-cache` com stores: `sessions` (key = session_id), `meta` (key = "historico_index"), `mutations` (key = uuid, ver Sprint 3).
+- Tudo tipado, com fallback silencioso para `null` se IndexedDB indisponível (Safari privado, quota).
+
+**Critério de aceite:**
+- [ ] `idbPut` + `idbGet` roundtrip funciona no Chrome, Firefox, Safari
+- [ ] Sem nova dependência em `package.json`
+- [ ] Erros (quota cheia, db corrompido) não quebram a app — fallback para `null`/no-op
+
+### T142 — Cache de `/historico` e sessões individuais
+
+**Tipo:** feature · **Onde:** `dashboard/lib/useHistory.ts` + `dashboard/components/history/*`
+
+Lista de histórico e detalhes de sessão hoje sempre fazem fetch. Sem rede = tela vazia.
+
+**Implementação:**
+- `useHistory()` (e o equivalente para detalhe) muda para padrão SWR-like manual: lê IndexedDB primeiro (sincronamente após mount), exibe dados stale, faz fetch em paralelo e atualiza ao chegar.
+- Em offline detectado (`useOnlineStatus`), pula o fetch e mostra dados cacheados com badge "📦 cache" no header da lista.
+- Sessões individuais visitadas são persistidas em `sessions` store sob demanda (lazy cache).
+- TTL? Não — dados de histórico são append-only por design. Invalidação se backend mandar ETag novo (ver T144).
+
+**Critério de aceite:**
+- [ ] Refresh com rede mostra lista igual à anterior (cache) antes do fetch completar — sem flash de loading
+- [ ] Offline + refresh ainda mostra histórico cacheado + badge
+- [ ] Sessão nunca visitada offline mostra "sem cache desta sessão" ao invés de tela quebrada
+
+---
+
+#### Sprint 2 — Backend hardening (idempotência + versioning)
+
+Sem isto, Sprint 3 fica frágil (retries duplicam mutações). T134 (schema_version) e T130 (race condition em favoritar) da FASE 14 são pré-requisitos naturais e podem entrar junto.
+
+### T143 — `schema_version` + `updated_at` em sessões
+
+**Tipo:** processo/infra · **Onde:** `api/storage.py` + `core/historico_index.py`
+
+Já planejado em T134 (FASE 14) sem campo de timestamp. Aproveitamos para já adicionar `updated_at` (epoch ms) — base para ETag, last-write-wins e delta sync.
+
+**Implementação:**
+- Ao salvar/atualizar JSON de sessão, gravar `schema_version: 1` e `updated_at: <epoch_ms>`.
+- Migration silenciosa: ao ler JSON sem `schema_version`, adicionar `1` + `updated_at = mtime` do arquivo e regravar (uma vez, lazy).
+- Índice `historico/_index.json` ganha `updated_at` por entrada também.
+
+**Critério de aceite:**
+- [ ] Sessão antiga lida e regravada vira `v1` com `updated_at`
+- [ ] Toda mutação (`/favoritar`, `/tags`) atualiza `updated_at`
+- [ ] Smoke test confirma idempotência (regravar duas vezes seguidas com mesmo payload muda `updated_at` mas nada mais)
+
+### T144 — ETag em GET /historico e GET /historico/{id}
+
+**Tipo:** feature · **Onde:** `api/routes/historico.py`
+
+Front hoje sempre baixa lista completa. Com ETag, navegação rápida (304 Not Modified) e SW pode usar cache HTTP nativo.
+
+**Implementação:**
+- GET `/historico`: ETag = hash do `updated_at` mais recente + count. Responder `304` se `If-None-Match` bater.
+- GET `/historico/{id}`: ETag = `W/"<updated_at>"`. Idem 304.
+- Front: `apiFetch` aceita `headers` opcionalmente e expõe `etag`/`notModified` no retorno (refactor pequeno).
+
+**Critério de aceite:**
+- [ ] `curl -I /historico` retorna `ETag: "..."` consistente entre requests sem mutação
+- [ ] Reenviar com `If-None-Match` correto retorna 304 + body vazio
+- [ ] Após mutação (favoritar), ETag muda
+
+### T145 — Chave de idempotência em mutações
+
+**Tipo:** feature · **Onde:** `api/routes/historico.py`, `share.py`, `calibragem.py`
+
+Sem isto, retry da queue (Sprint 3) corre risco de aplicar a mesma mutação duas vezes.
+
+**Implementação:**
+- Endpoints `POST /favoritar`, `POST /tags`, `POST /share/{token}/comentar` aceitam header `Idempotency-Key: <uuid>`.
+- Backend mantém ring buffer em memória (200 keys, LRU) das chaves recentes com hash do response. Hit = retorna response anterior, miss = processa e grava.
+- Sem persistência cross-restart por enquanto (servidor reinicia raramente; janela de duplicação aceitável).
+
+**Critério de aceite:**
+- [ ] Dois POSTs com mesma chave retornam corpo idêntico, mas processam só uma vez
+- [ ] Chaves diferentes processam normalmente
+- [ ] Sem chave = comportamento atual (compatível com chamadas existentes)
+
+### T146 — Endpoint `/sync/delta?since=<epoch_ms>`
+
+**Tipo:** feature · **Onde:** `api/routes/sync.py` (novo) + `api/main.py`
+
+Pull incremental: front pede só o que mudou desde a última sincronização, em vez de baixar histórico inteiro.
+
+**Implementação:**
+- GET `/sync/delta?since=<epoch_ms>` retorna `{ entries: [...sessões com updated_at > since], cutoff: <epoch_ms_now> }`.
+- Front guarda `cutoff` em IndexedDB store `meta` como `last_sync_at`.
+- Limita resposta a 500 entries (paginação simples via `cursor` se exceder — improvável no curto prazo).
+
+**Critério de aceite:**
+- [ ] `since=0` retorna tudo (equivalente a `/historico`)
+- [ ] `since=<futuro>` retorna lista vazia + cutoff atual
+- [ ] Mutar uma sessão e re-pedir com `since=cutoff_anterior` retorna só ela
+
+---
+
+#### Sprint 3 — Sync robusta (queue + retry)
+
+Aqui o offline vira realmente útil — usuário pode favoritar, tagear, comentar offline e tudo sincroniza ao voltar.
+
+### T147 — Queue de mutações em IndexedDB
+
+**Tipo:** feature · **Onde:** `dashboard/lib/sync-queue.ts` (novo)
+
+Toda mutação passa por uma fila persistente antes de ir ao servidor.
+
+**Implementação:**
+- `enqueueMutation({ endpoint, method, body, idempotencyKey })` grava em store `mutations` e tenta dispatch imediato se online.
+- Cada mutation tem: `id` (uuid = idempotency key), `created_at`, `attempts`, `last_error`, `status` (pending|inflight|done|failed).
+- API wrappers (`favoritarSessao`, etc.) reescritos para usar a queue ao invés de fetch direto.
+- UI atualiza otimisticamente; se mutation falhar definitivamente, reverte e mostra toast de erro.
+
+**Critério de aceite:**
+- [ ] Favoritar offline persiste no IDB e UI mostra como aplicado
+- [ ] Refresh com sessão offline preserva mutações pendentes
+- [ ] Mutação aplicada com sucesso some da queue
+
+### T148 — Worker de sync com retry exponencial
+
+**Tipo:** feature · **Onde:** `dashboard/lib/sync-worker.ts` (novo)
+
+Loop que processa a queue quando online.
+
+**Implementação:**
+- Singleton inicializado no app root. Reage a `online` event + tick a cada 30s.
+- Para cada mutation pending: tenta enviar com `Idempotency-Key`. Sucesso → marca `done` e remove. Falha 4xx (não-rede) → marca `failed` + reverte UI. Falha de rede ou 5xx → incrementa `attempts`, agenda retry com backoff `min(2^n, 60) segundos`.
+- Limite de 5 tentativas; depois marca `failed` e exige ação do usuário (toast com "Tentar de novo").
+
+**Critério de aceite:**
+- [ ] 3 mutações enfileiradas offline rodam em sequência ao voltar online
+- [ ] Backend 500 simulado → retry com delays crescentes, depois pára
+- [ ] Backend 400 (bad request) → falha imediata sem retry
+
+### T149 — Resolução last-write-wins via `updated_at`
+
+**Tipo:** feature · **Onde:** `api/routes/historico.py` + `dashboard/lib/useHistory.ts`
+
+Se duas abas (ou cliente + outro processo) mutarem a mesma sessão, precisamos de regra clara.
+
+**Implementação:**
+- Mutações aceitam header opcional `If-Unmodified-Since: <updated_at>` (last-known). Se backend tem `updated_at` mais recente, responde `409 Conflict` + estado atual.
+- Front, ao receber 409, atualiza cache com estado do servidor, reverte mutação local e mostra toast "Outro dispositivo já mudou esse item — sua alteração foi descartada".
+- Sem merge — last-write-wins puro. Mantém escopo pequeno.
+
+**Critério de aceite:**
+- [ ] Mutação com `If-Unmodified-Since` stale retorna 409
+- [ ] Front trata 409 sem quebrar a UI
+- [ ] Sem header = comportamento legado (atropela silenciosamente)
+
+### T150 — UI da fila de sync
+
+**Tipo:** feature · **Onde:** `dashboard/components/SyncStatus.tsx` (novo) + integração no header
+
+Operador precisa ver pendências e poder forçar retry.
+
+**Implementação:**
+- Ícone discreto no header (canto sup. direito) com badge numérico se há `pending > 0`.
+- Clique abre painel com lista de mutações pendentes (endpoint, idade, attempts, último erro).
+- Botão "Tentar agora" força dispatch imediato.
+- Botão "Descartar" remove mutação da fila (com confirmação).
+
+**Critério de aceite:**
+- [ ] 0 pendências = ícone neutro sem badge
+- [ ] Pendência velha (> 5min) destaca em amber
+- [ ] Falha definitiva destaca em red e exige ação
+
+---
+
+#### Sprint 4 — PWA shell
+
+App instalável + assets offline. Vai por último porque depende de o resto estar estável (SW que cacheia versão quebrada vira pesadelo).
+
+### T151 — `manifest.json` + ícones
+
+**Tipo:** infra · **Onde:** `dashboard/public/manifest.json` (novo) + `dashboard/app/layout.tsx`
+
+**Implementação:**
+- `manifest.json` com `name`, `short_name`, `start_url`, `display: standalone`, `theme_color`, `background_color`, ícones 192 e 512.
+- `<link rel="manifest">` no layout.
+- Ícones gerados a partir do logo Lemmon (PNG, dois tamanhos, sem maskable por enquanto).
+
+**Critério de aceite:**
+- [ ] Chrome mostra prompt "instalar" após critérios atendidos
+- [ ] App instalado abre em janela standalone com ícone correto
+
+### T152 — Service Worker vanilla
+
+**Tipo:** feature · **Onde:** `dashboard/public/sw.js` (novo) + `dashboard/lib/sw-register.ts` (novo)
+
+**Implementação:**
+- SW manual em `public/sw.js` (não Workbox).
+- `install`: pre-cache de shell (`/`, `/calibragem`, `/saude`, `/historico`, manifest, font/CSS críticos).
+- `activate`: limpa caches antigos por versão.
+- Registrado em `useEffect` no layout (client-only).
+
+**Critério de aceite:**
+- [ ] DevTools → Application → Service Workers mostra SW ativo
+- [ ] Offline + abrir rota cacheada = página renderiza shell
+
+### T153 — Estratégias de cache por tipo
+
+**Tipo:** feature · **Onde:** `dashboard/public/sw.js`
+
+**Implementação:**
+- API (`/historico`, `/sync/delta`, `/saude/*`): NetworkFirst com fallback IDB (não para o cache do SW, que duplicaria com T142).
+- Assets estáticos (`/_next/static/*`, fontes, imagens): CacheFirst com expiration de 30 dias.
+- HTML (`/`, rotas Next.js): StaleWhileRevalidate.
+- WebSocket: passa direto (SW não intercepta `ws://`).
+
+**Critério de aceite:**
+- [ ] Offline + abrir `/` = shell aparece + dados do IDB (T142)
+- [ ] Online + rota nova = baixa, cacheia, exibe
+- [ ] Atualização do bundle JS invalida cache antigo
+
+### T154 — Update flow + prompt de reload
+
+**Tipo:** feature · **Onde:** `dashboard/lib/sw-register.ts` + `dashboard/components/UpdatePrompt.tsx` (novo)
+
+SW novo só ativa após reload. Sem prompt, usuário fica em versão velha indefinidamente.
+
+**Implementação:**
+- `sw-register` detecta `updatefound` + `waiting` worker.
+- Mostra toast persistente "Nova versão disponível — clique para atualizar" via `sonner`.
+- Clique chama `worker.postMessage({type:'SKIP_WAITING'})` + `window.location.reload()`.
+
+**Critério de aceite:**
+- [ ] Deploy de versão nova → usuário vê toast
+- [ ] Clique recarrega na versão nova
+- [ ] Recusar mantém versão antiga sem quebrar
+
+---
+
+**Ordem de execução recomendada:** Sprint 1 (T140→T141→T142) → Sprint 2 (T143→T144→T145→T146) → Sprint 3 (T147→T148→T149→T150) → Sprint 4 (T151→T152→T153→T154).
+
+**Por que esta ordem:** Sprint 1 entrega valor sozinho mesmo se a fase parar aqui. Sprint 2 é pré-requisito técnico de Sprint 3. Sprint 4 fica por último porque cachear um app instável via SW é difícil de reverter.
+
+**Não-objetivos desta fase:**
+- Multi-device sync entre usuários diferentes (não há auth ainda).
+- Background sync via SW (`SyncManager`) — usamos worker em foreground; menos complexo e suficiente.
+- Conflict resolution merge — last-write-wins puro.
+- Push notifications.
+
+---
+
 ## POLIMENTOS — fazer só se sobrar tempo
 
 Lista curta, sem detalhamento — cada um vira tarefa numerada quando for atacado.
