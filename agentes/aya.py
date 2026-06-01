@@ -116,6 +116,9 @@ FERRAMENTA_DOSSIE_AYA = {
 class Aya(AgenteBase):
     nome = "aya"
     versao_prompt = "v1"
+    # T190.A5 — Aya compila dossiê visual com várias seções. Precisa de mais
+    # tokens que default (4k). 8k cobre o dossiê completo sem truncar.
+    max_tokens = 8192
     papel_curto = "Compiladora — gera dossiê visual juntando tudo do pipeline"
     quando_usar = [
         "pipeline com 2+ agentes terminou",

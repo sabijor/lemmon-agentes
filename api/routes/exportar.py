@@ -1,6 +1,7 @@
 """Rotas de exportação de dossiê/editorial e download."""
 import asyncio
 import json
+import re
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse
@@ -10,21 +11,46 @@ from api.schemas import ExportarPayload
 from core.exportador_aya import exportar_dossie
 from core.custo import Custo
 
+# T190.A7 — regex pra sanitizar path components (session_id, slug, agente).
+# Aceita apenas alfanuméricos + `_`, `-`, `.`, `+`. Bloqueia `..`, `/`, `\`, etc.
+_SAFE_PATH = re.compile(r"^[A-Za-z0-9_+.\-]+$")
+
+
+def _validar_componente(valor: str, nome_campo: str) -> str:
+    """Bloqueia path traversal em parâmetros de URL.
+
+    Rejeita `..`, `/`, `\\`, null bytes e tudo fora de [A-Za-z0-9_+.-].
+    """
+    if not valor or ".." in valor or "/" in valor or "\\" in valor or "\0" in valor:
+        raise HTTPException(status_code=400, detail=f"{nome_campo} inválido")
+    if not _SAFE_PATH.match(valor):
+        raise HTTPException(status_code=400, detail=f"{nome_campo} contém caracteres não permitidos")
+    return valor
+
 router = APIRouter()
 
 # T158 — labels humanas das seções por agente, usadas quando combinamos vários
 # outputs num único PDF. Mantém uma ordem editorial razoável (estratégia → roteiro
 # → performance → distribuição → compilação → espelho).
+# T191.d — carlos adicionado (roteirista publicitário, separado de Salles documental).
 _LABELS_AGENTE = {
     "otto": "Estratégia",
     "heitor": "Compliance Meta",
-    "salles": "Roteiros",
+    "carlos": "Roteiros (publicitários)",
+    "salles": "Roteiros (documentais)",
     "sonia": "Performance",
     "renata": "Cronograma editorial",
     "aya": "Dossiê",
     "pedro_abrahao": "Espelho do cliente (Pedro Abrahão)",
+    "ana_maria": "Análise financeira (CFO)",
+    "prichina": "Administrativo / RH",
+    "caito": "Decisão operacional (COO)",
+    "kelly": "Tributário / Contábil",
 }
-_ORDEM = ["otto", "heitor", "salles", "sonia", "renata", "aya", "pedro_abrahao"]
+_ORDEM = [
+    "otto", "heitor", "carlos", "salles", "sonia", "renata", "aya", "pedro_abrahao",
+    "ana_maria", "prichina", "caito", "kelly",
+]
 
 
 def _compor_markdown_combinado(respostas: dict, agentes: list[str]) -> str:
@@ -161,17 +187,34 @@ async def download_arquivo(
 
     T158: aceita `slug` (multi-agentes, ex: 'otto+salles') ou `agente` (legado).
     Ex: /download/SID/pdf?slug=otto+salles  ou  ?agente=renata
+
+    T190.A7: sanitiza session_id, slug e agente pra bloquear path traversal.
+    Valida que o arquivo final está mesmo dentro de OUTPUTS_DIR (defesa em profundidade).
     """
+    # T190.A7 — sanitize cada componente do path
+    session_id = _validar_componente(session_id, "session_id")
+    if slug is not None:
+        slug = _validar_componente(slug, "slug")
+    if agente is not None:
+        agente = _validar_componente(agente, "agente")
+    if tipo not in ("html", "pdf"):
+        raise HTTPException(status_code=400, detail="Tipo inválido. Use 'html' ou 'pdf'.")
+
     subdir = slug or agente or "aya"
     out_dir = OUTPUTS_DIR / subdir
-    if tipo == "html":
-        path = out_dir / f"{session_id}.html"
-        media_type = "text/html"
-    elif tipo == "pdf":
-        path = out_dir / f"{session_id}.pdf"
-        media_type = "application/pdf"
-    else:
-        raise HTTPException(status_code=400, detail="Tipo inválido. Use 'html' ou 'pdf'.")
+    media_type = "text/html" if tipo == "html" else "application/pdf"
+    path = out_dir / f"{session_id}.{tipo}"
+
+    # Defesa em profundidade: confirma que o path resolvido ainda está dentro
+    # de OUTPUTS_DIR (caso algum componente tenha escapado nossa validação)
+    try:
+        resolved = path.resolve()
+        outputs_resolved = OUTPUTS_DIR.resolve()
+        if not str(resolved).startswith(str(outputs_resolved) + "/") and resolved != outputs_resolved:
+            raise HTTPException(status_code=400, detail="Path inválido")
+    except (OSError, ValueError):
+        raise HTTPException(status_code=400, detail="Path inválido") from None
+
     if not path.exists():
         raise HTTPException(status_code=404, detail="Arquivo não encontrado. Exporte primeiro.")
     return FileResponse(path, media_type=media_type, filename=path.name)

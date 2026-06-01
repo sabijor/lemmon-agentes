@@ -147,6 +147,9 @@ FERRAMENTA_FORMATACAO_HEITOR = {
 class Heitor(AgenteBase):
     nome = "heitor"
     versao_prompt = "v1"
+    # T190.A5 — Heitor analisa termos críticos + cita artigos da política Meta.
+    # Output detalhado precisa de mais que 4k pra não truncar diretrizes.
+    max_tokens = 6144
     papel_curto = "Compliance Meta — checa risco de bloqueio em ads/posts"
     quando_usar = [
         "conteúdo de saúde, medicina, suplementos, estética",

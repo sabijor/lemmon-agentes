@@ -24,6 +24,7 @@ import { ConfigSidebar } from './ConfigSidebar'
 import { ProgressBar } from '../ProgressBar'
 import { MacroBar } from '../MacroBar'
 import ExportMenu from '../export/ExportMenu'  // T191.a — menu granular de export (3 modos)
+import { formatCustoBRL } from '@/lib/formatCusto'  // T190.B3 — USD → R$
 
 interface AttachedImage extends ImageData {
   preview: string
@@ -305,7 +306,30 @@ export default function ChatPanel({
       setInput(transcript)
     }
     rec.onend = () => setIsRecording(false)
-    rec.onerror = () => setIsRecording(false)
+    // T190.B4 — feedback claro de erro do microfone.
+    // Antes: `onerror = () => setIsRecording(false)` silencioso. User clicava,
+    // nada acontecia, achava que app travou. Erros comuns:
+    // - 'not-allowed': permissão negada pelo browser ou OS
+    // - 'no-speech': mic OK mas sem fala detectada
+    // - 'audio-capture': mic ausente/em uso por outro app
+    // - 'network': online recognition Chrome falhou (precisa internet)
+    // Tipa como `any` porque ISpeechRecognition tem signature `() => void` mas
+    // o evento real vem com `.error` (SpeechRecognitionErrorEvent — não no DOM lib).
+    rec.onerror = ((ev: { error?: string }) => {
+      setIsRecording(false)
+      const errCode = ev?.error || 'unknown'
+      if (errCode === 'not-allowed' || errCode === 'permission-denied') {
+        notify.error('🎤 Microfone bloqueado pelo navegador. Habilite nas configurações do site (ícone do cadeado na barra de endereço).')
+      } else if (errCode === 'audio-capture') {
+        notify.error('🎤 Não achei o microfone. Verifique se ele está conectado e não está sendo usado por outro app.')
+      } else if (errCode === 'network') {
+        notify.warning('🎤 Sem conexão de internet pro reconhecimento de voz. Tente digitar ou verifique sua rede.')
+      } else if (errCode === 'no-speech') {
+        // silencioso — usuário só não falou nada, sem precisar de toast
+      } else {
+        notify.error(`🎤 Erro no microfone: ${errCode}`)
+      }
+    }) as unknown as (() => void)
     rec.start()
     recognitionRef.current = rec
     setIsRecording(true)
@@ -344,7 +368,8 @@ export default function ChatPanel({
   const compartilharAprovacao = async () => {
     if (!sessionId) {
       // T157: cliente vê o botão mas a sessão ainda não foi salva — informa
-      notify.warning('Sessão ainda não foi salva. Aguarde o pipeline terminar antes de compartilhar.')
+      // T190.B1 — "pipeline" → "time" no toast pro leigo
+      notify.warning('Sessão ainda não foi salva. Aguarde o time terminar antes de compartilhar.')
       return
     }
     setSharingState('loading')
@@ -503,29 +528,32 @@ export default function ChatPanel({
               <div className="text-3xl mb-2">💸</div>
               <p className="text-sm font-display font-semibold text-stone-900 dark:text-stone-100 mb-1">Limite de custo atingido</p>
               <p className="text-[10px] font-mono text-stone-500 dark:text-stone-300 leading-relaxed">
-                O pipeline foi pausado ao atingir o cap de{' '}
-                <span className="text-stone-700 dark:text-stone-100 font-bold tabular-nums">${custoCapAtingido.cap.toFixed(2)}</span>.
+                {/* T190.B1 — "pipeline" → "trabalho do time" pro leigo */}
+                {/* T190.B3 — USD → R$ pra brasileiro entender */}
+                O trabalho foi pausado ao atingir o limite de{' '}
+                <span className="text-stone-700 dark:text-stone-100 font-bold tabular-nums">{formatCustoBRL(custoCapAtingido.cap)}</span>.
                 <br />
-                Custo acumulado: <span className="text-stone-700 dark:text-stone-100 tabular-nums">${custoCapAtingido.total.toFixed(3)}</span>
+                Já gastou: <span className="text-stone-700 dark:text-stone-100 tabular-nums">{formatCustoBRL(custoCapAtingido.total)}</span>
               </p>
             </div>
             <div className="flex flex-col gap-2">
+              {/* T190.B3 — USD → R$ nos botões. R$2.75 = $0.50 / R$11 = $2 */}
               <button
                 onClick={() => onAutorizarCusto(custoCapAtingido.cap + 0.50)}
                 className="w-full py-2.5 rounded-xl bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-900 text-[10px] font-mono font-bold uppercase tracking-widest
                   hover:bg-stone-700 dark:hover:bg-stone-200 active:scale-[0.98] transition-all">
-                Autorizar +$0.50 e continuar
+                Autorizar +{formatCustoBRL(0.50)} e continuar
               </button>
               <button
                 onClick={() => onAutorizarCusto(custoCapAtingido.cap + 2.00)}
                 className="w-full py-2.5 rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-600 dark:text-stone-200 text-[10px] font-mono uppercase tracking-widest
                   hover:border-stone-400 hover:bg-stone-50 dark:hover:bg-stone-700 active:scale-[0.98] transition-all">
-                Autorizar +$2.00 e continuar
+                Autorizar +{formatCustoBRL(2.00)} e continuar
               </button>
               <button
                 onClick={onRecusarCustoExtra}
                 className="w-full py-2 rounded-xl text-[10px] font-mono text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors uppercase tracking-widest">
-                Encerrar pipeline
+                Parar aqui
               </button>
             </div>
           </div>
@@ -702,11 +730,12 @@ export default function ChatPanel({
               return (
                 <span
                   className={`px-2 py-0.5 rounded-md text-[9px] font-mono border truncate min-w-0 ${corCap}`}
-                  title={custoCap ? `Cap: $${custoCap.toFixed(2)}` : 'Defina um cap em Configurações se quiser limite máximo'}
+                  title={custoCap ? `Limite: ${formatCustoBRL(custoCap)} ($${custoCap.toFixed(2)})` : 'Defina um limite em Configurações se quiser teto máximo'}
                 >
-                  ${totalSessao.toFixed(2)}
+                  {/* T190.B3 — USD → R$ no chip principal de custo */}
+                  {formatCustoBRL(totalSessao)}
                   {custoCap !== null && custoCap !== undefined && (
-                    <span className="opacity-60"> / ${custoCap.toFixed(2)}</span>
+                    <span className="opacity-60"> / {formatCustoBRL(custoCap)}</span>
                   )}
                 </span>
               )
@@ -900,6 +929,41 @@ export default function ChatPanel({
           </div>
         )}
 
+        {/* T190.B11 — ETA banner. Pedro: "travou? vou recarregar?" sem feedback.
+            Agora soma medianas dos agentes em fila + restante dos ativos = ETA. */}
+        {!minimized && mode === 'pipeline' && isRunning && (() => {
+          const activeIds = activeMessages
+            .filter(m => m.role !== 'user' && m.role !== 'concierge')
+            .map(m => m.role as AgentId)
+            .filter((id, i, arr) => arr.indexOf(id) === i)
+          // Calcula tempo restante baseado em mediana × (1 - progress)
+          let segundosRestantes = 0
+          for (const id of activeIds) {
+            const meta = agentProgressMeta[id]
+            if (!meta || meta.mediana == null) continue
+            const pct = (agentProgress[id] ?? 0) / 100
+            segundosRestantes += Math.max(0, meta.mediana * (1 - pct))
+          }
+          // Agentes ainda não iniciados (em inMeeting mas sem mensagem) contam mediana cheia
+          const startedIds = new Set(activeIds)
+          Array.from(inMeeting).forEach(id => {
+            if (startedIds.has(id)) return
+            const meta = agentProgressMeta[id]
+            if (meta?.mediana) segundosRestantes += meta.mediana
+          })
+          if (segundosRestantes <= 0) return null
+          const min = Math.ceil(segundosRestantes / 60)
+          const label = min < 1 ? 'menos de 1 min' : min === 1 ? '~1 min' : `~${min} min`
+          return (
+            <div className="px-4 py-1.5 border-b border-stone-100 dark:border-stone-800 bg-emerald-50/60 dark:bg-emerald-900/20 flex items-center gap-2 text-[10px] font-mono uppercase tracking-widest text-emerald-700 dark:text-emerald-300">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+              </svg>
+              <span>Restam {label} — não feche a aba</span>
+            </div>
+          )
+        })()}
+
         {/* MacroBar — pipeline overview */}
         {!minimized && mode === 'pipeline' && (
           <MacroBar
@@ -1029,9 +1093,10 @@ export default function ChatPanel({
             <div className="flex items-center gap-2 min-w-0">
               <span className="text-amber-500 text-sm flex-shrink-0">⚠</span>
               <p className="text-[9px] font-mono text-amber-700 leading-relaxed">
+                {/* T190.B3 — USD → R$ no aviso de custo */}
                 Custo em <strong>{custoAviso.pct}%</strong> do limite —{' '}
-                <span className="tabular-nums">${custoAviso.total.toFixed(3)}</span> de{' '}
-                <span className="tabular-nums">${custoAviso.cap.toFixed(2)}</span>
+                <span className="tabular-nums">{formatCustoBRL(custoAviso.total)}</span> de{' '}
+                <span className="tabular-nums">{formatCustoBRL(custoAviso.cap)}</span>
               </p>
             </div>
             <button onClick={() => onAutorizarCusto(custoAviso.cap)}

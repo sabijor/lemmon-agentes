@@ -1,9 +1,17 @@
 """WebSocket /ws/chat — pipeline principal de agentes."""
 import asyncio
+import json
 import re
 from collections import Counter
 
 from fastapi import WebSocket, WebSocketDisconnect
+
+# T190.A9 — limites de WebSocket pra evitar trava do worker.
+# 6MB max payload (cabe imagem 5MB + metadados). Mais que isso = desconecta.
+WS_MAX_PAYLOAD_BYTES = 6 * 1024 * 1024
+# Timeout pra receber uma mensagem. 5min é suficiente até pra cliente arrastar
+# imagem grande; conexão idle além disso é desconectada (libera worker).
+WS_RECEIVE_TIMEOUT_S = 300
 
 from agentes.aya import Aya
 from agentes.heitor import Heitor
@@ -45,7 +53,35 @@ async def chat(ws: WebSocket):
 
     try:
         while True:
-            data = await ws.receive_json()
+            # T190.A9 — recebe texto cru com timeout, valida tamanho, depois parseia JSON.
+            # Antes: `await ws.receive_json()` sem limite — payload 50MB OU conexão
+            # idle infinita travavam o worker. Agora:
+            #  - timeout 5min na espera (libera worker se cliente sumiu)
+            #  - check de tamanho ANTES de json.loads (evita carregar gigabytes na RAM)
+            #  - JSON inválido / payload grande / timeout → desconecta limpo
+            try:
+                raw = await asyncio.wait_for(ws.receive_text(), timeout=WS_RECEIVE_TIMEOUT_S)
+            except asyncio.TimeoutError:
+                try:
+                    await ws.close(code=1011, reason="idle timeout")
+                except Exception:
+                    pass
+                return
+            if len(raw) > WS_MAX_PAYLOAD_BYTES:
+                try:
+                    await ws.send_json({
+                        "type": "error",
+                        "message": "Mensagem grande demais (limite 6MB). Reduza a imagem anexada ou divida o pedido.",
+                    })
+                    await ws.close(code=1009, reason="payload too large")
+                except Exception:
+                    pass
+                return
+            try:
+                data = json.loads(raw)
+            except (json.JSONDecodeError, ValueError):
+                # cliente mandou lixo — ignora e segue esperando
+                continue
             names: list[str] = data.get("agents", [])
             briefing: str = data.get("message", "").strip()
             if not briefing or not names:
@@ -54,6 +90,21 @@ async def chat(ws: WebSocket):
             # Se houver imagem anexada, descreve com visão e injeta no briefing
             image_base64: str | None = data.get("image_base64")
             image_media_type: str = data.get("image_media_type", "image/jpeg")
+            # T190.A8 — limite tamanho imagem (5MB base64 ≈ 3.75MB binário).
+            # Sem isso, cliente podia mandar 50MB e detonar custo de visão + memória.
+            if image_base64 and len(image_base64) > 6_700_000:  # ~5MB binário com overhead base64
+                try:
+                    await ws.send_json({
+                        "type": "warning",
+                        "message": "Imagem muito grande (limite 5MB). Pipeline segue sem o contexto visual."
+                    })
+                except Exception:
+                    pass
+                image_base64 = None  # ignora imagem e segue
+            # T190.A8 — valida media type permitido
+            ALLOWED_MEDIA = {"image/jpeg", "image/png", "image/gif", "image/webp"}
+            if image_base64 and image_media_type not in ALLOWED_MEDIA:
+                image_base64 = None  # tipo desconhecido = ignora
             if image_base64:
                 try:
                     _resp = _anthropic_client.messages.create(
@@ -105,7 +156,15 @@ async def chat(ws: WebSocket):
             manual_mode: bool = data.get("manual_mode", False)
             fast_track: bool = data.get("fast_track", False)
             sandbox: bool = data.get("sandbox", False)
-            custo_cap_usd: float | None = data.get("custo_cap_usd") or None
+            # T190.A4 — cap default server-side. Cliente pode subir, mas nunca usa
+            # ilimitado. Default $0.50 protege contra runaway custo se UI bugar.
+            custo_cap_cliente = data.get("custo_cap_usd")
+            try:
+                custo_cap_usd: float = float(custo_cap_cliente) if custo_cap_cliente else 0.50
+            except (TypeError, ValueError):
+                custo_cap_usd = 0.50
+            # Limite máximo absoluto: $5/sessão. Mesmo se cliente pedir mais.
+            custo_cap_usd = min(custo_cap_usd, 5.0)
             config: dict = data.get("config", {})
             loop = asyncio.get_running_loop()
 

@@ -19,7 +19,9 @@ export interface ConciergeMsg {
 }
 
 export interface ConciergeResposta {
-  tipo: 'pergunta' | 'pronto'
+  // T188.a — "confirmar" é o estado intermediário entre pergunta e pronto.
+  // Concierge propõe equipe + razões e espera o user dizer "OK" antes de mobilizar.
+  tipo: 'pergunta' | 'confirmar' | 'pronto'
   conteudo: string
   briefing_refinado: string | null
   dimensoes_completas: string[]
@@ -43,8 +45,20 @@ export function useConcierge() {
         body: JSON.stringify({ historico }),
       })
       if (!res.ok) {
-        const errText = await res.text().catch(() => 'erro desconhecido')
-        throw new Error(`HTTP ${res.status}: ${errText.slice(0, 200)}`)
+        // T193.b — backend agora retorna status apropriado (402/429/401/503) +
+        // mensagem amigável em `detail`. Extrai e propaga em vez de stringificar HTTP.
+        const data = await res.json().catch(() => ({}))
+        const detail = (data as { detail?: string }).detail || `HTTP ${res.status}`
+        // Anexa código pro caller decidir se mostra ação específica
+        // (ex: 402 → link pra console.anthropic.com).
+        const err = new Error(detail) as Error & { status?: number; kind?: string }
+        err.status = res.status
+        err.kind = res.status === 402 ? 'sem_credito'
+                 : res.status === 429 ? 'rate_limit'
+                 : res.status === 401 ? 'auth'
+                 : res.status === 503 ? 'conexao'
+                 : 'outro'
+        throw err
       }
       return (await res.json()) as ConciergeResposta
     } catch (e) {

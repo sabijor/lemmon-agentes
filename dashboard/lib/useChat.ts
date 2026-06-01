@@ -115,15 +115,18 @@ export function useChat() {
     }
   }, [])
 
-  // T140 — Reconexão por visibilitychange.
+  // T140 + T190.C1 — Reconciliação por 3 eventos: visibilitychange, focus, online.
   // Chrome fecha WS em abas background. Quando o usuário volta, se uma sessão
   // estava rodando, o WS já caiu e o backend continuou sozinho (mensagens novas
-  // não chegam mais). Aqui detectamos isso e fazemos poll do histórico até achar
+  // não chegam mais). Aqui detectamos e fazemos poll do histórico até achar
   // a sessão (que o backend salva ao terminar) — e carregamos o resultado.
+  //
+  // T190.C1: antes só usava `visibilitychange`. Agora também `window.focus` e
+  // `window.online` — cobre casos onde a aba já está visível mas perde foco/rede
+  // (ex: usuário trocou de janela com Cmd+Tab e voltou, ou Wi-Fi caiu e voltou).
   useEffect(() => {
     let cancelled = false
-    const onVisibility = async () => {
-      if (document.visibilityState !== 'visible') return
+    const tentarReconciliar = async () => {
       if (!sessionStartTimeRef.current) return
       const wsClosed = !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN
       if (!wsClosed) return
@@ -160,10 +163,19 @@ export function useChat() {
         reconnectingRef.current = false
       }
     }
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') tentarReconciliar()
+    }
+    const onFocus = () => tentarReconciliar()
+    const onOnline = () => tentarReconciliar()
     document.addEventListener('visibilitychange', onVisibility)
+    window.addEventListener('focus', onFocus)
+    window.addEventListener('online', onOnline)
     return () => {
       cancelled = true
       document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('focus', onFocus)
+      window.removeEventListener('online', onOnline)
     }
     // loadSession é estável (useCallback), mas listamos pra deixar explícito
     // eslint-disable-next-line react-hooks/exhaustive-deps

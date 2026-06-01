@@ -1,4 +1,6 @@
 """Aplicação FastAPI do Lemmon Dashboard."""
+import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -10,10 +12,16 @@ from api.ws_mesa import mesa_redonda
 from api.ws_reuniao import reuniao
 from core.historico_index import sanity_check
 
+_log = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    sanity_check()
+    # T190.D4 — sanity_check pode crashar se disco cheio. Captura pra não morrer.
+    try:
+        sanity_check()
+    except Exception as exc:
+        _log.warning("sanity_check falhou na inicialização: %s", exc)
     yield
 
 
@@ -28,9 +36,23 @@ async def health():
     """
     return {"status": "ok", "service": "lemmon-agentes", "version": "1.36"}
 
+# T190.A6 — CORS restritivo. Antes era ["*"] (qualquer site externo podia
+# invocar). Agora só portas locais conhecidas. Em produção, override via env
+# `LEMMON_CORS_ORIGINS` (csv): ex `LEMMON_CORS_ORIGINS=https://meu.dominio.com`
+_cors_env = os.getenv("LEMMON_CORS_ORIGINS", "").strip()
+if _cors_env:
+    _cors_origins = [o.strip() for o in _cors_env.split(",") if o.strip()]
+else:
+    _cors_origins = [
+        "http://localhost:3000",
+        "http://localhost:4000",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:4000",
+    ]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],

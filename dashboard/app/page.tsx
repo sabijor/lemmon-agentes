@@ -38,7 +38,8 @@ export default function Home() {
   const [activeRoom, setActiveRoom] = useLocalStorage<ActiveRoom>('lemmon-active-room', 'creative')
   const { sugerir: sugerirPipeline } = useAutoRouter()
   // T186.b — Concierge orquestrador: conversa pra refinar briefing antes de mobilizar equipe
-  const { conversar: conciergeConversar } = useConcierge()
+  // T193.b — também precisa do `error` pra distinguir sem-crédito/auth/rate-limit
+  const { conversar: conciergeConversar, error: conciergeError } = useConcierge()
   const [conciergeHistory, setConciergeHistory] = useState<ConciergeMsg[]>([])
   // T148 — flag pra mostrar "recomendado" no Auto Mode até 1ª sessão concluir
   const [hasCompletedFirstSession, setHasCompletedFirstSession] = useLocalStorage<boolean>('lemmon-first-session-done', false)
@@ -142,7 +143,22 @@ export default function Home() {
       // Chama Concierge
       const resp = await conciergeConversar(novoHistorico)
       if (!resp) {
-        notify.error('Erro ao consultar o Concierge.')
+        // T193.b — mensagem específica baseada no tipo de erro do backend.
+        // `conciergeError` é setado pelo hook useConcierge com o detail amigável.
+        const msg = conciergeError || 'Erro ao consultar o Concierge.'
+        // Detecta sem-crédito pelo texto (já amigável) e dá um toast longo
+        // pra cliente leigo entender o que fazer.
+        if (msg.includes('Sem crédito')) {
+          notify.error(`💳 ${msg}`)
+        } else if (msg.includes('Chave da API')) {
+          notify.error(`🔑 ${msg}`)
+        } else if (msg.includes('Limite de chamadas')) {
+          notify.warning(`⏳ ${msg}`)
+        } else if (msg.includes('Sem conexão')) {
+          notify.error(`🌐 ${msg}`)
+        } else {
+          notify.error(msg)
+        }
         return
       }
 
@@ -150,13 +166,15 @@ export default function Home() {
       const conciergeId = crypto.randomUUID()
       setMessages(prev => [...prev, { id: conciergeId, role: 'concierge' as AgentId, content: resp.conteudo, done: true }])
 
-      if (resp.tipo === 'pergunta') {
-        // Adiciona resposta ao histórico e espera o próximo input do user
+      if (resp.tipo === 'pergunta' || resp.tipo === 'confirmar') {
+        // T188.a — pergunta E confirmar funcionam igual no fluxo: adiciona resposta
+        // ao histórico e espera próximo input do user (que pode ser "OK" pra confirmar
+        // OU mais info pra refinar a pergunta).
         setConciergeHistory(h => [...h, { role: 'concierge', content: resp.conteudo }])
         return
       }
 
-      // tipo === 'pronto': pipeline com agentes escolhidos pelo Concierge
+      // tipo === 'pronto': cliente confirmou. Pipeline com agentes escolhidos pelo Concierge
       let ids = resp.agentes_sugeridos.filter(id => {
         const agent = AGENTS.find(a => a.id === id)
         return agent && !agent.reuniaoOnly
@@ -274,11 +292,16 @@ export default function Home() {
             disabled={isRunning || reunIsRunning}
             showRecommended={!hasCompletedFirstSession}
           />
-          <ComplianceToggle
-            value={complianceMode}
-            setValue={setComplianceMode}
-            disabled={isRunning || reunIsRunning}
-          />
+          {/* T190.A13 — Compliance toggle escondido no 1º acesso. Cliente Hator
+              não deve poder desativar compliance acidentalmente (risco ban Meta).
+              Default "auto" (IA decide) é mantido. Após 1ª sessão, toggle volta. */}
+          {hasCompletedFirstSession && (
+            <ComplianceToggle
+              value={complianceMode}
+              setValue={setComplianceMode}
+              disabled={isRunning || reunIsRunning}
+            />
+          )}
           <Clock />
           <Link href="/saude" title="Dashboard de Saúde"
             className="w-8 h-8 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 flex items-center justify-center hover:bg-stone-50 dark:hover:bg-stone-800 hover:border-stone-400 dark:hover:border-stone-500 transition-all text-stone-500 dark:text-stone-400">

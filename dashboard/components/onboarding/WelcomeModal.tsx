@@ -113,7 +113,8 @@ export default function WelcomeModal({ onTryExample }: Props) {
             </div>
 
             <p className="text-[10px] text-stone-400 dark:text-stone-500 mt-4 text-center">
-              Custos da Anthropic: ~$0.10 a $0.50 por sessão.
+              {/* T190.B3 — custo em R$ pra brasileiro */}
+              Custo médio por sessão: ~R$ 0,50 a R$ 2,80.
             </p>
           </motion.div>
         </motion.div>

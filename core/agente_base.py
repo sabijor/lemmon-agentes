@@ -16,22 +16,74 @@ from .tipos import AgenteResultado
 def formatar_erro_anthropic(e: Exception) -> str:
     """Converte exceções do SDK Anthropic em mensagem pt-BR sem vazar internos."""
     s = str(getattr(e, "message", "") or e).lower()
+    status = getattr(e, "status_code", None)
+
+    # T193.b — sem crédito / cobrança vencida. Status 402 OU mensagem contém
+    # "credit balance", "insufficient_quota", "billing", "payment".
+    if (
+        status == 402
+        or "credit balance" in s
+        or "insufficient_quota" in s
+        or "insufficient quota" in s
+        or "billing" in s
+        or "payment" in s
+        or "your credit balance is too low" in s
+    ):
+        return (
+            "Sem crédito na API Anthropic. "
+            "Acesse console.anthropic.com → Billing pra recarregar."
+        )
     if "overloaded" in s:
         return "API Anthropic temporariamente sobrecarregada. Tente em 30 segundos."
-    if "rate_limit" in s or "rate limit" in s:
+    if "rate_limit" in s or "rate limit" in s or status == 429:
         return "Limite de chamadas atingido. Aguarde alguns segundos."
-    if "authentication" in s or "invalid api key" in s or "api key" in s:
-        return "Chave da API inválida. Verifique ANTHROPIC_API_KEY."
+    if (
+        "authentication" in s
+        or "invalid api key" in s
+        or "api key" in s
+        or "x-api-key" in s
+        or status == 401
+    ):
+        return "Chave da API inválida ou ausente. Verifique ANTHROPIC_API_KEY no .env."
     if "connection" in s or "timeout" in s:
         return "Sem conexão com a API Anthropic. Verifique sua internet."
     msg = str(getattr(e, "message", "") or e)
     return f"Erro temporário da API: {msg[:200]}"
 
 
+def classificar_erro_anthropic(e: Exception) -> str:
+    """T193.b — classifica erro Anthropic pra status HTTP apropriado.
+
+    Retorna: 'sem_credito' | 'rate_limit' | 'auth' | 'conexao' | 'outro'
+    Usado pelos endpoints pra escolher status code (402, 429, 401, 503, 502).
+    """
+    s = str(getattr(e, "message", "") or e).lower()
+    status = getattr(e, "status_code", None)
+    if (
+        status == 402
+        or "credit balance" in s
+        or "insufficient_quota" in s
+        or "insufficient quota" in s
+        or "billing" in s
+        or "payment" in s
+    ):
+        return "sem_credito"
+    if status == 429 or "rate_limit" in s or "rate limit" in s:
+        return "rate_limit"
+    if status == 401 or "authentication" in s or "invalid api key" in s or "x-api-key" in s:
+        return "auth"
+    if "connection" in s or "timeout" in s:
+        return "conexao"
+    return "outro"
+
+
 class AgenteBase(ABC):
     nome: str = "agente_base"
     versao_prompt: str = "v1"
-    max_tokens: int = 16384
+    # T190.A5 — default reduzido de 16k pra 4k. Pipeline 5-6 agentes em Sonnet
+    # com 16k = ~$1.50/briefing; com 4k = ~$0.40/briefing. Agentes que precisam
+    # de mais (Aya, Heitor com diretrizes longas) sobrescrevem na classe.
+    max_tokens: int = 4096
     system_prompt_reuniao: str | None = None  # se definido, usado no modo conversacional
     modelo: str  # setado em __init__ via resolver_modelo(self.nome)
 

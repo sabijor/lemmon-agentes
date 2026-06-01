@@ -17,6 +17,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from api.routes.agentes import construir_catalogo
+from core.agente_base import classificar_erro_anthropic, formatar_erro_anthropic
 
 router = APIRouter()
 
@@ -34,7 +35,9 @@ class ConcierePedido(BaseModel):
 
 
 class ConciereResposta(BaseModel):
-    tipo: Literal['pergunta', 'pronto']
+    # T188.a — novo tipo "confirmar" entre pergunta e pronto.
+    # Concierge propõe equipe + razão e pede OK do user antes de mobilizar.
+    tipo: Literal['pergunta', 'confirmar', 'pronto']
     conteudo: str
     briefing_refinado: str | None = None
     dimensoes_completas: list[str] = []
@@ -149,19 +152,26 @@ E também:
 
 ---
 
-## 🧭 Decisão: pergunta vs pronto
+## 🧭 Decisão: pergunta vs confirmar vs pronto
 
-### Pergunte quando:
+Você tem **3 tipos de resposta** (T188.a — sempre passa pelo "confirmar" antes de disparar):
+
+### "pergunta" — quando ainda falta contexto
 - Falta o **O QUÊ** ou **OBJETIVO** (são obrigatórios)
 - Faltam 2+ dimensões críticas
 - Ambíguo qual frente acionar (marketing vs admin Hator vs orçamento)
 
-### Vá pra "pronto" quando:
+### "confirmar" — quando você JÁ sabe o que fazer mas precisa do OK do cliente
 - O QUÊ e OBJETIVO claros + pelo menos 2 outras dimensões
 - Sabe exatamente quais especialistas ativar e por quê
-- Sabe se ferramentas extras são necessárias
+- **NUNCA dispare pipeline sem confirmação do cliente** — sempre passe por "confirmar" primeiro
+- Mostre a equipe escolhida + razão de cada um + pergunte "OK pra rodar?"
 
-**Limite**: após 4 rodadas de pergunta, FORCE "pronto" mesmo incompleto — não trave o cliente.
+### "pronto" — só depois que o cliente confirmou
+- Use APENAS quando a mensagem anterior foi "confirmar" E o cliente respondeu algo como "sim/ok/pode/vai/confirmado/pode rodar"
+- Se cliente respondeu "edita X" ou "tira Y", volte pra "confirmar" com ajustes
+
+**Limite**: após 4 rodadas de "pergunta", FORCE "confirmar" mesmo incompleto. Após 1 rodada de "confirmar" sem OK explícito do user, mantenha "confirmar" repetindo a pergunta (não force "pronto").
 
 ---
 
@@ -170,26 +180,68 @@ E também:
 - Português brasileiro coloquial e direto
 - Acolhedor SEM ser bajulador (evite "claro!", "ótimo!", "perfeito!")
 - **Uma frase curta de contexto** ("Vi que é sobre menopausa") + **uma pergunta concreta** ("É pra Reels orgânico ou ad pago?")
-- Em "pronto", explique: **quem vai fazer o quê** numa frase amigável
+- Em "confirmar": **liste os agentes escolhidos com razão de 1 linha cada** + "OK rodar?"
+- Em "pronto": frase curta de transição ("Bora! Time mobilizado.") — o pipeline já vai aparecer
 
 ---
 
-## 🧩 Padrões de pipeline (use como referência)
+## ⚠️ REGRAS RÍGIDAS (T188.b/c/d — bugs reportados no teste real)
 
-Esses são padrões observados, não regras rígidas. Você decide.
+### 1. Cliente Hator → SEMPRE inclua `pedro_abrahao`
+Se o briefing mencionar QUALQUER UM dos termos abaixo, `pedro_abrahao` é **OBRIGATÓRIO**
+(como espelho/validador médico, mesmo que outras frentes existam):
+- "Hator", "Dr. Pedro", "Dra. Pedro", "Pedro Abrahão", "menopausa", "saúde feminina",
+  "consulta médica", "TRH", "reposição hormonal", "estética orofacial", "clínica" + Pedro,
+  "ginecologia", "endocrinologia feminina"
 
-- **Reels orgânico saúde**: otto + carlos + heitor + sonia + (pedro_abrahao se Hator) + aya
-- **Ad pago saúde**: otto + heitor (obrigatório) + carlos + sonia + aya
-- **Conteúdo educativo**: otto + carlos + (pedro_abrahao se Hator) + aya
-- **Cliente tem refs visuais**: ferramenta `briefing_reverso` + otto + ...
-- **Calendário editorial**: renata + (otto se estratégico) + aya
-- **Reels com material gravado**: ferramenta `cortes_prontos` + carlos + sonia
+### 2. Salles entra SÓ com material/produção real
+`salles` é Produtor documental — entra APENAS se o briefing mencionar:
+- "gravar", "captação", "captar", "produzir vídeo", "set", "filmagem", "produção"
+- OU "entrevista AO VIVO/PRESENCIAL"
+- OU cliente já tem material gravado e quer ESTRUTURAR ele
+
+Se briefing é só "roteiros", "scripts", "textos", "legendas", "copy": **NÃO** chame Salles.
+Use Carlos (roteirista publicitário).
+
+### 3. Time conservador — defaults mínimos por demanda
+Default: **2-3 agentes**. Máximo: **5** (precisa justificativa explícita pra cada).
+
+Tabela de mínimos por tarefa típica:
+- "Roteiros" sozinho → `carlos` + `aya` (2)
+- "Estratégia" → `otto` + `aya` (2)
+- "Calendário editorial" → `renata` + `aya` (2)
+- "Ad pago" → `otto` + `heitor` + `carlos` + `aya` (4) — Heitor obrigatório
+- "Reels orgânico saúde Hator" → `otto` + `carlos` + `pedro_abrahao` + `aya` (4)
+- "Análise financeira Hator" → `ana_maria` (1) ± `caito`/`kelly` conforme área
+- "Cortes de vídeo gravado" → ferramenta `cortes_prontos` + `carlos` + `aya` (2)
+
+**NÃO inclua agente "pra ter certeza"**. Se não há razão específica no briefing,
+não convoca. Cliente paga por cada um.
+
+### 4. Heitor entra quando há risco
+`heitor` (compliance) entra obrigatoriamente quando:
+- É ad pago (Meta cobra compliance)
+- Mencionar produto/serviço de saúde com claims ("emagrecimento", "cura", "tratamento")
+- Cliente diz "auditar", "revisar termos", "checar"
+
+Pode ficar de fora em: posts orgânicos genéricos sem claim, calendário, copy interno.
+
+---
+
+## 🧩 Padrões de pipeline (use como guia, decida caso a caso)
+
+- **Reels orgânico saúde Hator**: otto + carlos + pedro_abrahao + aya (heitor só se ad)
+- **Ad pago saúde**: otto + heitor (obrigatório) + carlos + (pedro_abrahao se Hator) + aya
+- **Conteúdo educativo Hator**: otto + carlos + pedro_abrahao + aya
+- **Cliente tem refs visuais (prints)**: ferramenta `briefing_reverso` + otto + carlos + aya
+- **Calendário editorial**: renata + (otto só se estratégico) + aya
+- **Material gravado → cortes**: ferramenta `cortes_prontos` + carlos + aya
 - **Análise financeira Hator**: ana_maria + (caito se decisão) + (kelly se tributário)
 - **Decisão operacional Hator**: caito + (ana_maria/prichina/kelly conforme área)
 - **Folha/RH/contas Hator**: prichina + (ana_maria se pagamento)
 - **Tributário/imposto Hator**: kelly + (ana_maria se fluxo)
 
-**Sempre** termina com **aya** (compiladora) pra fechar dossiê — exceto pra admin Hator (que tem outras saídas).
+**Sempre** termina com **aya** (compiladora) — exceto pra admin Hator (saídas próprias).
 
 ---
 
@@ -199,9 +251,9 @@ Retorne SEMPRE um JSON válido, e SÓ o JSON (sem texto fora, sem markdown fence
 
 ```json
 {{
-  "tipo": "pergunta" | "pronto",
-  "conteudo": "<texto pro cliente — pergunta gentil OU mensagem de transição amigável explicando quem vai fazer o quê>",
-  "briefing_refinado": "<se pronto: consolidação clara em 2-4 frases. se pergunta: null>",
+  "tipo": "pergunta" | "confirmar" | "pronto",
+  "conteudo": "<texto pro cliente — pergunta gentil / proposta com OK / transição amigável>",
+  "briefing_refinado": "<se confirmar OU pronto: consolidação em 2-4 frases. se pergunta: null>",
   "dimensoes_completas": ["o_que", "publico", "canal", ...],
   "dimensoes_faltando": ["objetivo", "vibe", ...],
   "agentes_sugeridos": ["otto", "carlos", ...],
@@ -218,7 +270,50 @@ Use IDs exatos pra agentes (lowercase, snake_case): `otto`, `heitor`, `salles`, 
 Use keys exatos pra ferramentas: `briefing_reverso`, `cortes_prontos`, `calibragem_pedro`, `transcrever`, `share`, `exportar`.
 
 Se `tipo=pergunta`, deixe `agentes_sugeridos`, `razoes_agentes` e `ferramentas_extras` vazios.
+Se `tipo=confirmar`, PREENCHA todos esses campos (cliente precisa ver o que vai rodar).
+Se `tipo=pronto`, mantenha os mesmos campos da última "confirmar" (significa que cliente OKou).
+
+### Exemplo de "confirmar"
+```json
+{{
+  "tipo": "confirmar",
+  "conteudo": "Pra Reels de menopausa orgânico, vou mobilizar:\\n\\n• Otto — decodifica tese\\n• Carlos — escreve roteiros\\n• Pedro (espelho IA) — valida pela ótica do médico\\n• Aya — compila tudo\\n\\nOK rodar assim ou quer ajustar?",
+  "briefing_refinado": "Reels orgânico pra Instagram da Hator Clinic sobre menopausa. Público: mulheres 40-55 anos. Tom íntimo e científico.",
+  "dimensoes_completas": ["o_que", "publico", "canal", "objetivo", "vibe"],
+  "dimensoes_faltando": [],
+  "agentes_sugeridos": ["otto", "carlos", "pedro_abrahao", "aya"],
+  "razoes_agentes": {{
+    "otto": "decodifica tese em briefing aberto",
+    "carlos": "escreve roteiros publicitários filmáveis",
+    "pedro_abrahao": "valida pela ótica do médico (cliente Hator)",
+    "aya": "compila o dossiê final"
+  }},
+  "ferramentas_extras": []
+}}
+```
 """
+
+
+def _parse_resposta_concierge(text: str) -> dict | None:
+    """Tenta extrair JSON da resposta do Haiku tolerando fences markdown.
+
+    Retorna dict ou None se falhar. Não levanta — quem chama decide se faz retry.
+    """
+    try:
+        text_clean = text.strip()
+        # Remove fence ```json...``` ou ```...```
+        if text_clean.startswith("```"):
+            partes = text_clean.split("```")
+            if len(partes) >= 2:
+                text_clean = partes[1]
+            if text_clean.startswith("json"):
+                text_clean = text_clean[4:]
+            elif text_clean.startswith("JSON"):
+                text_clean = text_clean[4:]
+        text_clean = text_clean.strip()
+        return json.loads(text_clean)
+    except (json.JSONDecodeError, IndexError, ValueError):
+        return None
 
 
 @router.post("/concierge/conversar", response_model=ConciereResposta)
@@ -229,7 +324,11 @@ async def conversar(pedido: ConcierePedido):
 
     api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
-        raise HTTPException(status_code=500, detail="ANTHROPIC_API_KEY não configurada")
+        # T193.c — erro amigável quando .env do cliente não tem a key
+        raise HTTPException(
+            status_code=401,
+            detail="Chave da API Anthropic não configurada. Avise o suporte da Lemmon.",
+        )
 
     # Constrói messages no formato Anthropic. Suporta imagem (vision) anexa
     # ao último user message via content blocks (T186.c).
@@ -258,36 +357,69 @@ async def conversar(pedido: ConcierePedido):
     client = anthropic.Anthropic(api_key=api_key)
     system_prompt = _construir_system_prompt()
 
-    try:
-        response = client.messages.create(
-            model="claude-haiku-4-5",
-            max_tokens=2048,
-            system=system_prompt,
-            messages=messages,
-        )
-    except anthropic.APIError as e:
-        raise HTTPException(status_code=502, detail=f"erro Anthropic: {str(e)[:200]}") from e
-
-    # Extrai texto
+    # T188.l + T193.a — tenta até 2x: se 1ª resposta vier sem JSON válido,
+    # injeta lembrete e tenta de novo. Evita derrubar sessão por glitch do modelo.
+    data: dict | None = None
     text = ""
-    for block in response.content:
-        if block.type == "text":
-            text += block.text
+    ultima_excecao: Exception | None = None
 
-    # Parse JSON com tolerância a fences markdown
-    try:
-        text_clean = text.strip()
-        if text_clean.startswith("```"):
-            text_clean = text_clean.split("```")[1]
-            if text_clean.startswith("json"):
-                text_clean = text_clean[4:]
-        text_clean = text_clean.strip()
-        data = json.loads(text_clean)
-    except json.JSONDecodeError as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Concierge retornou JSON inválido: {text[:300]}",
-        ) from e
+    for tentativa in range(2):
+        try:
+            response = client.messages.create(
+                model="claude-haiku-4-5",
+                max_tokens=2048,
+                system=(
+                    system_prompt
+                    if tentativa == 0
+                    else system_prompt + "\n\n## ⚠ Última saída inválida\n"
+                    "Sua última resposta NÃO foi JSON válido. Retorne SÓ o objeto JSON "
+                    "exigido, sem texto antes/depois, sem fences markdown."
+                ),
+                messages=messages,
+            )
+        except (
+            anthropic.AuthenticationError,
+            anthropic.RateLimitError,
+            anthropic.APIConnectionError,
+            anthropic.APIStatusError,
+            anthropic.APIError,
+        ) as e:
+            # T193.b + T190.A10 — classifica erro e retorna status apropriado.
+            # NÃO vaza traceback nem string crua da Anthropic.
+            kind = classificar_erro_anthropic(e)
+            msg_amigavel = formatar_erro_anthropic(e)
+            status_map = {
+                "sem_credito": 402,
+                "rate_limit": 429,
+                "auth": 401,
+                "conexao": 503,
+                "outro": 502,
+            }
+            raise HTTPException(
+                status_code=status_map.get(kind, 502),
+                detail=msg_amigavel,
+            ) from e
+
+        text = ""
+        for block in response.content:
+            if block.type == "text":
+                text += block.text
+
+        data = _parse_resposta_concierge(text)
+        if data is not None:
+            break  # JSON OK, segue
+        # Se chegou aqui, vai tentar de novo (com prompt reforçado)
+
+    if data is None:
+        # T188.l — fallback gracioso: nem 2ª tentativa parseou. Em vez de derrubar
+        # a sessão com 500, retorna pergunta neutra pra user reformular.
+        return ConciereResposta(
+            tipo="pergunta",
+            conteudo=(
+                "Desculpa, me confundi processando sua mensagem. "
+                "Pode reformular ou dar mais um detalhe sobre o que você precisa?"
+            ),
+        )
 
     return ConciereResposta(
         tipo=data.get("tipo", "pergunta"),
