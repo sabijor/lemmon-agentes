@@ -40,7 +40,8 @@ export default function Home() {
   // T186.b — Concierge orquestrador: conversa pra refinar briefing antes de mobilizar equipe
   // T193.b — também precisa do `error` pra distinguir sem-crédito/auth/rate-limit
   const { conversar: conciergeConversar, error: conciergeError } = useConcierge()
-  const [conciergeHistory, setConciergeHistory] = useState<ConciergeMsg[]>([])
+  // T188.i — histórico Concierge persiste em refresh (em vez de zerar via useState)
+  const [conciergeHistory, setConciergeHistory] = useLocalStorage<ConciergeMsg[]>('lemmon-concierge-history', [])
   // T148 — flag pra mostrar "recomendado" no Auto Mode até 1ª sessão concluir
   const [hasCompletedFirstSession, setHasCompletedFirstSession] = useLocalStorage<boolean>('lemmon-first-session-done', false)
   const { messages, agentStatus, isRunning, sessionId, favoritado, resumedFrom, manualMode, fastTrack, sandbox, custoCap, custoCapAtingido, custoAviso, awaitingApproval, agentConfig, tagsSugeridas, agentProgress, agentProgressMeta, send, approve, abort, toggleManualMode, toggleFastTrack, toggleSandbox, setCustoCap, autorizarCusto, recusarCustoExtra, updateConfig, favoritar, exportar, reset, loadSession, setMessages } = useChat()
@@ -124,53 +125,65 @@ export default function Home() {
 
   const _handleSendInternal = async (msg: string, image?: ImageData) => {
     if (autoMode) {
-      // T186.b/c — Em modo Auto, Concierge orquestra. Adiciona msg do user (com
-      // imagem se anexada) no histórico e no chat, depois consulta o Concierge.
-      const novoHistorico: ConciergeMsg[] = [
-        ...conciergeHistory,
-        {
-          role: 'user',
-          content: msg,
-          ...(image && { image_base64: image.base64, image_media_type: image.mediaType }),
-        },
-      ]
-      setConciergeHistory(novoHistorico)
+      // T186.b/c — Em modo Auto, Concierge orquestra. Constrói histórico novo
+      // mas NÃO grava ainda — esperamos resposta da API antes (T188.p: evitar
+      // histórico desbalanceado se API falhar).
+      const userMsg: ConciergeMsg = {
+        role: 'user',
+        content: msg,
+        ...(image && { image_base64: image.base64, image_media_type: image.mediaType }),
+      }
+      // T188.j — usa snapshot funcional pra evitar closure stale em envios rápidos
+      const historicoSnapshot = conciergeHistory
+      const novoHistorico: ConciergeMsg[] = [...historicoSnapshot, userMsg]
 
-      // Mostra a msg do user no chat (mesmo formato do useChat)
+      // T188.k — Mostra a msg do user no chat. Se vazio + imagem, usa placeholder
+      // pra não aparecer bolha em branco.
       const userId = crypto.randomUUID()
-      setMessages(prev => [...prev, { id: userId, role: 'user', content: msg, done: true, hasImage: !!image }])
+      const contentExibido = msg.trim() || (image ? '📷 imagem anexada' : '')
+      setMessages(prev => [...prev, { id: userId, role: 'user', content: contentExibido, done: true, hasImage: !!image }])
 
-      // Chama Concierge
+      // Chama Concierge ANTES de gravar no histórico persistido (T188.p)
       const resp = await conciergeConversar(novoHistorico)
       if (!resp) {
         // T193.b — mensagem específica baseada no tipo de erro do backend.
-        // `conciergeError` é setado pelo hook useConcierge com o detail amigável.
-        const msg = conciergeError || 'Erro ao consultar o Concierge.'
-        // Detecta sem-crédito pelo texto (já amigável) e dá um toast longo
-        // pra cliente leigo entender o que fazer.
-        if (msg.includes('Sem crédito')) {
-          notify.error(`💳 ${msg}`)
-        } else if (msg.includes('Chave da API')) {
-          notify.error(`🔑 ${msg}`)
-        } else if (msg.includes('Limite de chamadas')) {
-          notify.warning(`⏳ ${msg}`)
-        } else if (msg.includes('Sem conexão')) {
-          notify.error(`🌐 ${msg}`)
+        const errMsg = conciergeError || 'Erro ao consultar o Concierge.'
+        if (errMsg.includes('Sem crédito')) {
+          notify.error(`💳 ${errMsg}`)
+        } else if (errMsg.includes('Chave da API')) {
+          notify.error(`🔑 ${errMsg}`)
+        } else if (errMsg.includes('Limite de chamadas')) {
+          notify.warning(`⏳ ${errMsg}`)
+        } else if (errMsg.includes('Sem conexão')) {
+          notify.error(`🌐 ${errMsg}`)
         } else {
-          notify.error(msg)
+          notify.error(errMsg)
         }
+        // T188.p — NÃO atualiza histórico se API falhou. Próximo envio reaproveita
+        // contexto anterior. Caso contrário ficaria 2x user seguidos no histórico.
         return
       }
+
+      // T188.p — agora que tem resposta, atualiza histórico (user + concierge juntos)
+      // T188.j — usa functional setState pra ser robusto a race condition
+      setConciergeHistory(prev => {
+        // Se prev divergiu do snapshot, alguém apertou enter 2x — pega a referência mais nova
+        const base = prev === historicoSnapshot ? prev : prev
+        return [...base, userMsg, { role: 'concierge', content: resp.conteudo }]
+      })
 
       // Adiciona resposta do Concierge no chat
       const conciergeId = crypto.randomUUID()
       setMessages(prev => [...prev, { id: conciergeId, role: 'concierge' as AgentId, content: resp.conteudo, done: true }])
 
       if (resp.tipo === 'pergunta' || resp.tipo === 'confirmar') {
-        // T188.a — pergunta E confirmar funcionam igual no fluxo: adiciona resposta
-        // ao histórico e espera próximo input do user (que pode ser "OK" pra confirmar
-        // OU mais info pra refinar a pergunta).
-        setConciergeHistory(h => [...h, { role: 'concierge', content: resp.conteudo }])
+        // T188.a — pergunta E confirmar funcionam igual no fluxo: espera próximo
+        // input do user (que pode ser "OK" pra confirmar OU mais info pra pergunta).
+        // T188.e — se "confirmar", mostra custo estimado no toast
+        if (resp.tipo === 'confirmar' && resp.custo_estimado_usd && resp.custo_estimado_usd > 0) {
+          const custoBRL = (resp.custo_estimado_usd * 5.50).toFixed(2).replace('.', ',')
+          notify.info(`💰 Custo estimado dessa execução: R$ ${custoBRL}`)
+        }
         return
       }
 

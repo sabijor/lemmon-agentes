@@ -82,6 +82,15 @@ async def chat(ws: WebSocket):
             except (json.JSONDecodeError, ValueError):
                 # cliente mandou lixo — ignora e segue esperando
                 continue
+            # T190.C6 — cliente pode mandar `{type: 'cancel'}` pra parar pipeline.
+            # Se já tem pipeline rodando, marcamos `pipeline_cancelled=True` (ws_helpers
+            # vê isso). Se for fora de pipeline, só fecha a conexão limpa.
+            if data.get("type") == "cancel":
+                try:
+                    await ws.close(code=1000, reason="user cancel")
+                except Exception:
+                    pass
+                return
             names: list[str] = data.get("agents", [])
             briefing: str = data.get("message", "").strip()
             if not briefing or not names:

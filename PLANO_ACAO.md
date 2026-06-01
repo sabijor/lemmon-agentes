@@ -1,177 +1,182 @@
 # Plano de Ação Lemmon Agentes
 
-**Última atualização:** 2026-06-01 (pós-update v2 entregue ao Pedro)
-**Histórico completo:** ver `PLANO_ACAO_HISTORICO.md` (4.4k linhas, T1-T193 fechados)
+**Última atualização:** 2026-06-01 (sprint final pré-QA fechado)
+**Histórico completo:** `PLANO_ACAO_HISTORICO.md` (T1-T193 fechados)
 
 ---
 
-## 🎯 Estado atual do sistema
+## 🎯 Estado atual
 
-✅ **No ar** (commit `0b6239e` na `main` do GitHub):
+✅ **No ar** (`main` no GitHub):
 - 12 agentes especialistas + Concierge orquestrador conversacional
 - Layout pixel-art único (SVG removido)
-- Concierge pede confirmação antes de mobilizar time (T188.a)
+- Concierge com tipo `confirmar` antes de mobilizar time
 - Erros Anthropic traduzidos (sem crédito / chave inválida / rate limit / offline)
 - Cap automático de custo $0.50/sessão (ceiling $5)
 - Custos em R$ pra brasileiro
 - CORS restrito, path traversal bloqueado, imagem ≤ 5MB, WS timeout 5min
 - 3 modos de export (enxuto / completo / personalizar)
 - Banner ETA durante pipeline
+- Rate limit 60/min por IP
+- ThreadPool dedicado 10 workers
+- Endpoint `/health/anthropic` valida credencial sem custo
+- Custo estimado por sessão exibido em "confirmar"
+- Histórico Concierge persiste em refresh
+- Anti prompt injection
+- Hard-enforce limite 4 rodadas
 
-📦 **Última entrega:**
-- ZIP: `~/Desktop/lemmon-update-2026-06-01-v2.zip` (192KB, 15 arquivos modificados)
-- Pedro tem instalação + script `atualizar.sh` com auto-detect
+🚫 **NÃO entregar atualização pro Pedro até completar QA interno.**
 
 ---
 
-## 🧪 ROTEIRO DE TESTES — pré-validação pré-envio Pedro
+## 🧪 ROTEIRO QA INTERNO — pre-aprovação
 
-### Setup
+### Preparação
 ```bash
-# 1. Aplicar o patch (na sua máquina) num clone limpo OU
-#    rodar o sistema atual depois de pull/restart:
 cd ~/Documents/lemmon-agentes
-git pull   # se quiser refletir GitHub
-# Reinicia backend + frontend pelos scripts/atalho habitual
+git pull origin main
+# Reinicia backend + frontend pelos scripts
 ```
 
-### T-A. Fluxo Concierge — caminho feliz Hator (CRÍTICO)
-- [ ] **A1** Abrir sistema novo (limpa localStorage: `localStorage.clear()` no console)
-- [ ] **A2** Modal de boas-vindas mostra exemplo "menopausa" (não café)
-- [ ] **A3** Header limpo no 1º acesso (sem 🏆 🔍 ✂️ 🎯 SVG/PIX, sem ComplianceToggle)
-- [ ] **A4** Empty state do chat tem 3 exemplos clicáveis Hator
-- [ ] **A5** Clicar em exemplo "menopausa" → texto preenche o input
-- [ ] **A6** Enviar → Concierge responde em ~3s
-- [ ] **A7** Concierge faz pergunta (não dispara pipeline direto)
-- [ ] **A8** Responder pergunta → próxima rodada
-- [ ] **A9** Concierge eventualmente responde tipo `confirmar` propondo time + razões
-- [ ] **A10** Responder "ok pode rodar" → pipeline dispara
-- [ ] **A11** Pedro (espelho IA) está no time se mencionou menopausa/Hator
-- [ ] **A12** Banner ETA aparece "Restam ~X min"
-- [ ] **A13** Pipeline termina → toast verde "Dossiê pronto" com 3 botões + share
-- [ ] **A14** Custos visíveis em R$ (não USD)
-
-### T-B. Concierge regras rígidas (T188.b/c/d)
-- [ ] **B1** Briefing "quero atrair pacientes pra consulta de menopausa" → Concierge inclui `pedro_abrahao`
-- [ ] **B2** Briefing "quero roteiros pro Instagram" (só roteiros) → inclui `carlos`, NÃO `salles`
-- [ ] **B3** Briefing "vamos gravar entrevista com o médico" → inclui `salles` (produção real)
-- [ ] **B4** Briefing simples não vira time inteiro — Concierge propõe 2-4 agentes, não 8
-
-### T-C. Erros Anthropic amigáveis (T193)
-- [ ] **C1** Sem crédito (testar com chave de conta vazia OU mock): mensagem "💳 Sem crédito... console.anthropic.com → Billing"
-- [ ] **C2** Chave errada no .env (renomear ANTHROPIC_API_KEY): mensagem "🔑 Chave da API inválida ou ausente"
-- [ ] **C3** Backend desligado: mensagem "Conexão com servidor perdida. Avise suporte da Lemmon" (sem mencionar Terminal)
-
-### T-D. Custos e segurança
-- [ ] **D1** Cap atinge: modal aparece com botões "Autorizar +R$ 2,75" / "+R$ 11,00" / "Parar aqui"
-- [ ] **D2** Tentar imagem >5MB: warning "Imagem muito grande, pipeline segue sem contexto visual"
-- [ ] **D3** Tentar acessar `/download/../../../etc/passwd`: 400 "session_id contém caracteres não permitidos"
-- [ ] **D4** Custo total da sessão fica ~R$ 2-3 (não R$ 8+)
-
-### T-E. Export do dossiê (3 modos)
-- [ ] **E1** Toast "Dossiê pronto" aparece após Aya terminar
-- [ ] **E2** Clicar "✂️ Só demandas (enxuto)" → baixa PDF só com Carlos + Renata
-- [ ] **E3** Clicar "📋 Completo" → baixa PDF da Aya completa
-- [ ] **E4** Clicar "⚙️ Personalizar" → fecha toast + aparece ExportMenu abaixo no chat
-- [ ] **E5** Selecionar 2-3 checkboxes específicos no ExportMenu → baixa PDF combinado
-- [ ] **E6** PDF combinado tem seções nomeadas certas (Carlos = Roteiros publicitários, Salles = Roteiros documentais, etc)
-
-### T-F. UX leigo
-- [ ] **F1** Banner ETA aparece e atualiza durante o pipeline
-- [ ] **F2** Microfone — negar permissão: toast "🎤 Microfone bloqueado... habilite no ícone do cadeado"
-- [ ] **F3** Microfone — sem mic conectado: toast "🎤 Não achei o microfone"
-- [ ] **F4** Empty state Auto: 14px legível com 3 exemplos clicáveis
-- [ ] **F5** NPC do escritório: hover no Pedro mostra "Pedro (espelho IA) — Validador médico"
-
-### T-G. Robustez WS
-- [ ] **G1** Iniciar pipeline → trocar de aba (visibility hidden) → voltar → reconcilia
-- [ ] **G2** Cmd+Tab pra outro app → voltar (window blur/focus) → reconcilia
-- [ ] **G3** Wi-Fi off → on durante pipeline (online event) → reconcilia
-- [ ] **G4** Aplicar duplo-clique no botão de enviar → só dispara 1 fluxo
-
-### T-H. localStorage versionado (T190.C2)
-- [ ] **H1** No console: `localStorage.setItem('lemmon-auto-mode', '"valor invalido"')` → reload → não crasha (volta pro default)
-- [ ] **H2** Dado novo gravado tem formato `{__v: 1, data: ...}`
-
----
-
-## ⏳ Pendências (após Pedro validar essa rodada)
-
-### 🔴 Concierge — refactor arquitetural
-| ID | Item | Esforço |
+### Bloco 1 — Concierge caminho feliz Hator
+| # | Cenário | Esperado |
 |---|---|---|
-| **T189.a-e** | Mover Concierge pra `agentes/concierge.py` herdando AgenteBase. Prompt vai pra `prompts/concierge_system_v1.md`. Endpoint vira thin wrapper. Aparece em `/agentes/catalogo` com flag `meta:bool`. | ~3h |
+| 1.1 | Limpar localStorage (`localStorage.clear()`) e reabrir | Modal "menopausa" + header limpo (sem 🏆 🔍 ✂️ 🎯 + sem ComplianceToggle) |
+| 1.2 | Empty state mostra 3 exemplos clicáveis Hator | Sim |
+| 1.3 | Clicar exemplo "menopausa" | Texto preenche input |
+| 1.4 | Input com highlight pulsante verde nos primeiros 5s | Sim |
+| 1.5 | Enviar briefing simples | Concierge responde em ~3s com pergunta |
+| 1.6 | Responder pergunta 1x | Concierge eventualmente responde tipo `confirmar` |
+| 1.7 | Mensagem de "confirmar" lista agentes + razões | Sim |
+| 1.8 | Toast info aparece com "💰 Custo estimado: R$ X,XX" | Sim |
+| 1.9 | Briefing menciona "menopausa/Hator/Pedro" | `pedro_abrahao` aparece no time |
+| 1.10 | Responder "ok pode rodar" | Pipeline dispara |
+| 1.11 | Banner verde ETA aparece | "Restam ~X min — não feche a aba" |
+| 1.12 | MacroBar mostra cargo abaixo do nome | Sim ("Estratég.", "Roteiri.", etc) |
+| 1.13 | Pipeline termina | Toast verde "🎉 Dossiê pronto!" com 3 botões + share |
+| 1.14 | Custos em R$ no chip | Sim, formato "R$ 2,75 / R$ 2,75" |
 
-### 🟠 Concierge — polish 12 itens
+### Bloco 2 — Concierge regras rígidas
+| # | Cenário | Esperado |
+|---|---|---|
+| 2.1 | Briefing "roteiros pro Instagram" | Inclui `carlos`, NÃO `salles` |
+| 2.2 | Briefing "vamos gravar entrevista AO VIVO com médico" | Inclui `salles` (produção real) |
+| 2.3 | Briefing "calendário editorial pro mês" | `renata` + `aya` apenas (2 agentes) |
+| 2.4 | Briefing genérico simples | Concierge não convoca 6+ agentes (default conservador) |
+| 2.5 | Briefing puro Hator | `pedro_abrahao` obrigatoriamente |
+| 2.6 | Continuar conversando 5x sem chegar a "confirmar" | 5ª resposta força `confirmar` (T188.m) |
+
+### Bloco 3 — Erros Anthropic amigáveis
+| # | Cenário | Esperado |
+|---|---|---|
+| 3.1 | Sem crédito na conta Anthropic | Toast "💳 Sem crédito... console.anthropic.com → Billing" |
+| 3.2 | Chave inválida no `.env` | Toast "🔑 Chave da API inválida ou ausente" |
+| 3.3 | Backend desligado | Toast "Conexão com servidor perdida" (sem mencionar Terminal) |
+| 3.4 | Sem internet | Toast "🌐 Sem conexão com a API Anthropic" |
+| 3.5 | Rate limit Anthropic atingido | Toast "⏳ Limite de chamadas atingido" |
+| 3.6 | `GET /health/anthropic` | `{"status":"ok"}` se OK; `{"kind":"sem_credito",...}` se sem crédito |
+
+### Bloco 4 — Custos e segurança
+| # | Cenário | Esperado |
+|---|---|---|
+| 4.1 | Não enviar custoCap pro WS | Backend usa default $0.50 (cap forçado server) |
+| 4.2 | Tentar custoCap=999 | Backend limita a $5 (ceiling) |
+| 4.3 | Anexar imagem > 5MB | Warning "Imagem muito grande" + pipeline segue sem visão |
+| 4.4 | Tentar GET `/download/../../etc/passwd` | 400 "session_id inválido" |
+| 4.5 | Briefing com PII (CPF, nome) | Logs não vazam dados sensíveis (verificar) |
+| 4.6 | Briefing 6MB no WS | Backend desconecta com 1009 + msg amigável |
+| 4.7 | Briefing com "ignore instructions" | Concierge NÃO revela system prompt |
+| 4.8 | Cap atinge | Modal "R$ 2,75 / R$ 2,75" + botões "Autorizar +R$ X" / "Parar aqui" |
+| 4.9 | 60+ requests/min do mesmo IP | 429 "Limite de chamadas atingido" |
+
+### Bloco 5 — Export do dossiê
+| # | Cenário | Esperado |
+|---|---|---|
+| 5.1 | Toast "Dossiê pronto" aparece | Sim, persistente (não auto-dismiss) |
+| 5.2 | Clicar "✂️ Só demandas (enxuto)" | Baixa PDF só com Carlos/Salles + Renata |
+| 5.3 | Clicar "📋 Completo" | Baixa PDF da Aya completa |
+| 5.4 | Clicar "⚙️ Personalizar" + 3 checkboxes | Baixa PDF combinado das seções escolhidas |
+| 5.5 | PDF tem seções nomeadas certas | "Roteiros (Carlos)", "Roteiros (Salles)", "Análise financeira (CFO)" etc |
+| 5.6 | Sessão Hator admin (ana_maria) | PDF exporta com label "Análise financeira (CFO)" |
+
+### Bloco 6 — UX leigo
+| # | Cenário | Esperado |
+|---|---|---|
+| 6.1 | Banner ETA durante pipeline | Aparece e atualiza em tempo real |
+| 6.2 | Microfone — negar permissão browser | Toast "🎤 Microfone bloqueado... cadeado" |
+| 6.3 | Microfone — sem mic conectado | Toast "🎤 Não achei o microfone" |
+| 6.4 | Empty state Auto | 14px legível + 3 exemplos clicáveis |
+| 6.5 | Hover NPC Pedro no escritório | Tooltip "Pedro (espelho IA) — Validador médico" |
+| 6.6 | Input do chat no 1º acesso | Highlight pulsante verde 5s |
+
+### Bloco 7 — Robustez frontend
+| # | Cenário | Esperado |
+|---|---|---|
+| 7.1 | Trocar de aba durante pipeline → voltar | Reconcilia via histórico |
+| 7.2 | Cmd+Tab → voltar | Reconcilia (window.focus) |
+| 7.3 | Wi-Fi off → on | Reconcilia (online event) |
+| 7.4 | Duplo-clique no botão enviar | Só dispara 1 fluxo (submittingRef) |
+| 7.5 | Clicar Abort durante pipeline | Backend para imediatamente (WS cancel) |
+| 7.6 | Refresh durante "confirmar" | Histórico Concierge persiste (vê na próxima abertura) |
+| 7.7 | F5 com sessão rodando | Estado parcial preservado + reconciliação dispara |
+| 7.8 | Enviar 5 mensagens rápido (race condition) | Histórico fica balanceado, sem duplicação |
+
+### Bloco 8 — localStorage versionado
+| # | Cenário | Esperado |
+|---|---|---|
+| 8.1 | `localStorage.setItem('lemmon-auto-mode', 'invalido')` + reload | Não crasha, volta pro default |
+| 8.2 | Dado novo gravado | Formato `{__v: 1, data: ...}` |
+| 8.3 | Bump schemaVersion num hook | Reset limpo + console.info |
+
+### Bloco 9 — Backend escalabilidade
+| # | Cenário | Esperado |
+|---|---|---|
+| 9.1 | 5 abas rodando pipeline simultâneo | Backend não trava `/health` (executor dedicado) |
+| 9.2 | `GET /health/anthropic` durante pipeline | Responde rápido (não bloqueia) |
+| 9.3 | Modelo Anthropic override via env | `LEMMON_MODELO_CONCIERGE=claude-sonnet-4-5` funciona |
+| 9.4 | sanity_check falha no startup | Backend sobe mesmo assim com log warning |
+
+---
+
+## ⏳ Pendências (não bloqueiam Pedro)
+
+### Refactor arquitetural — pode ficar pra próxima rodada
 | ID | Item |
 |---|---|
-| **T188.e** | Mostrar custo estimado antes de rodar (somar `custo_medio_usd` dos escolhidos) |
+| **T189.a-e** | Mover Concierge pra `agentes/concierge.py` herdando AgenteBase. Decisão: deixar como está enquanto está estável. Refactor não muda comportamento, apenas organização |
+
+### Features novas (não bugs)
+| ID | Item |
+|---|---|
 | **T188.f** | Concierge consulta `/historico/similar` ao receber briefing |
-| **T188.g** | Execução parcial — pipeline em etapas `[[carlos], [sonia, heitor], [aya]]` |
-| **T188.h** | Feedback loop pós-pipeline — Concierge volta com "Ficou bom? Iterar ou arquivar?" |
-| **T188.i** | Histórico Concierge persiste em refresh (`useLocalStorage('lemmon-concierge-history')`) |
-| **T188.j** | Race condition em envios rápidos — disable do input enquanto loading |
-| **T188.k** | Imagem sem texto = bolha vazia no chat (mostrar "📷 imagem anexada") |
-| **T188.m** | Hard-enforce limite de 4 rodadas no backend (não confiar só no modelo) |
-| **T188.n** | Concierge ignorado em modo Reunião → mostrar visual claro "Concierge OFF" |
-| **T188.o** | Prompt injection — detectar "ignore instructions" / sanitização básica |
-| **T188.p** | Histórico desbalanceado se API falha — gravar user msg só após resposta confirmada |
-| **T190.A15** | Concierge propõe defaults inteligentes (linkado T188.d, parcialmente ok) |
+| **T188.g** | Execução parcial — pipeline em etapas |
+| **T188.h** | Feedback loop pós-pipeline ("ficou bom? iterar?") |
+| **T190.B12** | Calibragem Pedro proativa na 1ª sessão Hator |
 
-### 🟠 UX leigo polish
+### Polish opcional
 | ID | Item |
 |---|---|
-| **T190.B5** | Painel resizável com grip-dots visíveis ou desativar resize no Auto |
-| **T190.B6** | Responsividade iPad/mobile — stack vertical < 768px |
-| **T190.B8** | Highlight pulsante no input do chat nos primeiros 5s |
-| **T190.B10** | Mostrar cargo abaixo do nome do agente durante pipeline (já tem em agents.ts, só usar) |
-| **T190.B12** | Calibragem Pedro nunca proposta — Concierge na 1ª sessão Hator: "quer subir vídeos do médico pra calibrar?" |
-
-### 🟡 Estado frontend
-| ID | Item |
-|---|---|
-| **T190.C3** | Concierge history dessincroniza do chat em append duplo |
-| **T190.C4** | messages persistido cresce sem cap — debounce setItem 200ms OU só persistir done=true |
-| **T190.C5** | send callback closure stale — fastTrack/sandbox/custoCap faltam nas deps |
-| **T190.C6** | abort fecha WS mas backend continua queimando custo |
-| **T190.C8** | Multi-tab sobrescreve sessão — BroadcastChannel ou storage listener |
-| **T190.C9** | Pipeline continua após desconexão WS — detectar disconnect antes de chamadas custosas |
-| **T190.C10** | Race agent_done vs fetch /sessoes/medianas (memory leak interval) |
-| **T190.C11** | useReuniao histRef cresce ilimitado |
-| **T190.C12** | pipeline_done sem session_id deixa órfão — log warn + notify |
-| **T190.C13** | reset não cancela polling reconexão |
-
-### 🟢 Backend polish
-| ID | Item |
-|---|---|
-| **T190.D1** | run_in_executor esgota threadpool 40 — ThreadPoolExecutor dedicado max_workers=10 |
-| **T190.D2** | Sem prompt caching — perda ~40% custo input (cache_control: ephemeral no system) |
-| **T190.D3** | briefing[:60] vaza PII no path — sanitizar ou usar UUID |
-| **T190.D5** | Sem rate limit endpoint — slowapi ou middleware IP-based |
-| **T190.D6** | Logs podem vazar PII paciente — redactar antes de logar |
-| **T190.D7** | Modelo Anthropic hardcoded em concierge — usar resolver_modelo() padrão |
-| **T190.D8** | Sem /health/anthropic — ping leve pra confirmar API responde |
-| **T190.D9** | TS: erros silenciosos com `any` em useChat — tipar progressivamente |
-
-### 🟡 PixelOfficeScene polish (opcional)
-| ID | Item |
-|---|---|
-| **T185.3f** | Modo reunião: agentes andam pro MEET_CHAR_POS_2D central |
-| **T185.3g** | Pan + zoom 2D (wheel/drag/reset) |
+| **T188.n** | Aviso visual "Concierge OFF" em modo Expert/Reunião |
+| **T190.B5** | Painel resizable com handles visíveis |
+| **T190.B6** | Responsividade iPad/mobile < 768px |
+| **T190.C8** | Multi-tab sobrescreve sessão (BroadcastChannel) |
+| **T190.C10/11** | Memory leaks sutis em refs |
+| **T190.D2** | Prompt caching Anthropic (~40% economia input) |
+| **T190.D9** | Tipar `any` em useChat progressivamente |
+| **T185.3f/g** | PixelOfficeScene: modo reunião + pan/zoom |
 
 ---
 
-## 📋 Protocolo de execução (firmado 2026-05-29)
+## 📋 Protocolo de execução
 
-1. **ANTES de executar** → registrar tarefa neste arquivo com status `⏳ em andamento`
-2. **DEPOIS de executar** → atualizar pra `✅ concluído` com Observações reais (não planejadas)
-3. Se falhar/abandonar → `❌ abandonada` + motivo
-4. Subtarefas (`T{N}.{letra}`) também entram aqui
-5. Este arquivo é o **source of truth** — TaskCreate interno é só navegação
+1. **ANTES de executar** → registrar como `⏳ em andamento`
+2. **DEPOIS de executar** → atualizar pra `✅ concluído` com observações reais
+3. Subtarefas `T{N}.{letra}` também entram aqui
+4. Este arquivo é source of truth — TaskCreate é navegação
 
 ---
 
-## 📐 Referência rápida — agentes ativos
+## 📐 Referência dos 13 agentes
 
 | ID | Nome | Papel | Categoria |
 |---|---|---|---|

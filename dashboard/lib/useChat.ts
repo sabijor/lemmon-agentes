@@ -74,7 +74,23 @@ export function useChat() {
   // (b) reload acidental, (c) qualquer bug futuro que zere o React state.
   // Pipeline em execução (isRunning + agentStatus transitório) NÃO persiste — o WS
   // cai ao mudar/recarregar e não dá pra retomar.
-  const [messages, setMessages] = useLocalStorage<Message[]>('lemmon-last-messages', [])
+  // T190.C4 — em vez de persistir A CADA TOKEN streamado (centenas/seg), mantemos
+  // messages em state normal e gravamos em localStorage só quando pipeline termina
+  // (em done=true). Antes: localStorage.setItem 500x por segundo durante streaming.
+  const [persistedMessages, setPersistedMessages] = useLocalStorage<Message[]>('lemmon-last-messages', [])
+  const [messages, setMessages] = useState<Message[]>(persistedMessages)
+  // Sincroniza state ↔ localStorage só em momentos "stables":
+  // (1) ao montar (já feito acima via useState com initial value)
+  // (2) quando alguma msg vira done=true (final de cada agente)
+  // (3) quando array fica vazio (reset)
+  const lastPersistedCount = useRef(persistedMessages.length)
+  useEffect(() => {
+    const allDone = messages.length === 0 || messages.every(m => m.done)
+    if (allDone && messages.length !== lastPersistedCount.current) {
+      setPersistedMessages(messages)
+      lastPersistedCount.current = messages.length
+    }
+  }, [messages, setPersistedMessages])
   const [agentStatus, setAgentStatus] = useState<Record<AgentId, AgentStatus>>({
     otto: 'idle', heitor: 'idle', salles: 'idle', carlos: 'idle', sonia: 'idle', aya: 'idle', pedro_abrahao: 'idle', renata: 'idle',
     ana_maria: 'idle', prichina: 'idle', caito: 'idle', kelly: 'idle', concierge: 'idle',
@@ -431,8 +447,18 @@ export function useChat() {
       if (data.type === 'pipeline_done') {
         setIsRunning(false)
         setAwaitingApproval(null)
-        if (data.session_id) setSessionId(data.session_id)
+        if (data.session_id) {
+          setSessionId(data.session_id)
+        } else {
+          // T190.C12 — pipeline_done sem session_id deixa sessão órfã (não dá pra
+          // favoritar ou exportar). Loga warn pra rastrear OU mostrar aviso.
+          // eslint-disable-next-line no-console
+          console.warn('[useChat] pipeline_done sem session_id — favoritar/exportar não vão funcionar')
+          notify.warning('Pipeline terminou mas não foi salvo no histórico. Recarregue e tente novamente.')
+        }
         setResumedFrom(null)
+        // T190.C13 — limpar sessionStartTimeRef pra parar polling de reconciliação
+        sessionStartTimeRef.current = null
         ws.close()
       }
     }
@@ -460,7 +486,10 @@ export function useChat() {
       activeAgentsRef.current.clear()
       timedOutAgentsRef.current.clear()
     }
-  }, [isRunning, manualMode, agentConfig])
+    // T190.C5 — adiciona deps que estavam faltando (fastTrack, sandbox, custoCap).
+    // Antes podia capturar valor stale: usuário ligava sandbox mas o send mantinha
+    // o snapshot anterior, mandando dados de outro mundo pro backend.
+  }, [isRunning, manualMode, agentConfig, fastTrack, sandbox, custoCap])
 
   const approve = useCallback((action: 'approve' | 'retry' | 'skip' | 'cancel' | 'confirmar_sim' | 'confirmar_nao') => {
     wsRef.current?.send(JSON.stringify({ type: action }))
@@ -513,7 +542,25 @@ export function useChat() {
   }, [])
 
   const abort = useCallback(() => {
-    wsRef.current?.close()
+    // T190.C6 — antes só fazia ws.close() unilateral. Backend continuava processando
+    // (queimando custo Anthropic) até terminar sozinho. Agora envia 'cancel' antes
+    // pra backend parar imediatamente.
+    const ws = wsRef.current
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      try {
+        ws.send(JSON.stringify({ type: 'cancel' }))
+      } catch {
+        /* envio pode falhar se WS ja' está degradado, fechar mesmo assim */
+      }
+      // Aguarda 300ms pra backend processar o cancel antes de fechar
+      setTimeout(() => {
+        try { ws.close(1000, 'user abort') } catch {}
+      }, 300)
+    } else {
+      try { ws?.close() } catch {}
+    }
+    // T190.C13 — também cancela o polling de reconciliação se estiver ativo
+    sessionStartTimeRef.current = null
     setIsRunning(false)
     setAwaitingApproval(null)
     Object.values(progressIntervalsRef.current).forEach(clearInterval)

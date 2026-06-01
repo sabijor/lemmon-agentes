@@ -130,6 +130,18 @@ export default function ChatPanel({
   const [sugestaoError, setSugestaoError] = useState('')
   const [dossiePronto, setDossiePronto] = useState(false)
   const prevIsRunningRef = useRef(false)
+  // T190.B8 — highlight pulsante no input nos primeiros 5s pra chamar atenção.
+  // Só dispara em sessão limpa (sem mensagens) e em modo pipeline auto.
+  const [shouldHighlightInput, setShouldHighlightInput] = useState(false)
+  useEffect(() => {
+    if (mode === 'pipeline' && activeMessages.length === 0 && !isRunning) {
+      setShouldHighlightInput(true)
+      const t = setTimeout(() => setShouldHighlightInput(false), 5000)
+      return () => clearTimeout(t)
+    }
+    setShouldHighlightInput(false)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, activeMessages.length === 0, isRunning])
 
   useEffect(() => { setTagsAceitas(tagsSugeridas) }, [tagsSugeridas])
   useEffect(() => { if (!loopStatus) setLoopCustoDismissed(false) }, [loopStatus])
@@ -1545,7 +1557,7 @@ export default function ChatPanel({
                   }}
                   placeholder={
                     isRecording ? 'Ouvindo... fale seu briefing'
-                    : activeIsRunning && mode === 'pipeline' ? 'Aguarde o pipeline terminar...'
+                    : activeIsRunning && mode === 'pipeline' ? 'Aguarde o time terminar...'
                     : mode === 'reuniao' ? `Escreva... @${meetingAgents.map(a => a.name.toLowerCase()).join(', @')} para mencionar`
                     : 'Descreva o projeto... (↵ envia · ⇧↵ nova linha)'
                   }
@@ -1554,7 +1566,8 @@ export default function ChatPanel({
                     px-4 py-3 pl-20 pr-24 text-sm font-mono text-stone-800 dark:text-stone-100
                     placeholder:text-stone-400 dark:placeholder:text-stone-500
                     focus:outline-none transition-all duration-200 leading-relaxed
-                    ${isRecording ? 'border-red-300 focus:border-red-400' : 'border-stone-200 dark:border-stone-700 focus:border-stone-400 dark:focus:border-stone-500'}`}
+                    ${isRecording ? 'border-red-300 focus:border-red-400' : 'border-stone-200 dark:border-stone-700 focus:border-stone-400 dark:focus:border-stone-500'}
+                    ${shouldHighlightInput ? 'ring-2 ring-emerald-400/50 ring-offset-2 ring-offset-white dark:ring-offset-stone-900 animate-pulse' : ''}`}
                 />
                 {/* Clipe (imagem) — T180 dark */}
                 <button type="button" onClick={() => fileInputRef.current?.click()} disabled={isRunning}

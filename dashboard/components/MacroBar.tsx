@@ -36,10 +36,14 @@ export function MacroBar({ activeAgentIds, agentStatus, agentProgress, isVisible
             const isActive = status === 'thinking' || status === 'speaking'
 
             return (
-              <div key={id} className="flex flex-col items-center gap-0.5 min-w-[36px]">
+              <div key={id} className="flex flex-col items-center gap-0.5 min-w-[44px]" title={agent.title}>
                 <span className="text-[8px] font-mono font-bold uppercase tracking-widest"
                   style={{ color: agent.color }}>
                   {agent.name}
+                </span>
+                {/* T190.B10 — cargo abaixo do nome pra cliente saber o que cada um faz */}
+                <span className="text-[7px] font-mono text-stone-500 dark:text-stone-400 leading-tight truncate max-w-[60px]">
+                  {agent.title}
                 </span>
                 <span className={`text-[10px] transition-colors ${
                   status === 'done' ? 'text-green-500' :

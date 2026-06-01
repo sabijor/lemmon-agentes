@@ -1,6 +1,7 @@
 """Dependências compartilhadas entre rotas e websockets do Lemmon API."""
 import logging
 import re
+from concurrent.futures import ThreadPoolExecutor
 
 import anthropic as _anthropic
 from anthropic import APIConnectionError, APIError, AuthenticationError, RateLimitError
@@ -26,6 +27,14 @@ from core.config import (
 
 _log = logging.getLogger("lemmon.api")
 _anthropic_client = _anthropic.Anthropic()
+
+# T190.D1 — ThreadPoolExecutor dedicado pra chamadas Anthropic blocking.
+# Antes: `loop.run_in_executor(None, ...)` usava o default executor do asyncio
+# (~40 threads). Com 5 abas abertas rodando pipelines em paralelo, esgotava
+# o pool e até `/health` ficava bloqueado.
+# Agora: pool dedicado limitado, separado do executor genérico do asyncio.
+# 10 workers = 10 chamadas Anthropic simultâneas no máximo. Resto fica em fila.
+LEMMON_EXECUTOR = ThreadPoolExecutor(max_workers=10, thread_name_prefix="lemmon-llm")
 
 SHARES_DIR = HISTORICO_DIR.parent / "shares"
 SHARES_DIR.mkdir(exist_ok=True)

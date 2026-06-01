@@ -29,6 +29,8 @@ export interface ConciergeResposta {
   agentes_sugeridos: string[]
   razoes_agentes: Record<string, string>
   ferramentas_extras: string[]
+  // T188.e — custo estimado em USD (soma custo_medio_usd dos sugeridos)
+  custo_estimado_usd?: number
 }
 
 export function useConcierge() {
