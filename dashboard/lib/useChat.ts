@@ -49,6 +49,7 @@ export interface ProgressMeta {
 const FALLBACK_MEDIANAS: Record<AgentId, number> = {
   otto: 20, heitor: 40, salles: 30, carlos: 25, sonia: 30, aya: 15, pedro_abrahao: 25, renata: 30,
   ana_maria: 20, prichina: 20, caito: 25, kelly: 22,
+  concierge: 8,  // T186 — Haiku rápido pra orquestrar
 }
 
 export interface AgentConfig {
@@ -76,7 +77,7 @@ export function useChat() {
   const [messages, setMessages] = useLocalStorage<Message[]>('lemmon-last-messages', [])
   const [agentStatus, setAgentStatus] = useState<Record<AgentId, AgentStatus>>({
     otto: 'idle', heitor: 'idle', salles: 'idle', carlos: 'idle', sonia: 'idle', aya: 'idle', pedro_abrahao: 'idle', renata: 'idle',
-    ana_maria: 'idle', prichina: 'idle', caito: 'idle', kelly: 'idle',
+    ana_maria: 'idle', prichina: 'idle', caito: 'idle', kelly: 'idle', concierge: 'idle',
   })
   const [isRunning, setIsRunning] = useState(false)
   const [sessionId, setSessionId] = useLocalStorage<string | null>('lemmon-last-session-id', null)
@@ -194,7 +195,7 @@ export function useChat() {
     setFavoritado(detail.favorito ?? false)
     setIsRunning(false)
     setAwaitingApproval(null)
-    setAgentStatus({ otto: 'idle', heitor: 'idle', salles: 'idle', carlos: 'idle', sonia: 'idle', aya: 'idle', pedro_abrahao: 'idle', renata: 'idle', ana_maria: 'idle', prichina: 'idle', caito: 'idle', kelly: 'idle' })
+    setAgentStatus({ otto: 'idle', heitor: 'idle', salles: 'idle', carlos: 'idle', sonia: 'idle', aya: 'idle', pedro_abrahao: 'idle', renata: 'idle', ana_maria: 'idle', prichina: 'idle', caito: 'idle', kelly: 'idle', concierge: 'idle' })
     setResumedFrom(detail.session_id)
     currentMsgId.current = {}
     resumeContextRef.current = (detail as HistoryDetail & { contexto_tecnico?: Record<string, unknown> }).contexto_tecnico ?? {
@@ -246,7 +247,18 @@ export function useChat() {
     }))
 
     ws.onmessage = (ev) => {
-      const data = JSON.parse(ev.data)
+      // T190.C7 — try/catch ao redor de JSON.parse. Um ping malformado vindo do
+      // backend, um keep-alive em texto puro ou um proxy que injete bytes podem
+      // crashar este listener silenciosamente. Com isso, a barra de progresso
+      // trava em 95% sem nada acontecer (Pedro pensa que o sistema travou).
+      let data: any
+      try {
+        data = JSON.parse(ev.data)
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.warn('[useChat] WS message não-JSON ignorado:', ev.data, err)
+        return
+      }
 
       if (data.type === 'agent_start') {
         const msgId = crypto.randomUUID()
@@ -510,7 +522,7 @@ export function useChat() {
   const reset = useCallback(() => {
     wsRef.current?.close()
     setMessages([])
-    setAgentStatus({ otto: 'idle', heitor: 'idle', salles: 'idle', carlos: 'idle', sonia: 'idle', aya: 'idle', pedro_abrahao: 'idle', renata: 'idle', ana_maria: 'idle', prichina: 'idle', caito: 'idle', kelly: 'idle' })
+    setAgentStatus({ otto: 'idle', heitor: 'idle', salles: 'idle', carlos: 'idle', sonia: 'idle', aya: 'idle', pedro_abrahao: 'idle', renata: 'idle', ana_maria: 'idle', prichina: 'idle', caito: 'idle', kelly: 'idle', concierge: 'idle' })
     setIsRunning(false)
     setSessionId(null)
     setFavoritado(false)
@@ -538,5 +550,7 @@ export function useChat() {
     send, approve, abort, toggleManualMode, toggleFastTrack, toggleSandbox,
     setCustoCap, autorizarCusto, recusarCustoExtra,
     updateConfig, favoritar, exportar, reset, loadSession,
+    // T186 — Exposto pro fluxo Concierge inserir mensagens dele no chat
+    setMessages,
   }
 }

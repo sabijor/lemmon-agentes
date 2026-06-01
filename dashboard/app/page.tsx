@@ -1,15 +1,21 @@
 'use client'
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence, useMotionValue, useDragControls } from 'framer-motion'
+// T178 (2026-05-28) — ChatPanel voltou a ser FIXO à direita. Removidos:
+// useMotionValue/useDragControls do panel principal, clamp() do localStorage
+// (`chatPanelPos`, `lemmon-chat-pinned`, `lemmon-chat-position`), onDragEnd.
+// `motion`+`useDragControls` continuam importados porque o HistoryPanel ainda
+// é arrastável e os pills do header usam motion.button.
 import { AGENTS, type AgentId } from '@/lib/agents'
 import { useChat, type ImageData } from '@/lib/useChat'
 import { useHistory, type HistoryDetail } from '@/lib/useHistory'
 import { useReuniao } from '@/lib/useReuniao'
 import { useAutoRouter } from '@/lib/useAutoRouter'
+import { useConcierge, type ConciergeMsg } from '@/lib/useConcierge'
 import { useLocalStorage } from '@/lib/hooks/useLocalStorage'
 import { notify } from '@/lib/toast'
 import Link from 'next/link'
-import OfficeScene from '@/components/office/OfficeScene'
+import PixelOfficeScene from '@/components/office-pixel/PixelOfficeScene'
 import ChatPanel from '@/components/chat/ChatPanel'
 import HistoryPanel from '@/components/history/HistoryPanel'
 import { ThemeToggle, Clock, AutoModeToggle, ComplianceToggle, RoomToggle, type ComplianceMode, type ActiveRoom } from '@/components/header/HeaderControls'
@@ -21,6 +27,8 @@ export default function Home() {
   const [chatMode, setChatMode] = useState<'pipeline' | 'reuniao'>('pipeline')
   const [historyOpen, setHistoryOpen] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
+  // T192 — Layout SVG isométrico removido em 2026-06-01 (pedido Calebe pós-teste Pedro).
+  // Mantemos só PixelOfficeScene (top-down pixel art).
   // T139 Sprint 2 — Modo Auto (default ligado): IA escolhe os agentes ao enviar briefing.
   // Modo Expert: cliente avançado convoca manualmente (pills no header).
   const [autoMode, setAutoMode] = useLocalStorage<boolean>('lemmon-auto-mode', true)
@@ -29,9 +37,12 @@ export default function Home() {
   // T171-T173 — sala ativa: criativo (Lemmon) ou admin (Hator). Persistida.
   const [activeRoom, setActiveRoom] = useLocalStorage<ActiveRoom>('lemmon-active-room', 'creative')
   const { sugerir: sugerirPipeline } = useAutoRouter()
+  // T186.b — Concierge orquestrador: conversa pra refinar briefing antes de mobilizar equipe
+  const { conversar: conciergeConversar } = useConcierge()
+  const [conciergeHistory, setConciergeHistory] = useState<ConciergeMsg[]>([])
   // T148 — flag pra mostrar "recomendado" no Auto Mode até 1ª sessão concluir
   const [hasCompletedFirstSession, setHasCompletedFirstSession] = useLocalStorage<boolean>('lemmon-first-session-done', false)
-  const { messages, agentStatus, isRunning, sessionId, favoritado, resumedFrom, manualMode, fastTrack, sandbox, custoCap, custoCapAtingido, custoAviso, awaitingApproval, agentConfig, tagsSugeridas, agentProgress, agentProgressMeta, send, approve, abort, toggleManualMode, toggleFastTrack, toggleSandbox, setCustoCap, autorizarCusto, recusarCustoExtra, updateConfig, favoritar, exportar, reset, loadSession } = useChat()
+  const { messages, agentStatus, isRunning, sessionId, favoritado, resumedFrom, manualMode, fastTrack, sandbox, custoCap, custoCapAtingido, custoAviso, awaitingApproval, agentConfig, tagsSugeridas, agentProgress, agentProgressMeta, send, approve, abort, toggleManualMode, toggleFastTrack, toggleSandbox, setCustoCap, autorizarCusto, recusarCustoExtra, updateConfig, favoritar, exportar, reset, loadSession, setMessages } = useChat()
   const {
     messages: reunMessages, agentStatus: reunAgentStatus, isRunning: reunIsRunning,
     agentProgress: reunAgentProgress, agentProgressMeta: reunAgentProgressMeta,
@@ -41,47 +52,21 @@ export default function Home() {
   } = useReuniao()
   const { sessions, selected, loading, loadingDetail, fetchSessions, fetchDetail, clearSelected } = useHistory()
 
-  const dragControls = useDragControls()
-  const panelX = useMotionValue(0)
-  const panelY = useMotionValue(0)
-
+  // T178 — Chat fixo à direita; HistoryPanel segue arrastável.
   const historyDragControls = useDragControls()
   const historyPanelX = useMotionValue(0)
   const historyPanelY = useMotionValue(0)
 
+  // T178 — limpa chaves antigas do chat draggable (uma vez por load)
+  // T192 — também limpa 'lemmon-office-mode' (toggle SVG/PIX removido)
   useEffect(() => {
-    const PANEL_W = 540
-    const PANEL_H = 640
-    const TOP_OFFSET = 48
-    const clamp = (x: number, y: number) => ({
-      x: Math.min(Math.max(0, x), Math.max(0, window.innerWidth - PANEL_W)),
-      y: Math.min(Math.max(0, y), Math.max(0, window.innerHeight - TOP_OFFSET - PANEL_H)),
-    })
-
     try {
-      const saved = localStorage.getItem('chatPanelPos')
-      if (saved) {
-        const { x, y } = JSON.parse(saved) as { x: number; y: number }
-        const { x: cx, y: cy } = clamp(x, y)
-        panelX.set(cx)
-        panelY.set(cy)
-      } else {
-        panelX.set(Math.max(0, window.innerWidth - 480))
-        panelY.set(56)
-      }
-    } catch {
-      panelX.set(Math.max(0, window.innerWidth - 480))
-      panelY.set(56)
-    }
-
-    const onResize = () => {
-      const { x, y } = clamp(panelX.get(), panelY.get())
-      panelX.set(x)
-      panelY.set(y)
-    }
-    window.addEventListener('resize', onResize)
-    return () => window.removeEventListener('resize', onResize)
-  }, [panelX, panelY])
+      localStorage.removeItem('chatPanelPos')
+      localStorage.removeItem('lemmon-chat-pinned')
+      localStorage.removeItem('lemmon-chat-position')
+      localStorage.removeItem('lemmon-office-mode')
+    } catch {}
+  }, [])
 
   useEffect(() => {
     historyPanelX.set(Math.max(0, (window.innerWidth - 760) / 2))
@@ -117,29 +102,67 @@ export default function Home() {
   const callAll = () => setInMeeting(new Set(AGENTS.map(a => a.id)))
   const exitMeeting = () => setInMeeting(new Set())
 
+  // T190.A11 — guard de double-send. Pedro pode clicar 2x ou apertar Enter
+  // várias vezes enquanto Concierge responde (~3-5s). Sem guard, cada clique
+  // dispara um fluxo paralelo, somando custo + bagunçando o histórico.
+  const submittingRef = useRef(false)
+
   const handleSend = async (msg: string, image?: ImageData) => {
+    if (submittingRef.current) {
+      // Já tem um envio rolando — ignora cliques extras silenciosamente.
+      // Se quisermos feedback visual, dá pra chamar notify.info aqui.
+      return
+    }
+    submittingRef.current = true
+    try {
+      await _handleSendInternal(msg, image)
+    } finally {
+      submittingRef.current = false
+    }
+  }
+
+  const _handleSendInternal = async (msg: string, image?: ImageData) => {
     if (autoMode) {
-      // T139 Sprint 2 — auto-roteador escolhe os agentes pela IA antes de rodar
-      const result = await sugerirPipeline(msg)
-      if (!result) return  // briefing vazio, silencioso
-      if (!result.ok) {
-        // T156 — mensagem adaptada ao tipo de erro
-        if (result.kind === 'network') {
-          notify.error(result.message)
-        } else {
-          notify.error(`Erro ao consultar o roteador: ${result.message}`)
-        }
+      // T186.b/c — Em modo Auto, Concierge orquestra. Adiciona msg do user (com
+      // imagem se anexada) no histórico e no chat, depois consulta o Concierge.
+      const novoHistorico: ConciergeMsg[] = [
+        ...conciergeHistory,
+        {
+          role: 'user',
+          content: msg,
+          ...(image && { image_base64: image.base64, image_media_type: image.mediaType }),
+        },
+      ]
+      setConciergeHistory(novoHistorico)
+
+      // Mostra a msg do user no chat (mesmo formato do useChat)
+      const userId = crypto.randomUUID()
+      setMessages(prev => [...prev, { id: userId, role: 'user', content: msg, done: true, hasImage: !!image }])
+
+      // Chama Concierge
+      const resp = await conciergeConversar(novoHistorico)
+      if (!resp) {
+        notify.error('Erro ao consultar o Concierge.')
         return
       }
-      const sugestao = result.sugestao
-      if (sugestao.agentes.length === 0) {
-        notify.warning(sugestao.motivo_vazio || 'Pedido muito vago — adicione mais contexto e tente de novo.')
+
+      // Adiciona resposta do Concierge no chat
+      const conciergeId = crypto.randomUUID()
+      setMessages(prev => [...prev, { id: conciergeId, role: 'concierge' as AgentId, content: resp.conteudo, done: true }])
+
+      if (resp.tipo === 'pergunta') {
+        // Adiciona resposta ao histórico e espera o próximo input do user
+        setConciergeHistory(h => [...h, { role: 'concierge', content: resp.conteudo }])
         return
       }
-      let ids = sugestao.agentes.filter(id => !AGENTS.find(a => a.id === id)?.reuniaoOnly)
-      // T160 — sobrepõe decisão do sugestor conforme toggle de compliance
+
+      // tipo === 'pronto': pipeline com agentes escolhidos pelo Concierge
+      let ids = resp.agentes_sugeridos.filter(id => {
+        const agent = AGENTS.find(a => a.id === id)
+        return agent && !agent.reuniaoOnly
+      }) as AgentId[]
+      // T160 — compliance toggle ainda sobrepõe
       if (complianceMode === 'sempre' && !ids.includes('heitor')) {
-        // Insere Heitor após Otto se estiver, ou no começo
         const idx = ids.indexOf('otto')
         ids = idx >= 0 ? [...ids.slice(0, idx + 1), 'heitor', ...ids.slice(idx + 1)] : ['heitor', ...ids]
         notify.info('🛡️ Compliance forçado: Heitor adicionado.')
@@ -147,13 +170,18 @@ export default function Home() {
         ids = ids.filter(id => id !== 'heitor')
         notify.warning('🚫 Compliance pulado conforme sua preferência.')
       }
+      if (ids.length === 0) {
+        notify.warning('Concierge não conseguiu escolher agentes. Tente reformular.')
+        return
+      }
       setInMeeting(new Set(ids))
       const nomes = ids.map(id => AGENTS.find(a => a.id === id)?.name ?? id).join(' · ')
-      const custoTxt = sugestao.custo_estimado_usd != null
-        ? ` (~$${sugestao.custo_estimado_usd.toFixed(2)})`
-        : ''
-      notify.info(`🤖 IA escolheu: ${nomes}${custoTxt}`)
-      send(ids, msg, image)
+      notify.info(`🎯 Concierge ativou: ${nomes}`)
+      // Limpa histórico do Concierge — próxima conversa começa fresh
+      setConciergeHistory([])
+      // Dispara pipeline com briefing refinado pelo Concierge
+      const briefingFinal = resp.briefing_refinado || msg
+      send(ids, briefingFinal, image)
       return
     }
     // Modo Expert — comportamento original (cliente convocou os agentes manualmente)
@@ -258,22 +286,30 @@ export default function Home() {
               <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
             </svg>
           </Link>
-          <Link href="/hall-of-fame" title="Hall of Fame"
-            className="w-8 h-8 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 flex items-center justify-center hover:bg-stone-50 dark:hover:bg-stone-800 hover:border-stone-400 dark:hover:border-stone-500 transition-all text-stone-500 dark:text-stone-400 text-sm">
-            🏆
-          </Link>
-          <Link href="/briefing-reverso" title="Briefing Reverso"
-            className="w-8 h-8 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 flex items-center justify-center hover:bg-stone-50 dark:hover:bg-stone-800 hover:border-stone-400 dark:hover:border-stone-500 transition-all text-stone-500 dark:text-stone-400 text-sm">
-            🔍
-          </Link>
-          <Link href="/cortes" title="Cortes-Prontos"
-            className="w-8 h-8 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 flex items-center justify-center hover:bg-stone-50 dark:hover:bg-stone-800 hover:border-stone-400 dark:hover:border-stone-500 transition-all text-stone-500 dark:text-stone-400 text-sm">
-            ✂️
-          </Link>
-          <Link href="/calibragem" title="Calibragem Pedro"
-            className="w-8 h-8 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 flex items-center justify-center hover:bg-stone-50 dark:hover:bg-stone-800 hover:border-stone-400 dark:hover:border-stone-500 transition-all text-stone-500 dark:text-stone-400 text-sm">
-            🎯
-          </Link>
+          {/* T190.A3 — esconde toggles avançados até cliente completar 1ª sessão.
+              Hall of Fame, Briefing Reverso, Cortes, Calibragem e SVG/PIX só aparecem
+              depois do onboarding pra evitar paralisia em leigo no 1º acesso. */}
+          {hasCompletedFirstSession && (
+            <>
+              <Link href="/hall-of-fame" title="Hall of Fame"
+                className="w-8 h-8 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 flex items-center justify-center hover:bg-stone-50 dark:hover:bg-stone-800 hover:border-stone-400 dark:hover:border-stone-500 transition-all text-stone-500 dark:text-stone-400 text-sm">
+                🏆
+              </Link>
+              <Link href="/briefing-reverso" title="Briefing Reverso"
+                className="w-8 h-8 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 flex items-center justify-center hover:bg-stone-50 dark:hover:bg-stone-800 hover:border-stone-400 dark:hover:border-stone-500 transition-all text-stone-500 dark:text-stone-400 text-sm">
+                🔍
+              </Link>
+              <Link href="/cortes" title="Cortes-Prontos"
+                className="w-8 h-8 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 flex items-center justify-center hover:bg-stone-50 dark:hover:bg-stone-800 hover:border-stone-400 dark:hover:border-stone-500 transition-all text-stone-500 dark:text-stone-400 text-sm">
+                ✂️
+              </Link>
+              <Link href="/calibragem" title="Calibragem Pedro"
+                className="w-8 h-8 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 flex items-center justify-center hover:bg-stone-50 dark:hover:bg-stone-800 hover:border-stone-400 dark:hover:border-stone-500 transition-all text-stone-500 dark:text-stone-400 text-sm">
+                🎯
+              </Link>
+              {/* T192 — toggle SVG/PIX removido. Sistema agora roda só com PixelOfficeScene. */}
+            </>
+          )}
           <ThemeToggle />
           <button
             onClick={() => setHistoryOpen(v => !v)}
@@ -288,100 +324,89 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Office — always full screen */}
-      <main className="flex-1 overflow-hidden">
-        <OfficeScene
-          inMeeting={inMeeting}
-          agentStatus={agentStatus}
-          onToggleAgent={toggleAgent}
-          onCallAll={callAll}
-          onExitMeeting={exitMeeting}
-          isRunning={isRunning}
-          messages={messages}
-          activeRoom={activeRoom}
-        />
-      </main>
-
-      {/* Draggable floating chat panel */}
-      {chatOpen && (
-        <motion.div
-          drag
-          dragControls={dragControls}
-          dragListener={false}
-          dragMomentum={false}
-          dragElastic={0}
-          style={{ x: panelX, y: panelY, position: 'fixed', top: 48, zIndex: 40 }}
-          className="shadow-2xl shadow-black/20 rounded-2xl"
-          onDragEnd={() => {
-            const PANEL_W = 540, PANEL_H = 640, TOP_OFFSET = 48
-            const x = Math.min(Math.max(0, panelX.get()), Math.max(0, window.innerWidth - PANEL_W))
-            const y = Math.min(Math.max(0, panelY.get()), Math.max(0, window.innerHeight - TOP_OFFSET - PANEL_H))
-            panelX.set(x); panelY.set(y)
-            try { localStorage.setItem('chatPanelPos', JSON.stringify({ x, y })) } catch {}
-          }}
-        >
-          <ChatPanel
-            mode={chatMode}
-            onToggleMode={() => setChatMode(m => m === 'pipeline' ? 'reuniao' : 'pipeline')}
-            messages={messages}
-            agentStatus={agentStatus}
-            agentProgress={agentProgress}
-            agentProgressMeta={agentProgressMeta}
+      {/* T185.6 — Split layout: escritorio (flex-1) + chat (largura fixa) lado a lado.
+          T192 — SVG isométrico removido. Apenas PixelOfficeScene em produção. */}
+      <div className="flex-1 flex overflow-hidden min-h-0">
+        <main className="flex-1 overflow-hidden">
+          <PixelOfficeScene
             inMeeting={inMeeting}
+            agentStatus={agentStatus}
+            onToggleAgent={toggleAgent}
+            onCallAll={callAll}
+            onExitMeeting={exitMeeting}
             isRunning={isRunning}
-            sessionId={sessionId}
-            favoritado={favoritado}
-            resumedFrom={resumedFrom}
-            manualMode={manualMode}
-            fastTrack={fastTrack}
-            sandbox={sandbox}
-            custoCap={custoCap}
-            custoCapAtingido={custoCapAtingido}
-            custoAviso={custoAviso}
-            awaitingApproval={awaitingApproval}
-            agentConfig={agentConfig}
-            dragControls={dragControls}
-            autoMode={autoMode}
-            hideAdvancedToggles={!hasCompletedFirstSession}
-            onSend={handleSend}
-            onReset={reset}
-            onFavoritar={favoritar}
-            onApprove={approve}
-            onAbort={abort}
-            onToggleManualMode={toggleManualMode}
-            onToggleFastTrack={toggleFastTrack}
-            onToggleSandbox={toggleSandbox}
-            onSetCustoCap={setCustoCap}
-            onAutorizarCusto={autorizarCusto}
-            onRecusarCustoExtra={recusarCustoExtra}
-            onUpdateConfig={updateConfig}
-            reunMessages={reunMessages}
-            reunAgentStatus={reunAgentStatus}
-            reunIsRunning={reunIsRunning}
-            reunAgentProgress={reunAgentProgress}
-            reunAgentProgressMeta={reunAgentProgressMeta}
-            onReunSend={handleReunSend}
-            onReunReset={reunReset}
-            onReunAbort={reunAbort}
-            onMesaRedonda={reunMesaRedonda}
-            loopMode={loopMode}
-            onSetLoopMode={setLoopMode}
-            loopMaxTurnos={loopMaxTurnos}
-            onSetLoopMaxTurnos={setLoopMaxTurnos}
-            loopCustoCap={loopCustoCap}
-            onSetLoopCustoCap={setLoopCustoCap}
-            loopActive={loopActive}
-            loopTurn={loopTurn}
-            loopCost={loopCost}
-            loopStatus={loopStatus}
-            onLoopStop={loopStop}
-            onExportar={exportar}
-            tagsSugeridas={tagsSugeridas}
-            onSetInMeeting={ids => setInMeeting(new Set(ids))}
-            onClose={() => setChatOpen(false)}
+            messages={messages}
+            activeRoom={activeRoom}
           />
-        </motion.div>
-      )}
+        </main>
+
+        {/* T185.6/7 - Chat split coluna direita, ocupa 100% altura disponivel. */}
+        <aside
+          className="flex-shrink-0 border-l border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 overflow-hidden h-full flex flex-col"
+          aria-label="Painel do chat"
+        >
+          <div className="flex-1 min-h-0 overflow-visible">
+            <ChatPanel
+              mode={chatMode}
+              onToggleMode={() => setChatMode(m => m === 'pipeline' ? 'reuniao' : 'pipeline')}
+              messages={messages}
+              agentStatus={agentStatus}
+              agentProgress={agentProgress}
+              agentProgressMeta={agentProgressMeta}
+              inMeeting={inMeeting}
+              isRunning={isRunning}
+              sessionId={sessionId}
+              favoritado={favoritado}
+              resumedFrom={resumedFrom}
+              manualMode={manualMode}
+              fastTrack={fastTrack}
+              sandbox={sandbox}
+              custoCap={custoCap}
+              custoCapAtingido={custoCapAtingido}
+              custoAviso={custoAviso}
+              awaitingApproval={awaitingApproval}
+              agentConfig={agentConfig}
+              autoMode={autoMode}
+              hideAdvancedToggles={!hasCompletedFirstSession}
+              onSend={handleSend}
+              onReset={reset}
+              onFavoritar={favoritar}
+              onApprove={approve}
+              onAbort={abort}
+              onToggleManualMode={toggleManualMode}
+              onToggleFastTrack={toggleFastTrack}
+              onToggleSandbox={toggleSandbox}
+              onSetCustoCap={setCustoCap}
+              onAutorizarCusto={autorizarCusto}
+              onRecusarCustoExtra={recusarCustoExtra}
+              onUpdateConfig={updateConfig}
+              reunMessages={reunMessages}
+              reunAgentStatus={reunAgentStatus}
+              reunIsRunning={reunIsRunning}
+              reunAgentProgress={reunAgentProgress}
+              reunAgentProgressMeta={reunAgentProgressMeta}
+              onReunSend={handleReunSend}
+              onReunReset={reunReset}
+              onReunAbort={reunAbort}
+              onMesaRedonda={reunMesaRedonda}
+              loopMode={loopMode}
+              onSetLoopMode={setLoopMode}
+              loopMaxTurnos={loopMaxTurnos}
+              onSetLoopMaxTurnos={setLoopMaxTurnos}
+              loopCustoCap={loopCustoCap}
+              onSetLoopCustoCap={setLoopCustoCap}
+              loopActive={loopActive}
+              loopTurn={loopTurn}
+              loopCost={loopCost}
+              loopStatus={loopStatus}
+              onLoopStop={loopStop}
+              onExportar={exportar}
+              tagsSugeridas={tagsSugeridas}
+              onSetInMeeting={ids => setInMeeting(new Set(ids))}
+            />
+          </div>
+        </aside>
+      </div>
 
       {/* Draggable floating history panel */}
       {historyOpen && (
@@ -410,29 +435,7 @@ export default function Home() {
         </motion.div>
       )}
 
-      {/* Floating button when closed */}
-      <AnimatePresence>
-        {!chatOpen && (
-          <motion.button
-            key="chat-btn"
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0, opacity: 0 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 24 }}
-            onClick={openChat}
-            className="fixed bottom-6 right-6 z-50 w-14 h-14 bg-stone-900 rounded-2xl shadow-2xl shadow-stone-900/25 text-white flex items-center justify-center hover:scale-105 active:scale-95 transition-transform"
-          >
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-            </svg>
-            {unreadCount > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 min-w-5 h-5 px-1 bg-red-500 rounded-full text-[9px] font-bold text-white flex items-center justify-center">
-                {unreadCount > 99 ? '99+' : unreadCount}
-              </span>
-            )}
-          </motion.button>
-        )}
-      </AnimatePresence>
+      {/* T185.5 — Floating button REMOVIDO: chat sempre visível, não pode fechar. */}
     </div>
   )
 }

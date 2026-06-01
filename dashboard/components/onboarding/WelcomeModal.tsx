@@ -18,7 +18,9 @@ interface Props {
   onTryExample?: (briefing: string) => void
 }
 
-const EXEMPLO = 'Quero lançar uma marca de café especial no Instagram. Tenho orçamento pra 1 captação profissional por mês.'
+// T190.A1 — exemplo trocado pra contexto Hator (saúde feminina/menopausa)
+// Cliente principal hoje: Dr. Pedro Abrahão / Hator Clinic.
+const EXEMPLO = 'Quero atrair pacientes pra consulta de menopausa pelo Instagram. Tenho material gravado do médico pra usar.'
 
 export default function WelcomeModal({ onTryExample }: Props) {
   const [open, setOpen] = useState(false)
@@ -76,13 +78,14 @@ export default function WelcomeModal({ onTryExample }: Props) {
             </div>
 
             <p className="text-sm text-stone-700 dark:text-stone-300 leading-relaxed mb-5">
-              Um time de 7 agentes de IA prontos pra trabalhar no seu conteúdo. Você descreve, eles entregam.
+              Um time de especialistas em IA pronto pra trabalhar no seu conteúdo. Você conversa, eles entregam.
             </p>
 
             <div className="space-y-3 mb-6">
-              <Step n="1" title="Descreva seu pedido" desc="Em linguagem natural, conta o que você quer (estratégia, roteiro, calendário, etc)." />
-              <Step n="2" title="A IA escolhe os agentes" desc="No Modo Auto (recomendado), o sistema decide automaticamente quem precisa entrar." />
-              <Step n="3" title="Cada agente entrega sua parte" desc="No final, a Aya monta um dossiê visual juntando tudo. Você baixa em PDF ou compartilha link." />
+              {/* T190.A2 — Step 2 reescrito pra deixar claro que o Concierge entrevista ANTES de mobilizar o time */}
+              <Step n="1" title="Conta o que você precisa" desc="Pode ser em linguagem natural mesmo — estratégia, roteiro, calendário, análise. Vale enviar print/imagem também." />
+              <Step n="2" title="O Concierge entrevista você" desc="Antes de chamar o time, ele faz 1-2 perguntas curtas pra entender objetivo, canal e público. Você aprova quem vai entrar." />
+              <Step n="3" title="O time entrega o dossiê" desc="Cada especialista faz sua parte e a Aya monta o resultado final. Você baixa em PDF ou compartilha link." />
             </div>
 
             <div className="bg-stone-50 dark:bg-stone-800/50 border border-stone-200 dark:border-stone-700 rounded-xl p-3 mb-5">

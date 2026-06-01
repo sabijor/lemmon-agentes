@@ -43,8 +43,12 @@ interface OpcaoExport {
 }
 
 const OPCOES: OpcaoExport[] = [
+  // T191.b — opção "enxuto" pro cliente que só quer entregar demandas (roteiros + cronograma)
+  // sem tese de Otto, riscos de Heitor, ou retenção de Sônia. Feedback Pedro 2026-06-01.
+  { id: 'enxuto',     label: '✂️ Só demandas (enxuto)', hint: 'Roteiros + cronograma. Sem compliance, estratégia ou notas de performance.', agentes: ['carlos', 'salles', 'renata'] },
   { id: 'estrategia', label: '🧠 Estratégia',         hint: 'Tese, conceito, mecanismo — output do Otto',                agentes: ['otto'] },
-  { id: 'roteiros',   label: '🎬 Roteiros',           hint: 'Roteiros filmáveis com hooks e CTAs — output do Salles',     agentes: ['salles'] },
+  { id: 'roteiros',   label: '🎬 Roteiros (Carlos)',  hint: 'Roteiros publicitários filmáveis — output do Carlos',       agentes: ['carlos'] },
+  { id: 'roteiros_doc', label: '🎬 Roteiros (Salles)', hint: 'Roteiros documentais — output do Salles',                   agentes: ['salles'] },
   { id: 'cronograma', label: '📅 Cronograma',         hint: 'Calendário editorial multi-plataforma — output da Renata',   agentes: ['renata'] },
   { id: 'compliance', label: '🛡️ Compliance',         hint: 'Riscos Meta + recomendações — output do Heitor',              agentes: ['heitor'] },
   { id: 'performance', label: '📈 Performance',       hint: 'Otimização para retenção e CTR — output da Sônia',           agentes: ['sonia'] },

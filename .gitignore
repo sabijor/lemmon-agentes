@@ -18,3 +18,28 @@ backups/
 # Claude Code settings (contêm permissões e info pessoal)
 .claude/settings.json
 .claude/settings.local.json
+
+# T192 (2026-06-01) — assets pesados, packs de terceiros e experimentos
+# Asset packs grandes (LimeZu pago, Jephed, Gandalf etc) — só committamos curados em uso
+avatar/
+referencia visual/
+dashboard/app/escritorio/
+# LimeZu: ignora tudo, EXCETO singles-curated (os 7 PNGs usados em produção)
+dashboard/public/limezu/*
+!dashboard/public/limezu/singles-curated/
+dashboard/public/pokemon/
+dashboard/public/sprites/
+dashboard/public/tiles/
+dashboard/public/pixel-office/
+
+# Rotas mockup obsoletas se voltarem a aparecer (T187)
+dashboard/app/mockup/
+dashboard/app/mockup-final/
+dashboard/app/mockup-firered/
+dashboard/app/mockup-pokemon/
+dashboard/app/mockup-comparar/
+dashboard/app/mockup-gather/
+
+# Release ZIPs gerados localmente
+*.zip
+release/

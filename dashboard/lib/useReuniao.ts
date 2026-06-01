@@ -8,11 +8,13 @@ import { WATCHDOG_TIMEOUT_MIN, PROGRESS_CURVE_POWER } from './config'
 const DEFAULT_STATUS = (): Record<AgentId, AgentStatus> => ({
   otto: 'idle', heitor: 'idle', salles: 'idle', carlos: 'idle', sonia: 'idle', aya: 'idle', pedro_abrahao: 'idle', renata: 'idle',
   ana_maria: 'idle', prichina: 'idle', caito: 'idle', kelly: 'idle',
+  concierge: 'idle', // T186 meta-agent — never roda em reunião mas precisa estar no record
 })
 
 const FALLBACK_MEDIANAS: Record<AgentId, number> = {
   otto: 20, heitor: 40, salles: 30, carlos: 25, sonia: 30, aya: 15, pedro_abrahao: 25, renata: 30,
   ana_maria: 20, prichina: 20, caito: 25, kelly: 22,
+  concierge: 5, // T186 meta-agent — meio-segundo no fluxo conversacional, antes do pipeline
 }
 
 export interface LoopStatus {
@@ -108,7 +110,15 @@ export function useReuniao() {
       const ws = new WebSocket(`${WS_URL}/ws/reuniao`)
 
       ws.onmessage = (e) => {
-        const msg = JSON.parse(e.data)
+        // T190.C7 — try/catch ao redor de JSON.parse pra não derrubar o listener
+        let msg: any
+        try {
+          msg = JSON.parse(e.data)
+        } catch (err) {
+          // eslint-disable-next-line no-console
+          console.warn('[useReuniao] WS message não-JSON ignorado:', e.data, err)
+          return
+        }
 
         if (msg.type === 'agent_start') {
           const agentId = msg.agent as AgentId
@@ -333,7 +343,15 @@ export function useReuniao() {
     await new Promise<void>(resolve => { ws.onopen = () => resolve() })
 
     ws.onmessage = (e) => {
-      const msg = JSON.parse(e.data)
+      // T190.C7 — try/catch ao redor de JSON.parse (Mesa Redonda)
+      let msg: any
+      try {
+        msg = JSON.parse(e.data)
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.warn('[mesa_redonda] WS message não-JSON ignorado:', e.data, err)
+        return
+      }
       if (msg.type === 'agent_start') {
         streamBufRef.current[msg.agent] = ''
         setAgentStatus(s => ({ ...s, [msg.agent]: 'thinking' }))

@@ -41,7 +41,8 @@ export function useAutoRouter() {
         resp = await fetch(url)
       } catch (netErr: any) {
         // TypeError do fetch = falha de rede (backend caiu, sem internet, CORS, etc.)
-        const msg = 'O servidor do sistema parece estar fora do ar. Verifique se a janela do Terminal "Iniciar Agentes de Conteúdo" ainda está aberta — se não, abra de novo pelo Desktop.'
+        // T190.A12 — texto amigável (sem "Terminal"/"Desktop" que assusta leigo)
+        const msg = 'O sistema perdeu conexão com o servidor. Avise o suporte da Lemmon pra restabelecer.'
         setError(msg)
         return { ok: false, kind: 'network', message: msg }
       }

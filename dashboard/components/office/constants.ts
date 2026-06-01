@@ -28,19 +28,23 @@ export const COLS = 14, ROWS = 10
 export const sx = (gx: number, gy: number) => OX + (gx - gy) * (TW / 2)
 export const sy = (gx: number, gy: number) => OY + (gx + gy) * (TH / 2)
 
-// ─── Meeting room constants — T175: deslocada pra dar lugar ao admin ───
-export const MEET_OX = 2100, MEET_OY = 120
+// ─── Meeting room constants — T175 + T181: pertinho do admin pra fechar o
+// gap visual gigante que aparecia em zoom-out. (Era 2100 → 1500.)
+export const MEET_OX = 1500, MEET_OY = 120
 export const MEET_COLS = 12, MEET_ROWS = 9
 export const msx = (gx: number, gy: number) => MEET_OX + (gx - gy) * (TW / 2)
 export const msy = (gx: number, gy: number) => MEET_OY + (gx + gy) * (TH / 2)
-export const CAMERA_MEETING = 1668
+// CAMERA mantém offset relativo de -432 do MEET_OX (= 1500 - 432).
+export const CAMERA_MEETING = 1068
 
-// ─── Reception room constants ─────────────────────────────────────────
-export const RECEP_OX = -480, RECEP_OY = 180
+// ─── Reception room constants — T181: encostada perto do criativo pra eliminar
+// gap de bege puro. (Era -480 → -200.)
+export const RECEP_OX = -200, RECEP_OY = 180
 export const RECEP_COLS = 8, RECEP_ROWS = 7
 export const rsx = (gx: number, gy: number) => RECEP_OX + (gx - gy) * (TW / 2)
 export const rsy = (gx: number, gy: number) => RECEP_OY + (gx + gy) * (TH / 2)
-export const CAMERA_RECEP = -944
+// CAMERA mantém offset relativo de -464 (= -200 - 464).
+export const CAMERA_RECEP = -664
 
 // ─── Admin room (Hator office) constants — T171 + T175 ───────────────
 // Posicionada LOGO À DIREITA do work room, conectada por um corredor visual.
@@ -51,8 +55,12 @@ export const asx = (gx: number, gy: number) => ADMIN_OX + (gx - gy) * (TW / 2)
 export const asy = (gx: number, gy: number) => ADMIN_OY + (gx + gy) * (TH / 2)
 export const CAMERA_ADMIN = 740
 
-// ─── Meeting room re-posicionada — fica DEPOIS do admin no eixo X ─────
-// (era 1560, vira 2100 pra manter ordem visual: criativo → admin → reunião)
+// ─── Layout final (após T175 + T181): RECEPÇÃO → CRIATIVO → ADMIN → REUNIÃO
+// com 3 corredores visuais ligando tudo. Distâncias visuais (top-left → bottom-right):
+//   RECEP_OX = -200  (extent: -424 .. 24)
+//   OX       =  420  (extent:  132 .. 836)   gap RECEP→CRIATIVO ≈ 108px
+//   ADMIN_OX = 1100  (extent:  844 .. 1356)  gap CRIATIVO→ADMIN ≈ 8px
+//   MEET_OX  = 1500  (extent: 1244 .. 1852)  gap ADMIN→MEET com leve sobreposição
 
 // ─── Paleta clínica (Hator) ───────────────────────────────────────────
 export const HATOR_PALETTE = {
@@ -88,6 +96,7 @@ export const ROLES: Record<AgentId, string> = {
   prichina: 'Admin/RH',
   caito: 'COO',
   kelly: 'Contábil',
+  concierge: 'Recepção', // T186 meta-agent — entrevista e mobiliza o time, não aparece em fluxo
 }
 
 // ─── Idle speech quotes ──────────────────────────────────────────────
@@ -104,4 +113,5 @@ export const IDLE_QUOTES: Record<AgentId, string[]> = {
   prichina:  ['Banco de horas ok.', 'NF emitida.', 'Atestado conferido.', 'DCTFWeb pago.'],
   caito:     ['Apagando fogo.', 'Cruzando indicadores.', '3 caminhos pro Calebe.', 'Decisão sua.'],
   kelly:     ['Presunção 8%.', 'Art. 9.249/95.', 'Distribuir lucro isento.', 'Elisão, não evasão.'],
+  concierge: ['Entrevistando cliente...', 'Mobilizando o time.', 'Quem precisa entrar?', 'Refinando o pedido.'], // T186 meta-agent
 }

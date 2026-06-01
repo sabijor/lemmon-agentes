@@ -659,6 +659,25 @@ export default function CharacterSprite({ id, size = 1, speaking, walking, sitti
         <rect x="20" y="61" width="13" height="9" rx="3" fill="#1c1917"/>
       </svg>
     ),
+
+    // ─── Concierge (meta-agent) — placeholder mínimo.
+    // T186 — Concierge é meta, filtrado fora do render pelo `.filter(a => !a.meta)`.
+    // Mas o tipo Record<AgentId, ReactNode> exige a chave, então renderizamos um
+    // sprite minimalista (azul, recepção) caso alguma rota acabe acessando direto.
+    concierge: (
+      <svg width={W * size} height={H * size} viewBox="0 0 40 72" fill="none" className={cls} style={{ display: 'block', flexShrink: 0, width: W * size, height: H * size }} preserveAspectRatio="xMidYMid meet" x={x} y={y}>
+        <ellipse cx="20" cy="19" rx="11" ry="10.5" fill="#f5d0a9"/>
+        <rect x="10" y="4" width="20" height="9" rx="4" fill="#0ea5e9"/>
+        <rect x="12" y="15" width="4" height="3" rx="0.5" fill="#1c1917"/>
+        <rect x="24" y="15" width="4" height="3" rx="0.5" fill="#1c1917"/>
+        <path d="M16 25 Q20 28 24 25" stroke="#b06040" strokeWidth="1" fill="none" strokeLinecap="round"/>
+        <rect x="8" y="30" width="24" height="22" rx="2" fill="#0ea5e9"/>
+        <rect x="14" y="34" width="12" height="4" rx="1" fill="#fafaf9"/>
+        <text x="20" y="37.5" fontSize="3" fill="#0c4a6e" textAnchor="middle" fontWeight="bold">RECEPÇÃO</text>
+        <rect x="9" y="52" width="9" height="14" rx="2" fill="#0c4a6e"/>
+        <rect x="22" y="52" width="9" height="14" rx="2" fill="#0c4a6e"/>
+      </svg>
+    ),
   }
 
   return <>{sprites[id]}</>

@@ -1,4 +1,4 @@
-export type AgentId = 'otto' | 'heitor' | 'salles' | 'carlos' | 'sonia' | 'aya' | 'pedro_abrahao' | 'renata' | 'ana_maria' | 'prichina' | 'caito' | 'kelly'
+export type AgentId = 'otto' | 'heitor' | 'salles' | 'carlos' | 'sonia' | 'aya' | 'pedro_abrahao' | 'renata' | 'ana_maria' | 'prichina' | 'caito' | 'kelly' | 'concierge'
 
 export interface AgentConfig {
   id: AgentId
@@ -14,6 +14,8 @@ export interface AgentConfig {
   reuniaoOnly?: boolean
   /** T175 — em qual sala o agente tem mesa. Default 'creative'. */
   room?: 'creative' | 'admin'
+  /** T186 — agente meta (não aparece no escritório, só no chat como orquestrador) */
+  meta?: boolean
 }
 
 export const AGENTS: AgentConfig[] = [
@@ -91,8 +93,10 @@ export const AGENTS: AgentConfig[] = [
   },
   {
     id: 'pedro_abrahao',
-    name: 'Pedro',
-    title: 'Consultor',
+    // T190.B9 — desambiguar: Dr. Pedro real (cliente) vs. espelho IA (NPC).
+    // Sem o sufixo, Pedro lê o próprio nome num avatar e pensa que clicou em si mesmo.
+    name: 'Pedro (espelho IA)',
+    title: 'Validador médico',
     rpgClass: 'Consultor',
     color: '#0f766e',
     colorDim: '#ccfbf1',
@@ -166,6 +170,20 @@ export const AGENTS: AgentConfig[] = [
     meetingPosition: { x: 580, y: 260 },
     idleQuote: 'Manobra legal, art. 9.249.',
     room: 'admin',
+  },
+  // T186 — Concierge: agente meta (orquestrador, sem mesa no escritório)
+  {
+    id: 'concierge',
+    name: 'Concierge',
+    title: 'Orquestrador',
+    rpgClass: 'Mestre',
+    color: '#0ea5e9',
+    colorDim: '#e0f2fe',
+    colorText: '#fff',
+    deskPosition: { x: 0, y: 0 },
+    meetingPosition: { x: 0, y: 0 },
+    idleQuote: 'Vamos entender o que você quer.',
+    meta: true,  // não aparece no escritório, só no chat
   },
 ]
 
