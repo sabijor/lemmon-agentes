@@ -4,12 +4,19 @@ from datetime import datetime
 from pathlib import Path
 
 from .config import HISTORICO_DIR
+from .tenant import tenant_id  # v1.46.2 A5-005 — completa fix #11 (multi-tenant)
 
 
 class Historico:
     def __init__(self, agente_nome: str):
         self.agente_nome = agente_nome
-        self.dir = HISTORICO_DIR / agente_nome
+        # v1.46.2 A5-005 — antes era HISTORICO_DIR / agente_nome (sem tenant).
+        # Bugfix #11 v1.46.1 cobriu api/storage.py mas esqueceu esta classe usada
+        # por TODOS os agentes (otto.registrar, heitor.registrar, etc).
+        # Resultado: histórico de Otto/Carlos/Pedro de TODOS os tenants misturava
+        # em historico/otto/, historico/carlos/, etc. Agora particiona certo.
+        self.agente_nome = agente_nome
+        self.dir = HISTORICO_DIR / tenant_id() / agente_nome
         self.dir.mkdir(parents=True, exist_ok=True)
 
     def registrar(self, registro: dict) -> Path:

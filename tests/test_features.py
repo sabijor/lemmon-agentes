@@ -136,7 +136,13 @@ def test_usuarios_lifecycle(cliente):
 # ─── LGPD ─────────────────────────────────────────────────────────────
 
 def test_lgpd_exportar_dados(cliente):
-    """GET /lgpd/exportar retorna ZIP."""
+    """GET /lgpd/exportar retorna ZIP em dev (sem LEMMON_AUTH_TOKEN).
+
+    v1.46.2 A3a-001 — quando auth token está setado, exige Bearer.
+    """
+    if os.getenv("LEMMON_AUTH_TOKEN"):
+        # Em prod, exportar exige auth (testado em test_regressoes_v1462)
+        pytest.skip("auth ativa — testado em test_regressoes_v1462")
     r = cliente.get("/lgpd/exportar")
     assert r.status_code == 200
     assert r.headers["content-type"] == "application/zip"
@@ -144,7 +150,9 @@ def test_lgpd_exportar_dados(cliente):
 
 
 def test_lgpd_deletar_inexistente(cliente):
-    """Deletar sessão inexistente → 404."""
+    """Deletar sessão inexistente → 404 em dev. Em prod, 403 sem auth."""
+    if os.getenv("LEMMON_AUTH_TOKEN"):
+        pytest.skip("auth ativa — testado em test_regressoes_v1462")
     r = cliente.post("/lgpd/deletar-sessao", json={"session_id": "naoexiste123"})
     assert r.status_code == 404
 

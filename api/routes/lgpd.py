@@ -29,10 +29,18 @@ from core.tenant import tenant_id
 router = APIRouter()
 
 
-def _require_auth_token(authorization: str | None) -> None:
-    """Exige Authorization: Bearer <LEMMON_AUTH_TOKEN>. Constant-time compare."""
+def _require_auth_token(authorization: str | None, *, allow_dev: bool = True) -> None:
+    """Exige Authorization: Bearer <LEMMON_AUTH_TOKEN>. Constant-time compare.
+
+    v1.46.2 A3a-001 — comportamento dev/prod:
+    - allow_dev=True (default): em dev (LEMMON_AUTH_TOKEN não setado) permite acesso.
+      Single-user local não precisa de auth pra exportar/deletar SUAS sessões.
+    - allow_dev=False: SEMPRE exige token (usado por /lgpd/apagar-tudo — destrutivo).
+    """
     esperado = os.getenv("LEMMON_AUTH_TOKEN", "")
     if not esperado:
+        if allow_dev:
+            return  # modo dev — single-user local, sem auth
         raise HTTPException(
             status_code=403,
             detail="Operação destrutiva requer LEMMON_AUTH_TOKEN configurada no servidor.",
@@ -48,14 +56,18 @@ def _require_auth_token(authorization: str | None) -> None:
 
 
 @router.get("/lgpd/exportar")
-async def lgpd_exportar_dados():
+async def lgpd_exportar_dados(authorization: str | None = Header(default=None)):
     """Exporta TODOS os dados do tenant em ZIP (Art. 18 LGPD).
+
+    v1.46.2 A3a-001 — agora exige auth. Antes GET sem token retornava ZIP
+    inteiro do tenant (vazamento médico + financeiro + audit).
 
     Inclui:
     - historico/<tenant>/dashboard/*.json (sessões)
     - historico/<tenant>/audit.jsonl
     - outputs/<tenant>/ (PDFs gerados)
     """
+    _require_auth_token(authorization)
     t = tenant_id()
     audit.registrar("lgpd_export", tenant=t)
 
@@ -95,11 +107,17 @@ class _DeletarSessaoPayload(BaseModel):
 
 
 @router.post("/lgpd/deletar-sessao")
-async def lgpd_deletar_sessao(payload: _DeletarSessaoPayload):
+async def lgpd_deletar_sessao(
+    payload: _DeletarSessaoPayload,
+    authorization: str | None = Header(default=None),
+):
     """Apaga 1 sessão específica + outputs relacionados.
 
     G-02 — direito ao esquecimento (Art. 18, IV LGPD).
+    v1.46.2 A3a-001 — agora exige auth. Antes POST sem token apagava sessão
+    de qualquer tenant que adivinhasse session_id.
     """
+    _require_auth_token(authorization)
     import re
     # SEC-equiv — sanitize session_id
     if not re.match(r"^[A-Za-z0-9_+.\-]+$", payload.session_id):
@@ -139,8 +157,9 @@ async def lgpd_apagar_tudo(authorization: str | None = Header(default=None)):
 
     G-03 — direito ao esquecimento total (Art. 18, VI LGPD).
     Exige Authorization: Bearer <LEMMON_AUTH_TOKEN> (constant-time compare).
+    v1.46.2 — allow_dev=False: sempre exige token, mesmo em dev (destrutivo).
     """
-    _require_auth_token(authorization)
+    _require_auth_token(authorization, allow_dev=False)
     t = tenant_id()
     apagados: list[str] = []
     for base in [HISTORICO_DIR / t, OUTPUTS_DIR / t]:

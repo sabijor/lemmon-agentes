@@ -86,17 +86,19 @@ class AgenteAdminBase(AgenteBase):
         if not texto:
             raise RuntimeError(f"{self.nome.capitalize()} não retornou conteúdo.")
 
+        # v1.46.2 A5-002 — bug VIVO descoberto na auditoria. Mesmo do Carlos #10:
+        # Historico tem .registrar(dict), não .salvar(kwargs). 4 agentes admin
+        # (Ana Maria, Prichina, Caíto, Kelly) crashavam por herança. Ana Maria é
+        # o agente da próxima feature (planilha financeira) — fix obrigatório.
         try:
-            self.historico.salvar(
-                input_resumido=briefing[:300],
-                output={
-                    "output_humano": texto,
-                    "tem_contexto_extra": bool(contexto_extra),
-                    "agentes_referenciados": list((contextos_agentes or {}).keys()),
-                },
-                custo=custo,
-                duracao_segundos=duracao,
-            )
+            self.historico.registrar({
+                "input_resumido": briefing[:300],
+                "output_humano": texto,
+                "tem_contexto_extra": bool(contexto_extra),
+                "agentes_referenciados": list((contextos_agentes or {}).keys()),
+                "custo_usd": custo.custo_usd if hasattr(custo, "custo_usd") else custo,
+                "duracao_segundos": duracao,
+            })
         except Exception as exc:  # noqa: BLE001
             self.logger.warning("Falha ao salvar histórico de %s: %s", self.nome, exc)
 

@@ -10,8 +10,12 @@ os.environ.setdefault("ANTHROPIC_API_KEY", "sk-test-fake-key-for-testing")
 
 @pytest.fixture()
 def client(tmp_path, monkeypatch):
-    """Cliente de teste com HISTORICO_DIR e SHARES_DIR apontando para tmp_path."""
-    sessao_dir = tmp_path / "historico" / "dashboard"
+    """Cliente de teste com HISTORICO_DIR e SHARES_DIR apontando para tmp_path.
+
+    v1.46.2 A5-005 — sessão criada em historico/<tenant>/dashboard/ (não mais
+    em historico/dashboard/ direto). Fixture usa tenant default.
+    """
+    sessao_dir = tmp_path / "historico" / "default" / "dashboard"
     sessao_dir.mkdir(parents=True)
     shares_dir = tmp_path / "shares"
     shares_dir.mkdir()
@@ -37,6 +41,11 @@ def client(tmp_path, monkeypatch):
     import api.routes.share as share_mod
     monkeypatch.setattr(share_mod, "HISTORICO_DIR", tmp_path / "historico")
     monkeypatch.setattr(share_mod, "SHARES_DIR", shares_dir)
+
+    # v1.46.2 A5-005 — historico_index agora tem _dashboard_dir() que resolve
+    # HISTORICO_DIR em runtime. Precisa monkeypatchar também.
+    import core.historico_index as idx_mod
+    monkeypatch.setattr(idx_mod, "HISTORICO_DIR", tmp_path / "historico")
 
     from api.main import app
     with TestClient(app) as c:

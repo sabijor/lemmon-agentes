@@ -150,18 +150,40 @@ export default function Home() {
       // Chama Concierge ANTES de gravar no histórico persistido (T188.p)
       const resp = await conciergeConversar(novoHistorico)
       if (!resp) {
-        // T193.b — mensagem específica baseada no tipo de erro do backend.
-        const errMsg = conciergeError || 'Erro ao consultar o Concierge.'
-        if (errMsg.includes('Sem crédito')) {
-          notify.error(`💳 ${errMsg}`)
-        } else if (errMsg.includes('Chave da API')) {
-          notify.error(`🔑 ${errMsg}`)
-        } else if (errMsg.includes('Limite de chamadas')) {
-          notify.warning(`⏳ ${errMsg}`)
-        } else if (errMsg.includes('Sem conexão')) {
-          notify.error(`🌐 ${errMsg}`)
+        // T193.b + v1.46.2 A4a-007 — wrap em PT amigável.
+        // Antes erros técnicos em inglês (ex: "Internal server error", "Failed to fetch")
+        // chegavam crus pro Pedro, que abandonava ao não entender. Agora detecta
+        // padrões conhecidos e formata. Fallback genérico também em PT.
+        const errMsgRaw = conciergeError || ''
+        const lower = errMsgRaw.toLowerCase()
+
+        // Detecção por palavra-chave conhecida do backend (que JÁ vem em PT)
+        if (errMsgRaw.includes('Sem crédito')) {
+          notify.error(`💳 ${errMsgRaw}`)
+        } else if (errMsgRaw.includes('Chave da API')) {
+          notify.error(`🔑 ${errMsgRaw}`)
+        } else if (errMsgRaw.includes('Limite de chamadas')) {
+          notify.warning(`⏳ ${errMsgRaw}`)
+        } else if (errMsgRaw.includes('Sem conexão')) {
+          notify.error(`🌐 ${errMsgRaw}`)
+        }
+        // Detecção por erros técnicos em inglês — wrap em PT
+        else if (lower.includes('failed to fetch') || lower.includes('network') || lower.includes('econn')) {
+          notify.error('🌐 Não foi possível conectar ao servidor. O backend tá no ar? Tente recarregar a página.')
+        } else if (lower.includes('timeout') || lower.includes('timed out')) {
+          notify.warning('⏱️ A resposta demorou demais. Tente de novo — se persistir, o Concierge pode estar sobrecarregado.')
+        } else if (lower.includes('json') || lower.includes('parse')) {
+          notify.error('⚠️ Resposta inválida do servidor. Recarregue a página e tente de novo.')
+        } else if (lower.includes('500') || lower.includes('internal server')) {
+          notify.error('🛠️ Erro interno no servidor. Calebe (suporte) recebeu o aviso. Tente em alguns minutos.')
+        } else if (lower.includes('404')) {
+          notify.error('🤔 Endpoint do Concierge não encontrado. Backend está rodando a versão certa?')
+        } else if (errMsgRaw) {
+          // Mensagem desconhecida: mostra mas com prefixo amigável
+          notify.error(`⚠️ Algo deu errado: ${errMsgRaw.slice(0, 120)}${errMsgRaw.length > 120 ? '…' : ''}`)
         } else {
-          notify.error(errMsg)
+          // Fallback genérico
+          notify.error('⚠️ Não consegui falar com o Concierge agora. Recarregue a página e tente de novo.')
         }
         // T188.p — NÃO atualiza histórico se API falhou. Próximo envio reaproveita
         // contexto anterior. Caso contrário ficaria 2x user seguidos no histórico.

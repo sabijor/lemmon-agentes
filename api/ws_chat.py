@@ -118,22 +118,30 @@ async def chat(ws: WebSocket):
             if image_base64 and image_media_type not in ALLOWED_MEDIA:
                 image_base64 = None  # tipo desconhecido = ignora
             # V-26 — valida magic bytes (anti-evasão: cliente diz "image/png" mas manda EXE)
+            # v1.46.2 A1a-007 — WebP completo: antes só checava RIFF (que também serve
+            # pra WAV/AVI/outros formatos RIFF). Agora exige marker "WEBP" nos bytes 8-11.
             if image_base64:
                 try:
                     import base64 as _b64
-                    _head = _b64.b64decode(image_base64[:32], validate=False)[:8]
-                    MAGIC = {
+                    # Precisamos de 16 bytes pra checar WEBP marker (bytes 8-11).
+                    # base64 codifica 3 bytes em 4 chars — pedimos 24 chars pra ter 18 bytes.
+                    _head = _b64.b64decode(image_base64[:24], validate=False)[:16]
+                    MAGIC_SIMPLES = {
                         b"\xff\xd8\xff": "image/jpeg",
                         b"\x89PNG\r\n\x1a\n": "image/png",
                         b"GIF87a": "image/gif",
                         b"GIF89a": "image/gif",
-                        b"RIFF": "image/webp",  # WebP começa com RIFF...WEBP
                     }
                     ok = False
-                    for m, t in MAGIC.items():
-                        if _head.startswith(m) and (t == image_media_type or (t == "image/webp" and image_media_type == "image/webp")):
+                    # Checa formatos com magic simples no início
+                    for m, t in MAGIC_SIMPLES.items():
+                        if _head.startswith(m) and t == image_media_type:
                             ok = True
                             break
+                    # WebP: RIFF nos bytes 0-3 E "WEBP" nos bytes 8-11
+                    if not ok and image_media_type == "image/webp":
+                        if len(_head) >= 12 and _head[:4] == b"RIFF" and _head[8:12] == b"WEBP":
+                            ok = True
                     if not ok:
                         image_base64 = None  # magic bytes não bate com declarado
                 except Exception:

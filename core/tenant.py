@@ -20,9 +20,24 @@ from pathlib import Path
 
 # ─── Tenant ──────────────────────────────────────────────────────────
 
+_TENANT_ID_RE = __import__("re").compile(r"^[a-z0-9][a-z0-9_-]{0,62}$")
+
+
 def tenant_id() -> str:
-    """Retorna tenant atual (env LEMMON_TENANT_ID ou 'default')."""
-    return os.getenv("LEMMON_TENANT_ID", "default").strip().lower() or "default"
+    """Retorna tenant atual (env LEMMON_TENANT_ID ou 'default').
+
+    v1.46.2 A3a-002 — sanitize contra path traversal. Antes `tenant_id="../etc"`
+    fazia tenant_namespace(HISTORICO_DIR, ...) escapar pra fora de historico/.
+    Agora regex força [a-z0-9_-]{1,63} iniciando com alfanumérico. Inválido →
+    'default'. Cobre LGPD safety (não vaza pra path de outro tenant).
+    """
+    raw = os.getenv("LEMMON_TENANT_ID", "default").strip().lower() or "default"
+    if not _TENANT_ID_RE.match(raw):
+        # Tenant inválido vira default — não escapa. Audit não fica disponível
+        # nesta camada (importaria circular), mas tenant_namespace nunca vai
+        # criar pasta fora do historico/.
+        return "default"
+    return raw
 
 
 def tenant_namespace(base: Path, subfolder: str = "dashboard") -> Path:

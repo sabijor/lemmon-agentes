@@ -17,14 +17,19 @@ from datetime import datetime
 from pathlib import Path
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, EmailStr
 
 from api.deps import HISTORICO_DIR
+from api.security import auth_required  # v1.46.2 A3a-004 — proteger endpoints
 from core import audit
 from core.tenant import tenant_id
 
-router = APIRouter()
+# v1.46.2 A3a-004 — todos os endpoints de /usuarios agora exigem auth.
+# Antes GET expunha lista com token prefix de cada user (ataque por brute force
+# em ambiente compartilhado). Em dev (LEMMON_AUTH_TOKEN vazia) auth_required
+# pula automaticamente, então não quebra single-user local.
+router = APIRouter(dependencies=[Depends(auth_required)])
 
 
 Role = Literal["admin", "editor", "viewer"]
