@@ -703,158 +703,230 @@ capa "Retargeting Cascata Lipedema — Pedro", sessão em `historico/hator/`.
 
 ---
 
-## 🏃 SPRINT v1.47 — "Polimento UX desktop + integração planilha" (2-3 dias)
 
-**Objetivo:** UX impecável no desktop (Pedro vai usar no PC do consultório). Preparar terreno pra próxima feature do Calebe (integrar planilha financeira da clínica).
+# 📊 AUDITORIA v1.47 — 73 achados (2026-06-02)
 
-**REVISÃO (2026-06-02 conversa Calebe):** Mobile/responsivo **REMOVIDO** — sistema é localhost privado, Pedro acessa pelo Mac do consultório. Auth obrigatório/CSP estrito também **DEFERIDO pro v1.49** (só faz sentido quando expor pra internet). Foco agora: deixar o sistema sólido pra receber dado sensível (planilha financeira da clínica).
+Pós-v1.46.1, com Pedro pronto pra receber acesso, fizemos **auditoria completa em 6 frentes** (Backend, Frontend, Security/LGPD, UX, Tests, DevOps) com 6 auditores especialistas em paralelo via raio-X do código.
 
-**Critério de done:**
-- [ ] Export seletivo gera PDF coerente (resumo bate com conteúdo)
-- [ ] Modal de export nunca trava
-- [ ] Textos do Carlos com formatação profissional
-- [ ] Se backend cair durante pipeline, frontend recupera gracefully
-- [ ] Pasta `inputs/planilhas/` + endpoint pra upload XLSX (preparação pra próxima feature)
-- [ ] Ana Maria consegue ler XLSX da clínica e gerar análise financeira
+**Resultado:** 73 achados (17 🔴 / 30 🟠 / 18 🟡 / 8 🟢). Detalhes completos em `AUDITORIA_v1.47.md` e relatórios individuais em `auditoria/A{1-6}_*.md`.
 
-**Sequência:**
+## 🚨 1 BUG VIVO descoberto (P0 absoluto)
 
-### Bloco A — Export sem amadorismo (4h)
-1. **#14** Export seletivo regenera resumo da pág 1 só com agentes selecionados
-2. **#15** ExportModal race condition — adicionar `useEffect` que aguarda opções carregarem antes de renderizar botões
-3. **#16** Reforçar prompt do Carlos pra capitalização. Adicionar pós-processamento Aya como segurança
+`core/agente_admin_base.py:90` chama `self.historico.salvar()` que **não existe na classe Historico** — só tem `.registrar()`. É o MESMO bug do Carlos #10 v1.46.1, mas a classe BASE foi esquecida. Resultado: **Ana Maria + Prichina + Caíto + Kelly TODOS vão estourar AttributeError na primeira invocação**.
 
-### Bloco B — Robustez frontend (3h)
-4. **#7** Detectar WS dead → toast "conexão perdida, recarregue?" + tentar reconectar 3x antes de desistir
+Ana Maria é exatamente o agente da próxima feature (planilha financeira). Pedro carrega XLSX → sistema crasha imediatamente. **Fix: 15 minutos.**
 
-### Bloco C — Preparação planilha financeira (5h)
-5. **PROD-FIN-1** Endpoint `POST /financeiro/upload` aceita XLSX/CSV, valida estrutura, salva em `historico/<tenant>/financeiro/`
-6. **PROD-FIN-2** Cripto-at-rest aplica automático nos arquivos da clínica (LEMMON_ENCRYPT_KEY)
-7. **PROD-FIN-3** Ana Maria lê planilha via `openpyxl`, gera análise (DRE simplificado, ticket médio, top 5 procedimentos)
-8. **PROD-FIN-4** Audit log pra cada acesso (LGPD — dado sensível financeiro)
+## Top 10 P0 ranqueados (impacto × esforço)
 
-### Bloco D — Testes (4h)
-9. **Vitest setup** — `package.json`, `vitest.config.ts`, primeiro teste smoke
-10. **5 testes core** — useChat hidratação (#4 regressão), Concierge defesa Heitor (#9 regressão), MessageBubble progress format (#6 regressão), ExportModal init, ChatPanel render
-
-**Não entra mais:**
-- ~~Mobile breakpoints (F-15)~~ — sistema é localhost, Pedro usa no Mac do consultório
-- ~~Auth obrigatório default (V-01)~~ — desnecessário em localhost privado, defere pra v1.49
-- ~~CSP estrito (V-15)~~ — só importa em domínio público
-
-**Risco:** integração planilha pode revelar bugs em Ana Maria (agente menos testado). Buffer de +2h.
-
----
-
-## 🏃 SPRINT v1.48 — "Refactor pra escalar" (1-2 semanas)
-
-**Objetivo:** Próxima feature de produto custa metade. Pré-requisito pra time aumentar.
-
-**Critério de done:**
-- [ ] ChatPanel em 6 componentes < 300 linhas cada
-- [ ] useChat retorna max 8 valores (Zustand store cuida do resto)
-- [ ] ws_chat.py com strategy pattern — 1 arquivo por agente, < 200 linhas cada
-- [ ] Adicionar novo agente leva < 1h (criar classe + registrar strategy)
-- [ ] Zero `as any` em locais críticos
-
-**Sequência:**
-
-### Bloco A — Backend strategy pattern (3 dias)
-1. **A-10** `ws_chat.py` 703 linhas → 1 strategy por agente em `api/agent_strategies/`
-2. **A-20** `sugerir_pipeline` prompt monolítico → templates modulares
-3. **A-11** Salles alternativas — não sobrescrever, criar lista de variantes
-4. **A-13** `_stream` real (não sleep 60ms fake) — usar `anthropic.AsyncStream` real
-
-### Bloco B — Frontend state mgmt (4 dias)
-5. **F-07** Migrar `useChat` 34 returns → Zustand store
-6. **F-14** Quebrar `ChatPanel.tsx` (1773 linhas) em:
-   - `ChatHeader.tsx` (header + toggles)
-   - `MessageList.tsx` (lista + virtualization)
-   - `MessageBubble.tsx` (já existe, expande)
-   - `ChatInput.tsx` (textarea + upload)
-   - `ChatFooter.tsx` (custo + ações)
-   - `AgentMacroBar.tsx` (avatares running)
-7. **F-04** Props ChatPanel: usar Zustand em vez de prop drilling
-8. **F-08 a F-13** Zod validation, Tanstack Query no useHistory, `cva` pra Tailwind dups
-
-### Bloco C — Tech debt menor (1 dia)
-9. **A-19** Callback bloqueante 5min — converter pra async com timeout
-10. **F-12** Remover `as any` críticos — tipar WS payload com Zod
-
-**Risco:** Refactor é onde projetos morrem. Definir incremento: cada refactor termina com testes passando antes de começar próximo. Sem big-bang.
-
----
-
-## 🏃 SPRINT v1.49 — "SaaS-ready" (1 semana)
-
-**Objetivo:** 2º cliente entra (não só Pedro). Pronto pra cobrar.
-
-**Critério de done:**
-- [ ] DB SQLite substituindo JSON em disco
-- [ ] Painel `/pricing` com checkout (Stripe ou Asaas)
-- [ ] WhatsApp notification "dossiê pronto" (PROD-5)
-- [ ] Onboarding self-serve (criar tenant via UI, não env var)
-- [ ] Rate limit por tenant (não só por IP)
-
-**Sequência:**
-
-### Bloco A — Persistência (2 dias)
-1. **A-05** SQLite com `tenant_id` em todas tabelas
-2. Migração one-shot de JSON → SQLite
-3. Backup automático diário (cron)
-
-### Bloco B — Monetização (2 dias)
-4. **PROD-14b** Stripe/Asaas checkout no `/pricing`
-5. **Webhook** atualiza `tenant.subscription_status`
-6. Middleware de feature flag por plano (Solo / Clínica / Agência)
-
-### Bloco C — Segurança SaaS (2 dias)
-7. **V-01** Auth obrigatório por default — quando hospedar em IP público, sistema EXIGE `LEMMON_AUTH_TOKEN`. Hoje aceita modo dev silencioso
-8. **V-13** Rate limit por tenant + por endpoint pesado
-9. **V-14** Cancel real do Anthropic (passar `signal: AbortController`)
-10. **V-04** WS CSWSH — origin check estrito por tenant
-11. **V-15** CSP estrito — remover `unsafe-inline`, mover scripts pra arquivos
-
-### Bloco D — Produtos (2 dias)
-10. **PROD-5** WhatsApp notify via Twilio quando Aya termina
-11. **PROD-1.b** Concierge consulta `/historico/similar` com cross-cliente desligado por default
-12. **Onboarding** — wizard 5 passos cria tenant + brand kit + admin user
-
----
-
-## 📊 Cronograma agregado
-
-| Sprint | Duração | Saída | Pré-requisito |
+| # | ID | Bug | Esforço |
 |---|---|---|---|
-| **v1.46.1** | 1 dia | Pedro recebe acesso | — |
-| **v1.47** | 2-3 dias | UX impecável + mobile + testes baseline | v1.46.1 done |
-| **v1.48** | 1-2 semanas | Refactor pra escala | v1.47 done **+ PMF confirmado** (Pedro usando 2+ semanas) |
-| **v1.49** | 1 semana | SaaS-ready (2º cliente) | v1.48 done **+ pricing validado com lead real** |
+| 1 | A5-002 | `AgenteAdminBase.salvar()` não existe (4 agentes admin) | S |
+| 2 | A3a-001 | `/lgpd/exportar` + `/lgpd/deletar-sessao` SEM auth | S |
+| 3 | A3a-004 | Tokens user com `==` (não constant-time) + GET usuarios sem auth | S |
+| 4 | A3a-002 | `tenant_id()` aceita path traversal (`../etc`) | S |
+| 5 | A6a-002 | README ensina entry point errado (Pedro nem sobe backend) | S |
+| 6 | A4a-007 | Erro técnico em inglês na primeira sessão → Pedro abandona | S |
+| 7 | A2a-006 | Race condition no `useChat.send()` (WS antigo não fechado) | M |
+| 8 | A1b-008 | `buscar_historico_similar` vaza histórico entre tenants (LGPD) | M |
+| 9 | A1b-004 | Defesa anti-Heitor bypassable por sinônimos (ANS, ads, Meta) | M |
+| 10 | A6a-007 | Update workflow inexistente (subir nova versão = bomba) | M |
 
-**Total até SaaS B2B: 3-5 semanas trabalho focado.**
+**6 dos 10 são S (<1h). ~3h fecha tudo.**
+
+## Comparação com baseline (134 achados anteriores)
+
+- **54 resolvidos** no v1.46 + v1.46.1 (40% → 41%)
+- **9 persistentes** confirmados (F-14, F-07, A-10, V-26 parcial, etc)
+- **~30 novos** descobertos agora (regressões parciais + arquitetura pra próxima feature)
 
 ---
 
-## 🚦 Decisões de roteamento
+# 🗺️ ROADMAP PÓS-AUDITORIA — 4 SPRINTS
 
-### Pula direto pra v1.48 se…
-- Pedro pediu features novas (e o sistema ainda não escala bem pra adicionar)
-- Time de dev cresce (mais de 1 pessoa precisa mexer no mesmo arquivo)
+## 🚨 SPRINT v1.46.2 — Emergencial pré-Pedro real (~3h)
 
-### Pula direto pra v1.49 se…
-- 2º cliente real bate na porta antes de v1.47/v1.48 terminarem
-- Pedro pediu cobrança (validou produto, quer pagar)
+**Por quê AGORA:** sem isso, Pedro testar Ana Maria com planilha financeira = crash imediato. LGPD vaza tudo via GET. README impede subir backend novo.
 
-### Pausa tudo se…
-- Pedro abandonar (sem PMF, refactor é desperdício)
-- Anthropic mudar pricing > 2x (modelo de negócio quebra)
+**Critério de done:**
+- [ ] Ana Maria executa sem AttributeError
+- [ ] LGPD endpoints exigem auth token
+- [ ] tenant_id rejeita path traversal
+- [ ] GET /usuarios exige auth, comparação constant-time
+- [ ] README ensina subir backend de verdade
+- [ ] Erro em inglês → mensagem PT amigável
+- [ ] Magic bytes WebP completo (não só RIFF)
+- [ ] historico.py respeita tenant
+- [ ] 2 testes de regressão escritos
+
+### Bloco A — Bug vivo + LGPD (1h15)
+| # | ID | Fix | Esforço |
+|---|---|---|---|
+| 1 | A5-002 | `AgenteAdminBase.salvar(...)` → `.registrar({...})` em `core/agente_admin_base.py` | 15min |
+| 2 | A3a-001 | `_require_auth_token` em `/lgpd/exportar` + `/lgpd/deletar-sessao` (já está em /apagar-tudo) | 20min |
+| 3 | A3a-004 | `secrets.compare_digest` em `api/security.py` + auth em `GET /usuarios` | 15min |
+| 4 | A3a-002 | Regex sanitize em `core/tenant.py:tenant_id()` (só alfanumérico + hífen) | 10min |
+| 5 | A5-005 | `core/historico.py:12` usar `tenant_namespace()` (completa fix #11) | 15min |
+
+### Bloco B — UX + DevOps crítico (1h15)
+| # | ID | Fix | Esforço |
+|---|---|---|---|
+| 6 | A6a-002 | README: subir backend via `uvicorn api.main:app --port 8000` + alinhar start.sh + Makefile | 30min |
+| 7 | A4a-007 | Wrap erros técnicos do Concierge em fallback amigável PT no `useConcierge.ts` | 30min |
+| 8 | A1a-007 | Magic bytes WebP completo (marker bytes 8-12 'WEBP') | 15min |
+
+### Bloco C — Testes regressão + commit (30min)
+| # | Item | Esforço |
+|---|---|---|
+| 9 | `tests/test_regressoes.py`: `test_agente_admin_usa_registrar` + `test_lgpd_endpoints_exigem_auth` + `test_tenant_id_rejeita_traversal` | 20min |
+| 10 | Smoke test Hator + commit + push | 10min |
+
+**Total: ~3h. Pré-requisito pra qualquer coisa depois.**
+
+---
+
+## 🏗️ SPRINT v1.47 — Refactors pré-feature + planilha financeira (7-10 dias)
+
+**Por quê:** sem refactors arquiteturais, planilha vira gambiarra em arquivos de 2000 linhas. Ana Maria fica isolada do resto. Próximas features custam o dobro.
+
+**Critério de done:**
+- [ ] `ws_chat.py` → 1 strategy por agente em `api/agent_strategies/`
+- [ ] `ChatPanel.tsx` quebrado em 6+ componentes < 300 linhas cada
+- [ ] `useChat` → Zustand store (35 returns → 8)
+- [ ] Concierge system prompt em arquivos modulares
+- [ ] CI mínimo funcionando (.github/workflows/ci.yml)
+- [ ] Endpoint `/financeiro/upload` aceita XLSX
+- [ ] Ana Maria real lê planilha e gera análise
+- [ ] Tela "Análise Financeira" no dashboard
+
+### Bloco A — Refactors arquiteturais (3 dias)
+| # | ID | Refactor | Esforço |
+|---|---|---|---|
+| 1 | A1a-001/002 | `ws_chat.py` → registry `PipelineStep` + 1 arquivo por agente em `api/agent_strategies/` | M (2d) |
+| 2 | A2a-001 | `ChatPanel.tsx` 1773 → `ChatHeader`/`MessageList`/`MessageBubble`/`ChatInput`/`ChatFooter`/`AgentMacroBar` | L (2d) |
+| 3 | A2a-002 | `useChat` → Zustand store, retornar apenas 8 valores | M (1d) |
+| 4 | A1b-001 | Concierge: extrair system prompt pra `prompts/concierge/*.md` modulares | S (4h) |
+| 5 | A2a-008 | Modelo `mode` expansível (não só pipeline/reuniao) + Message tipada por agente | M (1d) |
+
+### Bloco B — CI + testes core (1 dia)
+| # | ID | Item | Esforço |
+|---|---|---|---|
+| 6 | A5-003 | `.github/workflows/ci.yml`: ruff + pytest + tsc + npm build | S (2h) |
+| 7 | A5-* | 10 testes core (Ana Maria registrar, tenant isolation, magic bytes, Concierge defesa, useChat hidratação, MessageBubble progress, ExportModal init, ChatPanel render, treino_pedro auth) | M (1d) |
+| 8 | Vitest setup + 5 testes frontend | S (4h) |
+
+### Bloco C — Planilha financeira (2-3 dias)
+| # | ID | Item | Esforço |
+|---|---|---|---|
+| 9 | PROD-FIN-1 | Endpoint `POST /financeiro/upload` aceita XLSX/CSV, valida estrutura, cripta com Fernet, salva em `historico/<tenant>/financeiro/` | M (1d) |
+| 10 | PROD-FIN-2 | Validação anti-Excel-CSV-injection (fórmulas `=cmd|...`), zip bomb, magic bytes XLSX | S (4h) |
+| 11 | PROD-FIN-3 | Ana Maria lê XLSX via `openpyxl`, gera DRE simplificado / ticket médio / top 5 procedimentos | M (1d) |
+| 12 | PROD-FIN-4 | Audit log dedicado pra acesso financeiro (LGPD) | S (2h) |
+| 13 | Frontend | Tela `/financeiro/upload` com drag-and-drop + tela de resultado | M (1d) |
+
+### Bloco D — Polish UX descoberto na auditoria (1 dia)
+| # | ID | Item | Esforço |
+|---|---|---|---|
+| 14 | A4a-002 | Botão "Experimentar exemplo" → preenche campo (não envia direto) | S (1h) |
+| 15 | A4a-003 | Click backdrop no modal NÃO marca onboarded; só X | S (30min) |
+| 16 | A4a-005 | ConciergeConfirmCard alerta quando agente é filtrado | S (1h) |
+| 17 | A4a-008 | Pipeline rodando: pulsing dot central + agentes terminados em verde | S (2h) |
+| 18 | A2a-003 | Smooth scroll só no fim do streaming, não por token | S (30min) |
+| 19 | A2a-005 | Cleanup SpeechRecognition no unmount | S (15min) |
+
+**Total: ~7-10 dias trabalho focado.**
+
+---
+
+## 🔐 SPRINT v1.48 — Hardening + multi-tenant safety (~2 semanas)
+
+**Por quê:** preparar pra adicionar 2º cliente sem refactor. Tornar audit log inadulterável. Update workflow funcional.
+
+**Critério de done:**
+- [ ] Concierge funciona pra 2 clientes diferentes sem hardcode
+- [ ] `buscar_historico_similar` filtrado por tenant
+- [ ] Cripto Fernet em brand_kit + usuarios + audit + prompts treinados
+- [ ] Audit log com hash chain + fsync + rotation diária
+- [ ] Backup automático diário com teste de restore
+- [ ] Update workflow documentado + migrations
+
+### Bloco A — Multi-tenant safety (5 dias)
+| # | ID | Item | Esforço |
+|---|---|---|---|
+| 1 | A1b-008 | `buscar_historico_similar` filtra por `tenant_id()` | M (1d) |
+| 2 | A1b-006 | Concierge tenant-aware: system prompt parametrizado por brand kit, espelho médico configurável | L (3d) |
+| 3 | A1b-004 | Defesa anti-Heitor: lista expandida + force-include simétrico + audit | M (1d) |
+
+### Bloco B — Cripto + audit hardening (3 dias)
+| # | ID | Item | Esforço |
+|---|---|---|---|
+| 4 | A3a-003 | Cripto Fernet aplicada em `brand_kit.json`, `usuarios.json`, `audit.jsonl`, `prompts/pedro_*_v*.md` | M (1d) |
+| 5 | A3a-005 | Audit log: hash chain (prev hash em cada linha) + fsync por write + rotação diária + teste de detecção tampering | M (1d) |
+| 6 | A3a-006 | Treino Pedro: validar prompt resultado preserva seções obrigatórias + remover bypass dev em prod | M (1d) |
+
+### Bloco C — DevOps SaaS-ready (4 dias)
+| # | ID | Item | Esforço |
+|---|---|---|---|
+| 7 | A6a-001 | CI completo (3 jobs: backend, frontend, security) | M (1d) |
+| 8 | A6a-003 | Script de backup diário (rotativo 7d + 4 semanas + 3 meses) + teste de restore quinzenal | M (1d) |
+| 9 | A6a-007 | Update workflow: `UPDATE.md` + script `bin/update.sh` + migrations versionadas | M (1d) |
+| 10 | A6a-006 | Logs estruturados JSON + request_id propagado + session_id em todos os agentes | M (1d) |
+
+### Bloco D — ws_chat residuais + dívida (3 dias)
+| # | ID | Item | Esforço |
+|---|---|---|---|
+| 11 | A1a-005 | `await ws.receive_json()` com timeout em 4 pontos críticos | S (2h) |
+| 12 | A1a-006 | Detecção de risco/veredicto via campo estruturado, não emoji string | S (2h) |
+| 13 | A1a-008 | Fallback chain documentada em comentário + teste cobrindo Renata sem Aya | S (1h) |
+| 14 | A-11 audit | Salles alternativas não sobrescreve | M (1d) |
+
+**Total: ~2 semanas.**
+
+---
+
+## ✨ SPRINT v1.49+ — Polish + post-PMF (TBD)
+
+**Quando:** depois de Pedro usar 2+ semanas e confirmar valor, ou quando 2º cliente entrar.
+
+### Pendente do audit (não bloqueia)
+- A1b-002 — Detecção injection com lista expandida
+- A1b-005 — Hard-enforce 4 rodadas via state, não prompt
+- A1b-007 — Concierge usar tool-use mode da Anthropic
+- A1a-003/004 — Aya/Renata fora do for-loop + dedup snap_outputs
+- A2a-004/007 — useEffect deps + a11y full
+- A4a-001/004/006 — Modal/headline/Editar fluxo refinado
+- A5 (15 testes) — Cobertura de exportador, share, calendário, etc
+- A6a-004/005/008 — Health probe + .env docs + disco cheio alerta
+- A3a-007/008 — Path traversal residual + relative_to edge case
+
+### Game-changers diferidos (PROD-XX)
+- PROD-3 Meta API direta (Otto+Carlos+Aya → publicar)
+- PROD-5 WhatsApp notify dossiê pronto
+- PROD-10 Briefing por voz (Siri-style)
+- PROD-11 Heitor proativo alerta CFM/ANVISA
+
+---
+
+## 📊 Cronograma agregado revisado
+
+| Sprint | Duração | Output | Pré-req |
+|---|---|---|---|
+| **v1.46.2** | ~3h (hoje) | Sistema pronto pra Pedro testar Ana Maria | v1.46.1 ✅ |
+| **v1.47** | 7-10 dias | Planilha financeira em produção limpa | v1.46.2 done |
+| **v1.48** | ~2 semanas | Multi-tenant ready + audit inadulterável | v1.47 done + PMF |
+| **v1.49+** | TBD | Polish + game-changers | 2º cliente real |
+
+**Até planilha em prod sem dívida: ~2 semanas focadas.**
+**Até pronto pra 2º cliente: ~1 mês.**
 
 ---
 
 ## ✅ Próxima ação imediata
 
-**Aguardando OK do Calebe pra começar Sprint v1.46.1.**
+**Aguardando OK do Calebe pra começar Sprint v1.46.2 emergencial.**
 
-Sequência: #13 → #10 → #11 → #12 → QA-H7 real → commit/push.
+Sequência (3h):
+1. A5-002 → A3a-001 → A3a-004 → A3a-002 → A5-005 (1h15)
+2. A6a-002 → A4a-007 → A1a-007 (1h15)
+3. Testes regressão + commit + push (30min)
 
-Tempo estimado total: 4-6h. Posso começar agora se aprovar.
+Posso começar agora se aprovar.
