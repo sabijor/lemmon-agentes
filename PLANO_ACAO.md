@@ -1,178 +1,342 @@
 # Plano de Ação Lemmon Agentes
 
-**Última atualização:** 2026-06-01 (sprint final pré-QA fechado)
-**Histórico completo:** `PLANO_ACAO_HISTORICO.md` (T1-T193 fechados)
+**Última atualização:** 2026-06-01 (pós-auditoria startup-unicórnio com 5 agentes)
+**Histórico:** `PLANO_ACAO_HISTORICO.md` (T1-T193 fechados)
+**Auditoria completa:** seção AUDITORIA abaixo (134 achados consolidados)
 
 ---
 
-## 🎯 Estado atual
+## 🎯 Resumo Executivo (auditoria-honesta)
 
-✅ **No ar** (`main` no GitHub):
-- 12 agentes especialistas + Concierge orquestrador conversacional
-- Layout pixel-art único (SVG removido)
-- Concierge com tipo `confirmar` antes de mobilizar time
-- Erros Anthropic traduzidos (sem crédito / chave inválida / rate limit / offline)
-- Cap automático de custo $0.50/sessão (ceiling $5)
-- Custos em R$ pra brasileiro
-- CORS restrito, path traversal bloqueado, imagem ≤ 5MB, WS timeout 5min
-- 3 modos de export (enxuto / completo / personalizar)
-- Banner ETA durante pipeline
-- Rate limit 60/min por IP
-- ThreadPool dedicado 10 workers
-- Endpoint `/health/anthropic` valida credencial sem custo
-- Custo estimado por sessão exibido em "confirmar"
-- Histórico Concierge persiste em refresh
-- Anti prompt injection
-- Hard-enforce limite 4 rodadas
+> "Sistema é bem feito pra protótipo single-user no Mac. Pra Pedro botar dado médico real ou SaaS B2B, falta o pacote inteiro de auth/tenancy/cripto/LGPD. Não é dia ou semana — é 3-6 semanas de Backend Senior + DPO."
 
-🚫 **NÃO entregar atualização pro Pedro até completar QA interno.**
+**Veredito da auditoria:**
+| Dimensão | Nota | Comentário |
+|---|---|---|
+| **Engenharia** | 6/10 | sólido pra MVP, dívida crescendo no `ChatPanel.tsx` (1773 linhas) e `ws_chat.py` (703 linhas) |
+| **Segurança** | 3/10 | zero auth, zero multi-tenant, CSWSH trivial, Next.js com 6 CVEs ativas, PII plaintext |
+| **Produto** | 7/10 | Concierge + Pedro Espelho são moats reais, mas não há PMF confirmado (zero sessões Pedro reais no histórico) |
+| **Testes** | 2/10 | ~8% cobertura, frontend = 0 testes, zero CI/CD |
+| **UX leigo** | 8/10 | recente sprint resolveu bem; falta memória entre sessões |
+
+**3 verdades duras:**
+1. **PMF é hipótese, não evidência.** 33 sessões no histórico, zero com Pedro Espelho real ativado.
+2. **Pixel office consumiu 30+ sub-tarefas e zero impact em ativação.** Maior desperdício do projeto.
+3. **Pra cobrar dinheiro de cliente: faltam auth + multi-tenant + criptografia + billing.** Sem isso = freebie técnico avançado.
 
 ---
 
-## 🧪 ROTEIRO QA INTERNO — pre-aprovação
+## 🚀 SPRINTS RECOMENDADOS (próximos 90 dias)
 
-### Preparação
+### Sprint 0 — QA interno (essa semana)
+Validar tudo que já foi feito antes de mexer em qualquer coisa nova. Roteiro completo no final desse documento.
+
+### Sprint 1 — "Não vaza pra fora" (1-2 semanas)
+Pre-requisito pra Pedro entrar com dado real. Bloqueia tudo depois.
+- **AUTH-1** Bearer token obrigatório em todas as rotas + WS
+- **AUTH-2** Origin check no WS (anti-CSWSH) 
+- **SEC-1** Next.js update (14.2.5 → 14.2.32+ ou 15.x) — 6 CVEs
+- **SEC-2** `bleach.clean` no Markdown→HTML (anti-XSS no dossiê)
+- **SEC-3** `/sugerir_pipeline` GET→POST (PII em URL log)
+- **PERF-1** Plugar `LEMMON_EXECUTOR` (fantasma documentado)
+- **PERF-2** Reusar `_anthropic_client` no Concierge
+
+### Sprint 2 — Refactor crítico (2 semanas)
+Sem isso, próxima feature custa o dobro.
+- **ARCH-1** Quebrar `ChatPanel.tsx` em 6+ componentes
+- **ARCH-2** Zustand para `useChat`/`useReuniao` (mata prop drilling 60+ itens)
+- **ARCH-3** Strategy pattern em `ws_chat.py` (700 linhas → 1 arquivo por agente)
+- **TEST-1** Vitest + RTL setup + 10 testes core (useChat, Concierge)
+- **TEST-2** Pytest + CI GitHub Actions
+- **PERF-3** `React.memo` em MessageBubble + `useMemo` em derived state
+- **PERF-4** Cancel real no WS (task paralela escutando)
+
+### Sprint 3 — Memória + monetização (2-3 semanas)
+Game-changers de produto + começar a cobrar.
+- **PROD-1** Concierge consulta `/historico/similar` automaticamente (T188.f)
+- **PROD-2** Feedback loop pós-Aya: "ficou bom?" (T188.h)
+- **PROD-3** Calibragem que **atualiza prompt do Pedro Espelho** (não só registra)
+- **PROD-4** Página `/pricing` + plano R$ 497/mês "Concierge Saúde Premium"
+- **PROD-5** Notificação WhatsApp "dossiê pronto"
+- **UX-1** Esconder pixel office por padrão (toggle "Modo imersivo")
+- **UX-2** Welcome modal detecta `?cliente=hator`
+
+### Sprint 4 — Multi-tenant + SaaS B2B (3-4 semanas)
+Só fazer se Sprint 3 validar PMF.
+- **ARCH-4** SQLite (substitui JSON-em-disco) com `tenant_id` em tudo
+- **ARCH-5** Multi-user com permissões (Pedro / secretária / freelancer)
+- **SEC-4** Cripto-at-rest (Fernet/AES-GCM) para dados médicos
+- **SEC-5** Audit log estruturado (LGPD art. 18)
+- **SEC-6** DELETE endpoint LGPD-compliant
+- **PROD-6** Brand Kit por cliente (multi-tenant ready)
+- **PROD-7** Cortes automáticos de podcast (killer feature médico)
+
+---
+
+## 🚨 BLOQUEADORES — não entregar pra Pedro sem isso
+
+| # | Item | Por que bloqueia | Auditor |
+|---|---|---|---|
+| **B-01** | Zero auth em qualquer endpoint | Pedro abre pelo Tailscale, hacker chega na API | Segurança V-01 |
+| **B-02** | WS CSWSH trivial (sem origin check) | Site malicioso aberto na outra aba dispara pipeline pago | Segurança V-03 |
+| **B-03** | Next.js 14.2.5 com 6 CVEs incl. CVE-2025-29927 | Authorization Bypass middleware | Segurança V-06 |
+| **B-04** | XSS via dossiê markdown → HTML | Briefing malicioso = roubo de sessão Pedro | Segurança V-07 |
+| **B-05** | `LEMMON_EXECUTOR` fantasma | 10 clínicas paralelas = `/health` trava | Backend #1 |
+| **B-06** | PII médica plaintext + sem cripto + sem LGPD | Pedro processando dado médico = breach na hora | Segurança V-05, G-01/02/03 |
+| **B-07** | Cancel em auto-mode não funciona | "Cliente apertou cancelar mas pagou $0.50" | Backend #4 |
+
+---
+
+## 🎯 QUICK WINS (alto impacto, < 1 dia)
+
+| # | Item | Esforço | Onde | Impacto |
+|---|---|---|---|---|
+| **Q-01** | Plugar `LEMMON_EXECUTOR` em 14 sites `run_in_executor` | 15min | `ws_chat.py` + 5 outros | Resolve threadpool fantasma |
+| **Q-02** | Reusar `_anthropic_client` no Concierge | 5min | `concierge.py:414` | -50% latência cold-start |
+| **Q-03** | Aplicar timeout/max_size em `ws_reuniao` e `ws_mesa` | 20min | mesmo padrão `ws_chat:11-14` | Fecha 2 vetores DoS |
+| **Q-04** | `RotatingFileHandler` no logger | 10min | `core/logger.py:8-32` | Evita encher disco |
+| **Q-05** | `asyncio.get_running_loop()` em todos | 5min | sed 5 arquivos | Pronto pra Python 3.12+ |
+| **Q-06** | `crypto.randomUUID()` polyfill | 10min | `page.tsx` + 4 lugares | Evita crash iPad Safari < 15.4 |
+| **Q-07** | `tsconfig target` es5 → es2017 | 1min | `tsconfig.json:3` | -5-10KB bundle, sem regressão |
+| **Q-08** | Remover `console.log('[TTS] vozes...')` | 1min | `ChatPanel.tsx:1394` | console limpo |
+| **Q-09** | Remover classe `left-13` (não existe Tailwind) | 1min | `ChatPanel.tsx:1628` | dead code |
+| **Q-10** | Toast em erros engolidos do histórico/exemplar | 20min | `useHistory.ts`, `SessionDetail.tsx` | UX 10x melhor de debug |
+| **Q-11** | `useMemo` em `totalSessao` reduce | 5min | `ChatPanel.tsx:739-761` | -1000 recálculos/min |
+| **Q-12** | `mover AUDITORIA_2026-05-05.md` pra `.gitignore` | 1min | `.gitignore` | Não vazar threat model |
+| **Q-13** | Plano de pricing estático em `/pricing` | 4h | `dashboard/app/pricing/page.tsx` | Sinaliza monetização |
+| **Q-14** | Validar base64 magic bytes (não só media_type) | 30min | `ws_chat.py:113` | Anti-evasão upload |
+| **Q-15** | POST em `/sugerir_pipeline` (era GET) | 10min | `auxiliares.py:85` | PII fora de URL log |
+
+---
+
+## 🚀 INOVAÇÕES DE PRODUTO (do auditor de PM)
+
+### 🚀 Game-changer (mudaria o jogo)
+
+| # | Item | Esforço | Por que |
+|---|---|---|---|
+| **PROD-1** | Concierge consulta `/historico/similar` antes de perguntar | M | Diferencial brutal vs ChatGPT que não lembra. Endpoint já existe |
+| **PROD-2** | Calibragem que TREINA (atualiza prompt do Pedro Espelho com correção real) | L | Sem isso, o moat erode. Hoje só registra divergência |
+| **PROD-3** | Modo "Publicador" — integração Meta API direta | L | Tira fricção: do briefing ao agendado em 8min |
+| **PROD-4** | "Ficou bom?" pós-Aya com sinais qualitativos | S | Reinforcement signal pra sistema aprender |
+| **PROD-5** | Cortes automáticos de podcast (1h → 10 Reels prontos) | M | Killer feature pra médico que faz podcast |
+
+### ✨ Alto impacto
+
+| # | Item | Esforço |
+|---|---|---|
+| **PROD-6** | App mobile read-only (PWA) pra aprovação Pedro entre consultas | M |
+| **PROD-7** | Brand Kit por cliente (logo, paleta, fonte, tom) | M |
+| **PROD-8** | Multi-user com permissões (Pedro admin / secretária / freelancer) | L |
+| **PROD-9** | Dashboard performance Instagram (link roteiro → métrica → próximo briefing) | M |
+| **PROD-10** | Briefing por voz no celular ("Siri pra marketing de clínica") | S |
+| **PROD-11** | Heitor proativo — alerta semanal CFM/ANVISA | M |
+| **PROD-12** | Heatmap calibragem visual (gameifica melhoria do moat) | S |
+
+### ✨ Polish / Marketing
+
+| # | Item | Esforço |
+|---|---|---|
+| **PROD-13** | Esconder pixel office por padrão (Modo Imersivo off) | S |
+| **PROD-14** | Página `/pricing` estática | S |
+| **PROD-15** | Welcome modal detecta `?cliente=hator` | S |
+| **PROD-16** | Painel saúde do sistema visível pro user | S |
+| **PROD-17** | Notificação email/WhatsApp "dossiê pronto" | M |
+| **PROD-18** | "Auditoria de feed gratuita em 60s" como lead magnet | M |
+
+### 💀 Top 3 riscos churn em 30 dias
+
+1. **Memória zero**: Pedro repete contexto toda sessão → "sistema burro". Fix: PROD-1.
+2. **Custo opaco**: R$ 60-100/mês acumulando sem billing. Fix: PROD-14 + cap mensal.
+3. **Concierge interroga demais**: briefing genérico sem `?cliente=hator` → ChatGPT bom. Fix: PROD-15.
+
+---
+
+## 🔒 SEGURANÇA — 30 vulnerabilidades catalogadas
+
+### 🔴 Críticas (CVSS 9-10) — bloqueiam Pedro
+
+| ID | Vulnerabilidade | Vetor | Mitigação |
+|---|---|---|---|
+| **V-01** | Zero auth em TODA a API | curl /historico → dados Hator inteiros | Bearer token obrigatório |
+| **V-02** | Zero multi-tenancy | namespace único `historico/dashboard/` | tenant_id particionado |
+| **V-03** | WS sem origin check (CSWSH) | `new WebSocket()` em evil.com | valida `ws.headers.origin` |
+| **V-04** | CORS não protege WS | WS bypassa CORS por design | mesmo de V-03 |
+| **V-05** | PII médica plaintext + sem TTL + sem audit | dados Hator world-readable | cripto-at-rest + DELETE endpoint |
+
+### 🟠 Altas (CVSS 7-8)
+
+| ID | Vulnerabilidade | Onde |
+|---|---|---|
+| **V-06** | Next.js 14.2.5 com 6 CVEs ativas (CVE-2025-29927) | `dashboard/package.json:12` |
+| **V-07** | XSS persistente via dossiê PDF/HTML | `exportador_aya.py:70-84` |
+| **V-08** | Prompt injection nos agentes downstream (não só Concierge) | `ws_chat.py` todos `_run_agent_step` |
+| **V-09** | `/sugerir_pipeline` GET com briefing na URL → log leak | `auxiliares.py:85` |
+| **V-10** | Rate limit ineficaz (botnet, proxy mascarado) | `main.py:25-48` |
+| **V-11** | Markdown sem bleach/safe_mode | `exportador_aya.py:70` |
+| **V-12** | Concierge prompt injection bypass (unicode, base64, indireção) | `concierge.py:331-362` |
+| **V-13** | DoS via WS — abrir 10, threadpool satura | `deps.py:37` + `ws_chat.py` |
+| **V-14** | Cancel não interrompe Anthropic em curso (queima crédito) | `ws_chat.py:215-440` |
+| **V-15** | `'unsafe-inline'` em CSP + script inline `/share` | `share.py:107-115` |
+
+### 🟡 Médias
+
+| ID | Item |
+|---|---|
+| **V-16** | Token calibragem só 24 bits (`token_hex(6)`) |
+| **V-17** | TOCTOU em `/share/{token}/comentar` |
+| **V-18** | `/transcrever` sem cap de tamanho/MIME (OOM) |
+| **V-19** | `/exportar` modo=resumo sem rate limit específico ($0.15 Anthropic por call) |
+| **V-20** | Traceback Anthropic vaza em `/transcrever` e `/exportar` |
+| **V-21** | `/calibragem_pedro` GET retorna registros plaintext sem auth |
+| **V-22** | `sanity_check` engole erro mascarando disk corrupt |
+| **V-23** | `pipeline_done` sem session_id deixa órfão silencioso |
+| **V-24** | `AUDITORIA_*.md` e `PLANO_ACAO*.md` na raiz — vaza threat model |
+| **V-25** | `BRIEFING_MAX_CARACTERES=15000` mas WS aceita 6MB |
+| **V-26** | Imagens base64 não validam magic bytes |
+
+### 🟢 Baixas
+
+V-27 a V-30: `.env` em backups, `/health/anthropic` sem cache, `except: pass` espalhado, `AGENTE_ALIAS` permite enumeração.
+
+### Compliance gaps LGPD/GDPR (dados médicos)
+
+- **G-01** Categoria especial (saúde) sem consentimento mapeado
+- **G-02** Sem direito ao esquecimento (DELETE/exportar)
+- **G-03** Transferência internacional Anthropic/OpenAI não disclosed
+
+---
+
+## ⚙️ ARQUITETURA — refactors críticos
+
+### Backend (30 achados, top 10)
+
+| ID | Item | Severidade | Esforço |
+|---|---|---|---|
+| **A-01** | `LEMMON_EXECUTOR` declarado mas NUNCA usado (fantasma) | 🔴 | S |
+| **A-02** | `Anthropic()` criado por agente, por step, por execução | 🔴 | M |
+| **A-03** | `concierge.py:414` recria client cada turno | 🔴 | S |
+| **A-04** | Cancel quebrado em auto-mode (loop sequencial) | 🔴 | M |
+| **A-05** | Persistência JSON-em-disco sem DB → não escala | 🔴 | L |
+| **A-06** | Multi-tenant inexistente | 🔴 | L |
+| **A-07** | Rate limit vaza memória + falha em proxy | 🔴 | M |
+| **A-08** | `ws_reuniao`/`ws_mesa` sem timeout/payload limit | 🔴 | S |
+| **A-09** | `_tolerant_send_json` monkey-patch confuso | 🟠 | S |
+| **A-10** | `ws_chat.chat()` 703 linhas, 5 closures, 13 nonlocals | 🟠 | L |
+| **A-11** | `_run_salles_alternativas` perde 2/3 dos roteiros (sobrescreve) | 🟠 | M |
+| **A-12** | PDF gen bloqueia executor default | 🟠 | M |
+| **A-13** | `_stream` finge streaming (sleep 60ms) | 🟠 | M |
+| **A-14** | Logger sem rotação + sem session_id | 🟠 | S |
+| **A-15** | `marcar_favorito` sem lock no `_index.json` | 🟠 | S |
+| **A-16** | Carrega catálogo 2× por request Concierge | 🟠 | S |
+| **A-17** | `image_base64` sem validação Pydantic | 🟠 | S |
+| **A-18** | Sem timeout/retry nas chamadas Anthropic | 🟠 | S |
+| **A-19** | `_make_confirmacao_callback` pode bloquear 5min | 🟠 | M |
+| **A-20** | `sugerir_pipeline` prompt monolítico 60 linhas hardcoded | 🟠 | M |
+
+### Frontend (28 achados, top 10)
+
+| ID | Item | Severidade | Esforço |
+|---|---|---|---|
+| **F-01** | Re-render ChatPanel em CADA token streamado | 🔴 | M |
+| **F-02** | `totalSessao` recalcula a cada render (sem memo) | 🔴 | S |
+| **F-03** | `Object.keys` 3× por tick no PixelOfficeScene | 🔴 | S |
+| **F-04** | 60 props pro ChatPanel + callbacks inline (referência nova) | 🟠 | M |
+| **F-05** | `setOverlayTick` 350ms re-render desnecessário | 🟠 | M |
+| **F-06** | `key={i}` em listas dinâmicas | 🟠 | S |
+| **F-07** | useChat retorna 34 valores (prop drilling) | 🔴 | L |
+| **F-08** | 2 sources of truth pro Concierge history | 🔴 | M |
+| **F-09** | `submittingRef` perde queue (silencia 2º clique) | 🔴 | S |
+| **F-10** | `useChat.send` cria WS novo cada vez | 🔴 | M |
+| **F-11** | `setState` após unmount (fetch sem AbortController) | 🔴 | S |
+| **F-12** | `as any` em locais críticos (WS payload) | 🔴 | L |
+| **F-13** | `tsconfig target: es5` em React 18 | 🟠 | S |
+| **F-14** | **ChatPanel.tsx = 1773 linhas** (cofre técnico) | 🔴 | L |
+| **F-15** | Sistema é desktop-only (sem breakpoint mobile) | 🔴 | L |
+| **F-16** | `concierge` agent pode crashar se removido do AGENTS | 🔴 | S |
+| **F-17** | `marcarExemplar` / `fetchSessions` engolem erro silencioso | 🟠 | S |
+| **F-18** | Foco em modal sem trap + Esc não fecha | 🟠 | M |
+| **F-19** | Texto `text-[8px-10px]` em volume (a11y WCAG) | 🟡 | M |
+| **F-20** | `panelSize` SSR mismatch | 🟠 | S |
+
+**Recomendação arquitetural unificada:**
+- **Zustand** para state management (mata #7, #4, #1)
+- **Quebrar ChatPanel** em 6+ componentes (mata #14)
+- **Zod** para validar todo payload WS (mata #12)
+- **Tanstack Query** para useHistory (mata #17)
+- **`clsx`/`cva`** para Tailwind (40+ dups de dark mode)
+
+---
+
+## 🧪 TESTES — 25 gaps, cobertura atual ~8%
+
+### Top 10 testes que pegam 80% dos bugs
+
+1. **`test_ws_chat_pipeline_happy_path`** — pipeline 12 agentes mockado, sequência eventos validada
+2. **`test_concierge_4_rodadas_forca_confirmar`** — T188.m regressão
+3. **`test_concierge_prompt_injection_alerts`** — T188.o
+4. **`test_exportar_pdf_gera_arquivo`** — pega T157 que já quebrou
+5. **`test_path_traversal_download_historico`** — tabela de casos maliciosos
+6. **`test_share_xss_escape_e_csp`** — T133 regressão
+7. **`test_rate_limit_middleware`** — 61ª request retorna 429
+8. **`test_concurrent_favoritar_tags`** — T130 regressão
+9. **`test_useChat_reconcilia_historico_focus`** — T140 regressão
+10. **`test_classificar_e_formatar_erro_anthropic`** — tabela exaustiva
+
+### Infra recomendada
+
+- **Backend:** pytest + pytest-asyncio + httpx (já tem) + respx (mockar Anthropic) + coverage + hypothesis (fuzz path validators) + schemathesis (contract OpenAPI)
+- **Frontend:** vitest + @testing-library/react + msw (mock fetch/WS)
+- **E2E:** Playwright (não Cypress — WS funciona melhor)
+- **CI/CD:** GitHub Actions com 3 jobs (backend, frontend, security)
+
+### CI mínimo proposto
+
+`.github/workflows/ci.yml`:
+- Job backend: ruff + mypy + pytest com coverage
+- Job frontend: tsc --noEmit + npm build (depois: vitest)
+- Job security: bandit + safety + npm audit
+- Pre-commit: ruff format + prettier + tsc-files + gitleaks
+
+---
+
+## 🧪 ROTEIRO QA INTERNO (antes de qualquer melhoria nova)
+
+### Setup
 ```bash
 cd ~/Documents/lemmon-agentes
-git pull origin main
-# Reinicia backend + frontend pelos scripts
+git pull origin main  # commit fe698c1
+# Reinicia backend + frontend
 ```
 
-### Bloco 1 — Concierge caminho feliz Hator
-| # | Cenário | Esperado |
-|---|---|---|
-| 1.1 | Limpar localStorage (`localStorage.clear()`) e reabrir | Modal "menopausa" + header limpo (sem 🏆 🔍 ✂️ 🎯 + sem ComplianceToggle) |
-| 1.2 | Empty state mostra 3 exemplos clicáveis Hator | Sim |
-| 1.3 | Clicar exemplo "menopausa" | Texto preenche input |
-| 1.4 | Input com highlight pulsante verde nos primeiros 5s | Sim |
-| 1.5 | Enviar briefing simples | Concierge responde em ~3s com pergunta |
-| 1.6 | Responder pergunta 1x | Concierge eventualmente responde tipo `confirmar` |
-| 1.7 | Mensagem de "confirmar" lista agentes + razões | Sim |
-| 1.8 | Toast info aparece com "💰 Custo estimado: R$ X,XX" | Sim |
-| 1.9 | Briefing menciona "menopausa/Hator/Pedro" | `pedro_abrahao` aparece no time |
-| 1.10 | Responder "ok pode rodar" | Pipeline dispara |
-| 1.11 | Banner verde ETA aparece | "Restam ~X min — não feche a aba" |
-| 1.12 | MacroBar mostra cargo abaixo do nome | Sim ("Estratég.", "Roteiri.", etc) |
-| 1.13 | Pipeline termina | Toast verde "🎉 Dossiê pronto!" com 3 botões + share |
-| 1.14 | Custos em R$ no chip | Sim, formato "R$ 2,75 / R$ 2,75" |
+### 9 blocos, 60+ cenários (mantidos da versão anterior)
 
-### Bloco 2 — Concierge regras rígidas
-| # | Cenário | Esperado |
-|---|---|---|
-| 2.1 | Briefing "roteiros pro Instagram" | Inclui `carlos`, NÃO `salles` |
-| 2.2 | Briefing "vamos gravar entrevista AO VIVO com médico" | Inclui `salles` (produção real) |
-| 2.3 | Briefing "calendário editorial pro mês" | `renata` + `aya` apenas (2 agentes) |
-| 2.4 | Briefing genérico simples | Concierge não convoca 6+ agentes (default conservador) |
-| 2.5 | Briefing puro Hator | `pedro_abrahao` obrigatoriamente |
-| 2.6 | Continuar conversando 5x sem chegar a "confirmar" | 5ª resposta força `confirmar` (T188.m) |
+Ver detalhamento nos blocos T-A a T-H acima (commit anterior do plano). Resumo:
 
-### Bloco 3 — Erros Anthropic amigáveis
-| # | Cenário | Esperado |
-|---|---|---|
-| 3.1 | Sem crédito na conta Anthropic | Toast "💳 Sem crédito... console.anthropic.com → Billing" |
-| 3.2 | Chave inválida no `.env` | Toast "🔑 Chave da API inválida ou ausente" |
-| 3.3 | Backend desligado | Toast "Conexão com servidor perdida" (sem mencionar Terminal) |
-| 3.4 | Sem internet | Toast "🌐 Sem conexão com a API Anthropic" |
-| 3.5 | Rate limit Anthropic atingido | Toast "⏳ Limite de chamadas atingido" |
-| 3.6 | `GET /health/anthropic` | `{"status":"ok"}` se OK; `{"kind":"sem_credito",...}` se sem crédito |
+- **T-A** Concierge caminho feliz Hator (14 cenários)
+- **T-B** Concierge regras rígidas (6) — Pedro obrigatório, Salles só com gravação, time conservador
+- **T-C** Erros Anthropic amigáveis (6) — sem crédito / chave inválida / offline / rate limit / health/anthropic
+- **T-D** Custos e segurança (9) — cap, image 5MB, path traversal, PII, prompt injection
+- **T-E** Export 3 modos (6)
+- **T-F** UX leigo (6) — ETA, microfone, NPC Pedro, highlight input
+- **T-G** Robustez frontend (8) — reconciliação 3 eventos, double-click, abort
+- **T-H** localStorage versionado (3)
 
-### Bloco 4 — Custos e segurança
-| # | Cenário | Esperado |
-|---|---|---|
-| 4.1 | Não enviar custoCap pro WS | Backend usa default $0.50 (cap forçado server) |
-| 4.2 | Tentar custoCap=999 | Backend limita a $5 (ceiling) |
-| 4.3 | Anexar imagem > 5MB | Warning "Imagem muito grande" + pipeline segue sem visão |
-| 4.4 | Tentar GET `/download/../../etc/passwd` | 400 "session_id inválido" |
-| 4.5 | Briefing com PII (CPF, nome) | Logs não vazam dados sensíveis (verificar) |
-| 4.6 | Briefing 6MB no WS | Backend desconecta com 1009 + msg amigável |
-| 4.7 | Briefing com "ignore instructions" | Concierge NÃO revela system prompt |
-| 4.8 | Cap atinge | Modal "R$ 2,75 / R$ 2,75" + botões "Autorizar +R$ X" / "Parar aqui" |
-| 4.9 | 60+ requests/min do mesmo IP | 429 "Limite de chamadas atingido" |
-
-### Bloco 5 — Export do dossiê
-| # | Cenário | Esperado |
-|---|---|---|
-| 5.1 | Toast "Dossiê pronto" aparece | Sim, persistente (não auto-dismiss) |
-| 5.2 | Clicar "✂️ Só demandas (enxuto)" | Baixa PDF só com Carlos/Salles + Renata |
-| 5.3 | Clicar "📋 Completo" | Baixa PDF da Aya completa |
-| 5.4 | Clicar "⚙️ Personalizar" + 3 checkboxes | Baixa PDF combinado das seções escolhidas |
-| 5.5 | PDF tem seções nomeadas certas | "Roteiros (Carlos)", "Roteiros (Salles)", "Análise financeira (CFO)" etc |
-| 5.6 | Sessão Hator admin (ana_maria) | PDF exporta com label "Análise financeira (CFO)" |
-
-### Bloco 6 — UX leigo
-| # | Cenário | Esperado |
-|---|---|---|
-| 6.1 | Banner ETA durante pipeline | Aparece e atualiza em tempo real |
-| 6.2 | Microfone — negar permissão browser | Toast "🎤 Microfone bloqueado... cadeado" |
-| 6.3 | Microfone — sem mic conectado | Toast "🎤 Não achei o microfone" |
-| 6.4 | Empty state Auto | 14px legível + 3 exemplos clicáveis |
-| 6.5 | Hover NPC Pedro no escritório | Tooltip "Pedro (espelho IA) — Validador médico" |
-| 6.6 | Input do chat no 1º acesso | Highlight pulsante verde 5s |
-
-### Bloco 7 — Robustez frontend
-| # | Cenário | Esperado |
-|---|---|---|
-| 7.1 | Trocar de aba durante pipeline → voltar | Reconcilia via histórico |
-| 7.2 | Cmd+Tab → voltar | Reconcilia (window.focus) |
-| 7.3 | Wi-Fi off → on | Reconcilia (online event) |
-| 7.4 | Duplo-clique no botão enviar | Só dispara 1 fluxo (submittingRef) |
-| 7.5 | Clicar Abort durante pipeline | Backend para imediatamente (WS cancel) |
-| 7.6 | Refresh durante "confirmar" | Histórico Concierge persiste (vê na próxima abertura) |
-| 7.7 | F5 com sessão rodando | Estado parcial preservado + reconciliação dispara |
-| 7.8 | Enviar 5 mensagens rápido (race condition) | Histórico fica balanceado, sem duplicação |
-
-### Bloco 8 — localStorage versionado
-| # | Cenário | Esperado |
-|---|---|---|
-| 8.1 | `localStorage.setItem('lemmon-auto-mode', 'invalido')` + reload | Não crasha, volta pro default |
-| 8.2 | Dado novo gravado | Formato `{__v: 1, data: ...}` |
-| 8.3 | Bump schemaVersion num hook | Reset limpo + console.info |
-
-### Bloco 9 — Backend escalabilidade
-| # | Cenário | Esperado |
-|---|---|---|
-| 9.1 | 5 abas rodando pipeline simultâneo | Backend não trava `/health` (executor dedicado) |
-| 9.2 | `GET /health/anthropic` durante pipeline | Responde rápido (não bloqueia) |
-| 9.3 | Modelo Anthropic override via env | `LEMMON_MODELO_CONCIERGE=claude-sonnet-4-5` funciona |
-| 9.4 | sanity_check falha no startup | Backend sobe mesmo assim com log warning |
-
----
-
-## ⏳ Pendências (não bloqueiam Pedro)
-
-### Refactor arquitetural — pode ficar pra próxima rodada
-| ID | Item |
-|---|---|
-| **T189.a-e** | Mover Concierge pra `agentes/concierge.py` herdando AgenteBase. Decisão: deixar como está enquanto está estável. Refactor não muda comportamento, apenas organização |
-
-### Features novas (não bugs)
-| ID | Item |
-|---|---|
-| **T188.f** | Concierge consulta `/historico/similar` ao receber briefing |
-| **T188.g** | Execução parcial — pipeline em etapas |
-| **T188.h** | Feedback loop pós-pipeline ("ficou bom? iterar?") |
-| **T190.B12** | Calibragem Pedro proativa na 1ª sessão Hator |
-
-### Polish opcional
-| ID | Item |
-|---|---|
-| **T188.n** | Aviso visual "Concierge OFF" em modo Expert/Reunião |
-| **T190.B5** | Painel resizable com handles visíveis |
-| **T190.B6** | Responsividade iPad/mobile < 768px |
-| **T190.C8** | Multi-tab sobrescreve sessão (BroadcastChannel) |
-| **T190.C10/11** | Memory leaks sutis em refs |
-| **T190.D2** | Prompt caching Anthropic (~40% economia input) |
-| **T190.D9** | Tipar `any` em useChat progressivamente |
-| **T185.3f/g** | PixelOfficeScene: modo reunião + pan/zoom |
+### Refinamentos visuais (commit `fe698c1`) a validar
+- [ ] Bolha "Concierge pensando..." aparece após enviar
+- [ ] Card "confirmar" com avatares + cargos + custo R$ + botões grandes
+- [ ] MacroBar com glow no agente ativo
+- [ ] ETA banner com relógio rotacionando
+- [ ] Custos em R$ em MessageBubble
 
 ---
 
 ## 📋 Protocolo de execução
 
-1. **ANTES de executar** → registrar como `⏳ em andamento`
-2. **DEPOIS de executar** → atualizar pra `✅ concluído` com observações reais
+1. **ANTES de executar** → registrar tarefa como `⏳ em andamento`
+2. **DEPOIS de executar** → `✅ concluído` com observações reais
 3. Subtarefas `T{N}.{letra}` também entram aqui
-4. Este arquivo é source of truth — TaskCreate é navegação
+4. Este arquivo é source of truth
 
 ---
 
@@ -193,3 +357,15 @@ git pull origin main
 | `prichina` | Prichina | Admin/RH Hator | admin |
 | `caito` | Caíto | COO Hator | admin |
 | `kelly` | Kelly | Tributário/Contábil Hator | admin |
+
+---
+
+## 📊 Estatísticas finais da auditoria
+
+- **134 achados catalogados** (30 backend + 28 frontend + 30 segurança + 18 produto + 25 testes + 3 polish geral)
+- **22 bloqueadores 🔴** (não pode B2B SaaS sem tratar)
+- **15 quick wins 🟢** (alto impacto, < 1 dia cada)
+- **5 game-changers de produto 🚀**
+- **30 vulnerabilidades de segurança** (5 críticas, 10 altas)
+- **3 gaps LGPD/GDPR** (dados médicos)
+- **Cobertura de testes ~8%** (frontend = 0)
