@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from api.deps import _anthropic_client
-from api.routes import agentes, auxiliares, brand_kit, calibragem, concierge, exemplares, exportar, historico, lgpd, saude, sessoes, share, transcrever, treino_pedro, usuarios
+from api.routes import agentes, auxiliares, brand_kit, calibragem, concierge, exemplares, exportar, financeiro, historico, lgpd, saude, sessoes, share, transcrever, treino_pedro, usuarios
 from api.ws_chat import chat
 from api.ws_mesa import mesa_redonda
 from api.ws_reuniao import reuniao
@@ -137,6 +137,7 @@ app.include_router(concierge.router)  # T186 — orquestrador conversacional
 app.include_router(lgpd.router)  # G-01/02/03 — LGPD compliance
 app.include_router(brand_kit.router)  # PROD-7 — Brand Kit por cliente
 app.include_router(usuarios.router)  # PROD-8 — Multi-user
+app.include_router(financeiro.router)  # PROD-FIN v1.47 — planilha financeira XLSX/CSV pra Ana Maria
 app.include_router(treino_pedro.router)  # PROD-2 — Calibragem que treina
 
 app.websocket("/ws/chat")(chat)
