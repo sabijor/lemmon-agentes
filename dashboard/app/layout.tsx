@@ -5,7 +5,14 @@ import { ThemeProvider } from '@/lib/theme-provider'
 
 export const metadata: Metadata = {
   title: 'Lemmon | Agentes',
-  description: 'Sistema multi-agente da Lemmon Produções',
+  description: 'Time IA da sua clínica — conversa, valida e entrega',
+  manifest: '/manifest.json',  // PROD-6 — PWA
+  themeColor: '#10b981',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Lemmon',
+  },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

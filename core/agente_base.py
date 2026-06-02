@@ -86,6 +86,10 @@ class AgenteBase(ABC):
     max_tokens: int = 4096
     system_prompt_reuniao: str | None = None  # se definido, usado no modo conversacional
     modelo: str  # setado em __init__ via resolver_modelo(self.nome)
+    # A-18 — timeout em segundos pra chamadas Anthropic. Default 120s.
+    api_timeout_s: float = 120.0
+    # A-18 — retries automáticos em erros transientes (overloaded, 5xx, timeout).
+    api_max_retries: int = 2
 
     # ── METADADOS PARA AUTO-ROTEADOR (T139) ─────────────────────────────────
     # Lidos por GET /agentes/catalogo e por /sugerir_pipeline para a IA

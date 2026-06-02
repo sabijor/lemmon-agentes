@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { motion } from 'framer-motion'
 import { AGENT_MAP, type AgentId } from '@/lib/agents'
 import { type Message } from '@/lib/useChat'
@@ -28,7 +29,9 @@ export function exportTxt(messages: Message[]) {
   URL.revokeObjectURL(url)
 }
 
-export function UserMessage({ msg }: { msg: Message }) {
+// F-01 — React.memo evita re-render em cada token streamado. Antes,
+// ChatPanel inteiro re-renderizava ~500x/segundo durante pipeline.
+export const UserMessage = memo(function UserMessage({ msg }: { msg: Message }) {
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-end gap-1">
       <div className="flex items-center gap-2 pr-1">
@@ -51,9 +54,9 @@ export function UserMessage({ msg }: { msg: Message }) {
       </div>
     </motion.div>
   )
-}
+})
 
-export function AgentMessage({ msg, progress }: { msg: Message; progress?: number }) {
+export const AgentMessage = memo(function AgentMessage({ msg, progress }: { msg: Message; progress?: number }) {
   const agent = AGENT_MAP[msg.role as AgentId] ?? AGENT_MAP[msg.role.replace(/_v\d+$/, '') as AgentId]
   if (!agent) return null
   return (
@@ -100,4 +103,11 @@ export function AgentMessage({ msg, progress }: { msg: Message; progress?: numbe
       </div>
     </motion.div>
   )
-}
+}, (prev, next) => {
+  // Custom equality: re-renderiza só se content, done ou progress mudar
+  return prev.msg.id === next.msg.id
+    && prev.msg.content === next.msg.content
+    && prev.msg.done === next.msg.done
+    && prev.msg.error === next.msg.error
+    && prev.progress === next.progress
+})

@@ -35,8 +35,20 @@ class HistoricoMensagem(BaseModel):
     role: Literal['user', 'concierge']
     content: str
     # T186.c — imagem opcional anexada à mensagem (vision)
+    # A-17 — image_base64 com limite Pydantic + tipos restritos
     image_base64: str | None = None
-    image_media_type: str | None = None
+    image_media_type: Literal[
+        'image/jpeg', 'image/png', 'image/gif', 'image/webp', None
+    ] | None = None
+
+    @classmethod
+    def __get_validators__(cls):
+        yield from super().__get_validators__()  # type: ignore
+
+    def model_post_init(self, _ctx) -> None:
+        # Limite 6.7MB base64 ≈ 5MB binário
+        if self.image_base64 and len(self.image_base64) > 6_700_000:
+            raise ValueError("image_base64 muito grande (limite ~5MB)")
 
 
 class ConcierePedido(BaseModel):
@@ -94,10 +106,18 @@ FERRAMENTAS_DISPONIVEIS = {
 }
 
 
+# A-16 — cache de catálogo (era construído 2x por request Concierge)
+_CATALOGO_CACHE: list[dict] | None = None
+
+
 def _carregar_catalogo_seguro() -> list[dict]:
-    """Carrega catálogo dos agentes; retorna lista vazia se falhar."""
+    """Carrega catálogo dos agentes; cache em memória (raramente muda)."""
+    global _CATALOGO_CACHE
+    if _CATALOGO_CACHE is not None:
+        return _CATALOGO_CACHE
     try:
-        return construir_catalogo()
+        _CATALOGO_CACHE = construir_catalogo()
+        return _CATALOGO_CACHE
     except Exception:
         return []
 
