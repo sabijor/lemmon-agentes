@@ -68,7 +68,12 @@ def gerar_html_capa(nome_projeto: str, data_compilacao: str,
 # =============================================================================
 
 def markdown_para_html(markdown: str) -> str:
-    """Converte markdown pra HTML usando biblioteca markdown."""
+    """Converte markdown pra HTML usando biblioteca markdown.
+
+    SEC-C — passa por bleach pra remover qualquer `<script>` ou outro vetor
+    XSS que tenha vindo do briefing/output do agente. Mitiga prompt injection
+    que injeta HTML malicioso no dossiê.
+    """
     try:
         import markdown as md_lib
     except ImportError:
@@ -81,7 +86,44 @@ def markdown_para_html(markdown: str) -> str:
         extensions=["extra", "tables", "fenced_code", "nl2br", "sane_lists"],
         output_format="html5",
     )
-    return md.convert(markdown)
+    html_raw = md.convert(markdown)
+
+    # SEC-C — sanitize com bleach (whitelist). Se bleach não estiver instalado,
+    # loga warning e retorna raw (modo degradado, não quebra exportação).
+    try:
+        import bleach
+        ALLOWED_TAGS = [
+            "p", "br", "hr", "em", "strong", "del", "code", "pre",
+            "h1", "h2", "h3", "h4", "h5", "h6",
+            "ul", "ol", "li",
+            "blockquote", "a",
+            "table", "thead", "tbody", "tr", "th", "td",
+            "img", "span", "div",
+        ]
+        ALLOWED_ATTR = {
+            "a": ["href", "title"],
+            "img": ["src", "alt", "title", "width", "height"],
+            "span": ["class"],
+            "div": ["class"],
+            "th": ["align"],
+            "td": ["align"],
+        }
+        ALLOWED_PROTOCOLS = ["http", "https", "mailto"]
+        html_safe = bleach.clean(
+            html_raw,
+            tags=ALLOWED_TAGS,
+            attributes=ALLOWED_ATTR,
+            protocols=ALLOWED_PROTOCOLS,
+            strip=True,
+        )
+        return html_safe
+    except ImportError:
+        # Degrade silencioso — log no caller
+        import logging
+        logging.getLogger("lemmon.exportador").warning(
+            "bleach não instalado; HTML do dossiê sai sem sanitização (risco XSS)."
+        )
+        return html_raw
 
 
 # =============================================================================

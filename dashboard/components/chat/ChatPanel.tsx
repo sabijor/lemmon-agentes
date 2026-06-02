@@ -27,6 +27,7 @@ import ExportMenu from '../export/ExportMenu'  // T191.a — menu granular de ex
 import { formatCustoBRL } from '@/lib/formatCusto'  // T190.B3 — USD → R$
 import { ConciergeTyping } from './ConciergeTyping'  // Refinamento — loading "pensando..."
 import { ConciergeConfirmCard } from './ConciergeConfirmCard'  // Refinamento — card "confirmar"
+import { FeedbackPosPipeline } from './FeedbackPosPipeline'  // PROD-4 — feedback loop
 
 interface AttachedImage extends ImageData {
   preview: string
@@ -1232,6 +1233,9 @@ export default function ChatPanel({
               initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
               className="mx-4 mb-1 flex flex-col gap-3 px-4 py-3 rounded-xl border border-stone-200/60 dark:border-stone-700/60 bg-stone-50/80 dark:bg-stone-900/60 flex-shrink-0"
             >
+              {/* PROD-4 — feedback pós-pipeline (reacao loop) */}
+              <FeedbackPosPipeline sessionId={sessionId} isVisible={!!sessionId} />
+
               {/* Tags sugeridas — T180 dark */}
               {tagsAceitas.length > 0 && (
                 <div className="border-b border-stone-200/60 dark:border-stone-700/60 pb-3 mb-3">
@@ -1391,7 +1395,9 @@ export default function ChatPanel({
                         const ayaMsg = messages.find(m => m.role === 'aya' && m.done && m.content)
                         if (!ayaMsg) return
                         const voices = window.speechSynthesis.getVoices()
-                        console.log('[TTS] vozes disponíveis:', voices.map(v => `${v.name} (${v.lang})`))
+                        if (process.env.NODE_ENV === 'development') {
+                          console.log('[TTS] vozes disponíveis:', voices.map(v => `${v.name} (${v.lang})`))
+                        }
                         const ptVoice = voices.find(v => v.lang.startsWith('pt'))
                         if (!ptVoice && voices.length > 0) {
                           setTtsError('Nenhuma voz pt-BR disponível. Tente Chrome ou instale uma voz no sistema.')
@@ -1625,7 +1631,7 @@ export default function ChatPanel({
                 {/* Upload de áudio (T34) — T180 dark */}
                 <button type="button" onClick={() => audioInputRef.current?.click()} disabled={isRunning || audioTranscribing}
                   title="Upload de áudio — transcrição automática"
-                  className={`absolute left-13 bottom-3 w-8 h-8 rounded-lg border flex items-center justify-center transition-all
+                  className={`absolute bottom-3 w-8 h-8 rounded-lg border flex items-center justify-center transition-all
                     disabled:opacity-30 disabled:cursor-not-allowed
                     ${audioTranscribing
                       ? 'border-violet-400 bg-violet-100 dark:bg-violet-900/40 animate-pulse'

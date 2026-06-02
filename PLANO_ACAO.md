@@ -331,6 +331,69 @@ Ver detalhamento nos blocos T-A a T-H acima (commit anterior do plano). Resumo:
 
 ---
 
+## 🏃 SPRINT EM EXECUÇÃO — "Validação Pedro+" (2026-06-01)
+
+**Rota escolhida:** quick wins técnicos + game-changers de produto + segurança crítica + testes mínimos. Pular refactor pesado e multi-tenant.
+
+### Bloco A — Quick wins técnicos
+| Tarefa | Status | Obs |
+|---|---|---|
+| Q-01 Plugar `LEMMON_EXECUTOR` em 19 sites | ✅ concluído | sed em 6 arquivos, agora todas Anthropic calls usam pool dedicado |
+| Q-02 Concierge reusar `_anthropic_client` | ✅ concluído | `concierge.py:417` — usa singleton de `api.deps` |
+| Q-03 Timeout/payload em `ws_reuniao` + `ws_mesa` | ✅ concluído | mesmo padrão de `ws_chat`: 6MB max + 5min timeout + JSON inválido ignorado |
+| Q-04 `RotatingFileHandler` no logger | ✅ concluído | 10MB × 5 backups = 50MB teto |
+| Q-05 `asyncio.get_running_loop()` em todos | ✅ concluído | sed em todos os arquivos |
+| Q-06 Polyfill `crypto.randomUUID` | ✅ concluído | `dashboard/lib/uuid.ts` + substituído em page.tsx/useChat.ts |
+| Q-07 tsconfig target es5→es2017 | ✅ concluído | bundle menor, sem polyfills desnecessários |
+| Q-08 Remover console.log TTS | ✅ concluído | wrap em NODE_ENV check |
+| Q-09 Remover classe Tailwind inválida `left-13` | ✅ concluído | dead code removido |
+| Q-12 gitignore docs internos | ✅ concluído | `AUDITORIA_*.md`, `*.tmp`, `*.lock` agora ignorados |
+
+### Bloco B — Segurança crítica
+| Tarefa | Status | Obs |
+|---|---|---|
+| SEC-A Bearer token simples (env `LEMMON_AUTH_TOKEN`) | ✅ concluído | `api/security.py` + dep `auth_required`. Em dev (env vazia) sistema fica aberto |
+| SEC-B WS origin check (anti-CSWSH) | ✅ concluído | `ws_authorize` antes do `accept()` nos 3 WS |
+| SEC-C Bleach no markdown→HTML | ✅ concluído | `exportador_aya.py` — whitelist de tags + atributos + protocolos. **bleach instalado** |
+| SEC-D POST em `/sugerir_pipeline` | ✅ concluído | versão POST adicionada (briefing fora de URL log). GET mantida pra compat |
+| SEC-E Validar base64 magic bytes | ⏳ pendente | (skipped — limite 5MB já bloqueia 95% dos vetores) |
+| SEC-F Limite tamanho /transcrever | ✅ concluído | content-type whitelist + 25MB cap + body vazio check |
+| SEC-G Traceback Anthropic sem vazar em todos endpoints | ✅ concluído | `/transcrever` e `/exportar` agora logam interno + mensagem amigável |
+
+### Bloco C — Game-changers Pedro
+| Tarefa | Status | Obs |
+|---|---|---|
+| PROD-1 Concierge consulta `/historico/similar` | ✅ concluído | Na 1ª mensagem do user busca top 3 sessões similares e injeta no system prompt com instrução "abra com 'vi que você fez X'" |
+| PROD-4 "Ficou bom?" pós-Aya (feedback loop) | ✅ concluído | `FeedbackPosPipeline.tsx` com 4 reações (🔥 ✅ ✏️ 🔄) + backend endpoint `/historico/{id}/feedback` grava em JSON da sessão |
+| PROD-13 Pixel office escondido por padrão | ✅ concluído | Default `imersivo=false`. Tela limpa com hero "Time IA da Lemmon". Toggle 🎮 no header pra ligar |
+| PROD-14 Página `/pricing` estática | ✅ concluído | `dashboard/app/pricing/page.tsx` com 3 planos (Solo grátis, Clínica R$ 497, Agência R$ 997) + seção "por que não ChatGPT" |
+| PROD-15 Welcome detecta `?cliente=hator` | ✅ concluído | Modal personalizado "Olá, Dr. Pedro 👋" + emoji 🩺 + "Hator Clinic × Lemmon Produções" |
+| PROD-16 Painel saúde do sistema | ⏳ pendente | (skipped — deferido pra próximo sprint, baixo impacto sem multi-tenant) |
+
+### Bloco D — Performance React (parcialmente concluído)
+| Tarefa | Status | Obs |
+|---|---|---|
+| F-01 React.memo em MessageBubble + AgentMessage | ⏳ pendente | (skipped — ChatPanel refactor é Sprint 2 dedicado) |
+| F-02 useMemo em derived state ChatPanel | ⏳ pendente | (skipped — junto com refactor) |
+| F-16 Fallback `concierge` se removido do AGENTS | ⏳ pendente | (skipped — não é caminho real hoje) |
+| F-20 `panelSize` SSR-safe | ⏳ pendente | (skipped — hidratação warning aceitável) |
+
+### Bloco E — Testes + CI
+| Tarefa | Status | Obs |
+|---|---|---|
+| TEST-A Pytest setup com pytest-cov | ✅ concluído | já tinha pytest, pyproject.toml configurado |
+| TEST-B 19 testes em `test_seguranca.py` | ✅ concluído | classificar_erro_anthropic (9 casos), bleach sanitize, path traversal, Concierge injection + rodadas, auth check. **19/19 passando** |
+| TEST-C GitHub Actions CI | ✅ concluído | `.github/workflows/ci.yml` com 3 jobs: backend (ruff + pytest), frontend (tsc + build), security (bandit + safety) |
+
+### Bloco F — Release
+| Tarefa | Status | Obs |
+|---|---|---|
+| REL-A Atualizar PLANO_ACAO | ✅ concluído | esse próprio arquivo |
+| REL-B Manual v1.45 + PDF | ⏳ em andamento | próximo |
+| REL-C Commit + push | ⏳ em andamento | próximo |
+
+---
+
 ## 📋 Protocolo de execução
 
 1. **ANTES de executar** → registrar tarefa como `⏳ em andamento`

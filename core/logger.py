@@ -1,6 +1,7 @@
 """Logger unificado para todos os agentes."""
 import logging
 import sys
+from logging.handlers import RotatingFileHandler
 
 from .config import BASE_DIR, LOG_LEVEL
 
@@ -22,10 +23,16 @@ def get_logger(nome: str) -> logging.Logger:
     sh.setFormatter(formato)
     logger.addHandler(sh)
 
-    # Arquivo
+    # Arquivo com rotação (Q-04 — antes era FileHandler sem rotação:
+    # em 1 mês de uso o arquivo virava GBs. Agora 10MB max × 5 backups = 50MB teto).
     log_dir = BASE_DIR / "historico"
     log_dir.mkdir(exist_ok=True)
-    fh = logging.FileHandler(log_dir / "lemmon.log", encoding="utf-8")
+    fh = RotatingFileHandler(
+        log_dir / "lemmon.log",
+        maxBytes=10 * 1024 * 1024,  # 10 MB
+        backupCount=5,
+        encoding="utf-8",
+    )
     fh.setFormatter(formato)
     logger.addHandler(fh)
 

@@ -20,6 +20,7 @@ import ChatPanel from '@/components/chat/ChatPanel'
 import HistoryPanel from '@/components/history/HistoryPanel'
 import { ThemeToggle, Clock, AutoModeToggle, ComplianceToggle, RoomToggle, type ComplianceMode, type ActiveRoom } from '@/components/header/HeaderControls'
 import WelcomeModal from '@/components/onboarding/WelcomeModal'
+import { uuid } from '@/lib/uuid'
 
 export default function Home() {
   const [inMeeting, setInMeeting] = useState<Set<AgentId>>(new Set())
@@ -32,6 +33,9 @@ export default function Home() {
   // T139 Sprint 2 — Modo Auto (default ligado): IA escolhe os agentes ao enviar briefing.
   // Modo Expert: cliente avançado convoca manualmente (pills no header).
   const [autoMode, setAutoMode] = useLocalStorage<boolean>('lemmon-auto-mode', true)
+  // PROD-13 — Modo Imersivo: pixel office. Por padrão OFF (cliente leigo confunde).
+  // Ativa via toggle no header (depois de 1ª sessão).
+  const [imersivo, setImersivo] = useLocalStorage<boolean>('lemmon-imersivo', false)
   // T160 — Compliance mode: 'auto' (IA decide), 'sempre' (força Heitor), 'nunca' (remove Heitor).
   const [complianceMode, setComplianceMode] = useLocalStorage<ComplianceMode>('lemmon-compliance-mode', 'auto')
   // T171-T173 — sala ativa: criativo (Lemmon) ou admin (Hator). Persistida.
@@ -139,7 +143,7 @@ export default function Home() {
 
       // T188.k — Mostra a msg do user no chat. Se vazio + imagem, usa placeholder
       // pra não aparecer bolha em branco.
-      const userId = crypto.randomUUID()
+      const userId = uuid()
       const contentExibido = msg.trim() || (image ? '📷 imagem anexada' : '')
       setMessages(prev => [...prev, { id: userId, role: 'user', content: contentExibido, done: true, hasImage: !!image }])
 
@@ -174,7 +178,7 @@ export default function Home() {
 
       // Adiciona resposta do Concierge no chat
       // Refinamento — se for "confirmar", anexa metadata pro ConciergeConfirmCard renderizar
-      const conciergeId = crypto.randomUUID()
+      const conciergeId = uuid()
       const novaMensagem = {
         id: conciergeId,
         role: 'concierge' as AgentId,
@@ -341,6 +345,15 @@ export default function Home() {
           {/* T190.A3 — esconde toggles avançados até cliente completar 1ª sessão.
               Hall of Fame, Briefing Reverso, Cortes, Calibragem e SVG/PIX só aparecem
               depois do onboarding pra evitar paralisia em leigo no 1º acesso. */}
+          {hasCompletedFirstSession && imersivo && (
+            <button
+              onClick={() => setImersivo(false)}
+              title="Sair do modo imersivo (esconder escritório)"
+              className="w-8 h-8 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 flex items-center justify-center hover:bg-stone-50 dark:hover:bg-stone-800 text-stone-500 dark:text-stone-400 text-sm"
+            >
+              🎮
+            </button>
+          )}
           {hasCompletedFirstSession && (
             <>
               <Link href="/hall-of-fame" title="Hall of Fame"
@@ -379,17 +392,43 @@ export default function Home() {
       {/* T185.6 — Split layout: escritorio (flex-1) + chat (largura fixa) lado a lado.
           T192 — SVG isométrico removido. Apenas PixelOfficeScene em produção. */}
       <div className="flex-1 flex overflow-hidden min-h-0">
-        <main className="flex-1 overflow-hidden">
-          <PixelOfficeScene
-            inMeeting={inMeeting}
-            agentStatus={agentStatus}
-            onToggleAgent={toggleAgent}
-            onCallAll={callAll}
-            onExitMeeting={exitMeeting}
-            isRunning={isRunning}
-            messages={messages}
-            activeRoom={activeRoom}
-          />
+        <main className="flex-1 overflow-hidden bg-gradient-to-br from-stone-50 to-stone-100 dark:from-stone-900 dark:to-stone-950">
+          {imersivo ? (
+            <PixelOfficeScene
+              inMeeting={inMeeting}
+              agentStatus={agentStatus}
+              onToggleAgent={toggleAgent}
+              onCallAll={callAll}
+              onExitMeeting={exitMeeting}
+              isRunning={isRunning}
+              messages={messages}
+              activeRoom={activeRoom}
+            />
+          ) : (
+            // PROD-13 — sem pixel office: tela limpa, focada no chat.
+            // Cliente leigo não se distrai com escritório.
+            <div className="h-full flex flex-col items-center justify-center px-8 text-center max-w-xl mx-auto">
+              <div className="w-16 h-16 rounded-2xl bg-stone-900 dark:bg-stone-100 flex items-center justify-center mb-6">
+                <span className="text-white dark:text-stone-900 text-xl font-display font-bold">L</span>
+              </div>
+              <h1 className="text-2xl font-display font-bold text-stone-900 dark:text-stone-100 mb-3">
+                Time IA da Lemmon
+              </h1>
+              <p className="text-stone-600 dark:text-stone-300 leading-relaxed">
+                {isRunning
+                  ? 'O time está trabalhando — acompanha no painel à direita.'
+                  : 'Descreva o que você precisa no chat. O Concierge entrevista e mobiliza o time certo pra você.'}
+              </p>
+              {!isRunning && hasCompletedFirstSession && (
+                <button
+                  onClick={() => setImersivo(true)}
+                  className="mt-6 text-xs font-mono uppercase tracking-widest text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 transition-colors"
+                >
+                  🎮 Modo Imersivo (escritório pixel)
+                </button>
+              )}
+            </div>
+          )}
         </main>
 
         {/* T185.6/7 - Chat split coluna direita, ocupa 100% altura disponivel. */}

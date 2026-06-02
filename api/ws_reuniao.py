@@ -4,7 +4,8 @@ import re
 
 from fastapi import WebSocket, WebSocketDisconnect
 
-from api.deps import _make_agent, _parse_mentions
+from api.deps import _make_agent, _parse_mentions, LEMMON_EXECUTOR
+from api.security import ws_authorize
 from api.storage import _salvar_sessao_reuniao
 from api.ws_helpers import _make_on_token
 from core.historico_index import adicionar_entrada
@@ -18,6 +19,8 @@ _RE_AYUDA   = re.compile(r'\[PRECISO DE AYUDA OPERADOR\]', re.IGNORECASE)
 
 
 async def reuniao(ws: WebSocket):
+    if not await ws_authorize(ws):
+        return
     await ws.accept()
     historico: list[dict] = []
     reun_session_id: str | None = None
@@ -26,9 +29,28 @@ async def reuniao(ws: WebSocket):
     reun_respostas: dict[str, str] = {}
     reun_custos: dict[str, float] = {}
     reun_briefing: str = ""
+    # Q-03 — Mesmas constantes do ws_chat pra robustez
+    WS_MAX = 6 * 1024 * 1024
+    WS_TIMEOUT = 300
+    import json as _json
     try:
         while True:
-            data = await ws.receive_json()
+            try:
+                raw = await asyncio.wait_for(ws.receive_text(), timeout=WS_TIMEOUT)
+            except asyncio.TimeoutError:
+                try: await ws.close(code=1011, reason="idle timeout")
+                except Exception: pass
+                return
+            if len(raw) > WS_MAX:
+                try:
+                    await ws.send_json({"type": "error", "message": "Mensagem grande demais (limite 6MB)."})
+                    await ws.close(code=1009, reason="payload too large")
+                except Exception: pass
+                return
+            try:
+                data = _json.loads(raw)
+            except (_json.JSONDecodeError, ValueError):
+                continue
 
             if data.get("type") == "reset":
                 historico = []
@@ -130,7 +152,7 @@ async def reuniao(ws: WebSocket):
                             snap_hist = list(historico)
                             on_tok = _make_on_token(ws, ev_loop, name)
                             result = await ev_loop.run_in_executor(
-                                None,
+                                LEMMON_EXECUTOR,
                                 lambda ag=ag, h=snap_hist, m=loop_msg, ot=on_tok:
                                     ag.responder(m, h, None, on_token=ot),
                             )
@@ -244,7 +266,7 @@ async def reuniao(ws: WebSocket):
                     snap_msg = message
                     on_tok = _make_on_token(ws, ev_loop, name)
                     result = await ev_loop.run_in_executor(
-                        None,
+                        LEMMON_EXECUTOR,
                         lambda ag=ag, h=snap_hist, r=snap_turno, m=snap_msg, ot=on_tok:
                             ag.responder(m, h, r or None, on_token=ot),
                     )

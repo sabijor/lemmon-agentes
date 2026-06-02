@@ -9,6 +9,7 @@ from api.deps import (
     HISTORICO_DIR,
 )
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 from api.schemas import AvaliacaoPayload, FavoritarPayload, TagsPayload
 from core.historico_index import _update_json_atomic, atualizar_entrada, marcar_favorito, reconstruir
 from core.similaridade import buscar_historico_similar
@@ -99,6 +100,36 @@ async def detalhe_historico(session_id: str):
     dados = json.loads(path.read_text(encoding="utf-8"))
     dados["session_id"] = session_id  # garante que o id vem do nome do arquivo (nunca null)
     return dados
+
+
+class _FeedbackPayload(BaseModel):
+    reacao: str  # 'love' | 'otimo' | 'ajustar' | 'refazer'
+    timestamp: int | None = None
+
+
+@router.post("/historico/{session_id}/feedback")
+async def registrar_feedback(session_id: str, payload: _FeedbackPayload):
+    """PROD-4 — registra reação do user no final da sessão (qualidade do dossiê).
+
+    Reações: love (🔥), otimo (✅), ajustar (✏️), refazer (🔄).
+    Gravado dentro do JSON da sessão pra alimentar futura inteligência do Concierge.
+    """
+    from core.historico_index import _update_json_atomic
+    path = _path_da_sessao(session_id)
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Sessão não encontrada")
+
+    def aplicar(dados: dict) -> dict:
+        feedbacks = dados.get("feedbacks", [])
+        feedbacks.append({
+            "reacao": payload.reacao,
+            "timestamp": payload.timestamp or 0,
+        })
+        dados["feedbacks"] = feedbacks
+        return dados
+
+    _update_json_atomic(path, aplicar)
+    return {"ok": True}
 
 
 @router.post("/favoritar")

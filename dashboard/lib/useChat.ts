@@ -6,6 +6,7 @@ import { API_URL, WS_URL } from './api'
 import { WATCHDOG_TIMEOUT_MIN, PROGRESS_CURVE_POWER } from './config'
 import { notify } from './toast'
 import { useLocalStorage } from './hooks/useLocalStorage'
+import { uuid } from './uuid'
 
 export type MessageRole = 'user' | AgentId
 export interface Message {
@@ -256,7 +257,7 @@ export function useChat() {
     setAgentProgress({})
     setAgentProgressMeta({})
 
-    const userId = crypto.randomUUID()
+    const userId = uuid()
     setMessages(prev => [...prev, { id: userId, role: 'user', content: userMessage, done: true, hasImage: !!image }])
     setAgentStatus(prev => {
       const next = { ...prev }
@@ -298,7 +299,7 @@ export function useChat() {
       }
 
       if (data.type === 'agent_start') {
-        const msgId = crypto.randomUUID()
+        const msgId = uuid()
         currentMsgId.current[data.agent] = msgId
         setMessages(prev => [...prev, { id: msgId, role: data.agent as AgentId, content: '', done: false }])
         setAgentStatus(prev => ({ ...prev, [data.agent]: 'speaking' }))
@@ -435,7 +436,7 @@ export function useChat() {
 
       if (data.type === 'routing_condicional') {
         // T29: show as system message
-        const msgId = crypto.randomUUID()
+        const msgId = uuid()
         setMessages(prev => [...prev, { id: msgId, role: 'aya' as AgentId, content: data.mensagem, done: true }])
       }
 

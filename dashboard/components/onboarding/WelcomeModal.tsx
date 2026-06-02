@@ -22,9 +22,22 @@ interface Props {
 // Cliente principal hoje: Dr. Pedro Abrahão / Hator Clinic.
 const EXEMPLO = 'Quero atrair pacientes pra consulta de menopausa pelo Instagram. Tenho material gravado do médico pra usar.'
 
+// PROD-15 — variação personalizada quando ?cliente=hator (sem trocar EXEMPLO,
+// que pode ser usado em outros lugares)
+function detectarHator(): boolean {
+  if (typeof window === 'undefined') return false
+  try {
+    const sp = new URLSearchParams(window.location.search)
+    return sp.get('cliente') === 'hator'
+  } catch { return false }
+}
+
 export default function WelcomeModal({ onTryExample }: Props) {
   const [open, setOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
+  // PROD-15 — variação Hator quando URL tem ?cliente=hator
+  const [isHator, setIsHator] = useState(false)
+  useEffect(() => { setIsHator(detectarHator()) }, [])
 
   useEffect(() => {
     setMounted(true)
@@ -66,13 +79,15 @@ export default function WelcomeModal({ onTryExample }: Props) {
             onClick={e => e.stopPropagation()}
           >
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center text-xl">🤖</div>
+              <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center text-xl">
+                {isHator ? '🩺' : '🤖'}
+              </div>
               <div>
                 <h2 className="font-display font-bold text-lg text-stone-900 dark:text-stone-100 leading-tight">
-                  Bem-vindo aos Agentes de Conteúdo
+                  {isHator ? 'Olá, Dr. Pedro 👋' : 'Bem-vindo aos Agentes de Conteúdo'}
                 </h2>
                 <p className="text-xs font-mono text-stone-500 dark:text-stone-400">
-                  Lemmon Produções
+                  {isHator ? 'Hator Clinic × Lemmon Produções' : 'Lemmon Produções'}
                 </p>
               </div>
             </div>

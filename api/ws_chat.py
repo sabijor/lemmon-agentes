@@ -25,12 +25,15 @@ from agentes.kelly import Kelly
 from agentes.prichina import Prichina
 from agentes.salles import Salles
 from agentes.sonia import Sonia
-from api.deps import _anthropic_client, _log
+from api.deps import _anthropic_client, _log, LEMMON_EXECUTOR
+from api.security import ws_authorize
 from api.storage import _salvar_sessao
 from api.ws_helpers import _make_confirmacao_callback, _stream
 
 
 async def chat(ws: WebSocket):
+    if not await ws_authorize(ws):
+        return
     await ws.accept()
 
     # T140 — tolerância a desconexão.
@@ -220,7 +223,7 @@ async def chat(ws: WebSocket):
                     ag = Otto()
                     modo_visual = cfg_otto.get("modo_visual", "completo")
                     res = await loop.run_in_executor(
-                        None, lambda: ag.executar(briefing, modo_visual=modo_visual)
+                        LEMMON_EXECUTOR, lambda: ag.executar(briefing, modo_visual=modo_visual)
                     )
                     analise_otto = res.get("output_tecnico", {})
                     analise_otto["briefing_original"] = briefing
@@ -232,7 +235,7 @@ async def chat(ws: WebSocket):
                     max_buscas = int(cfg_heitor.get("max_buscas", 3))
                     cb = _make_confirmacao_callback(ws, loop, "heitor")
                     res = await loop.run_in_executor(
-                        None,
+                        LEMMON_EXECUTOR,
                         lambda: ag.executar(
                             conteudo=briefing,
                             modo="cadeia",
@@ -267,7 +270,7 @@ async def chat(ws: WebSocket):
                             "apenas. Heitor identificou risco vermelho de compliance neste briefing."
                         )
                     res = await loop.run_in_executor(
-                        None,
+                        LEMMON_EXECUTOR,
                         lambda: ag.executar(
                             briefing=briefing_salles,
                             analise_otto_existente=analise_otto,
@@ -289,7 +292,7 @@ async def chat(ws: WebSocket):
                     if isinstance(diretrizes_heitor, dict):
                         contexto_heitor_humano = diretrizes_heitor.get("output_humano", "") or ""
                     res = await loop.run_in_executor(
-                        None,
+                        LEMMON_EXECUTOR,
                         lambda: ag.executar(
                             briefing=briefing,
                             contexto_otto=contexto_otto_humano or None,
@@ -305,7 +308,7 @@ async def chat(ws: WebSocket):
                 elif name == "ana_maria":
                     ag = AnaMaria()
                     res = await loop.run_in_executor(
-                        None, lambda: ag.executar(briefing=briefing),
+                        LEMMON_EXECUTOR, lambda: ag.executar(briefing=briefing),
                     )
                     out = res.get("output_humano", "")
                     admin_outputs["ana_maria"] = out
@@ -314,7 +317,7 @@ async def chat(ws: WebSocket):
                 elif name == "prichina":
                     ag = Prichina()
                     res = await loop.run_in_executor(
-                        None, lambda: ag.executar(briefing=briefing),
+                        LEMMON_EXECUTOR, lambda: ag.executar(briefing=briefing),
                     )
                     out = res.get("output_humano", "")
                     admin_outputs["prichina"] = out
@@ -323,7 +326,7 @@ async def chat(ws: WebSocket):
                 elif name == "kelly":
                     ag = Kelly()
                     res = await loop.run_in_executor(
-                        None, lambda: ag.executar(briefing=briefing),
+                        LEMMON_EXECUTOR, lambda: ag.executar(briefing=briefing),
                     )
                     out = res.get("output_humano", "")
                     admin_outputs["kelly"] = out
@@ -340,7 +343,7 @@ async def chat(ws: WebSocket):
                         if otto_humano:
                             contextos["otto"] = otto_humano
                     res = await loop.run_in_executor(
-                        None,
+                        LEMMON_EXECUTOR,
                         lambda: ag.executar(
                             briefing=briefing,
                             contextos_agentes=contextos or None,
@@ -357,7 +360,7 @@ async def chat(ws: WebSocket):
                     usar_tendencias = bool(cfg_sonia.get("usar_tendencias", True))
                     cb = _make_confirmacao_callback(ws, loop, "sonia")
                     res = await loop.run_in_executor(
-                        None,
+                        LEMMON_EXECUTOR,
                         lambda: ag.executar(
                             roteiro=roteiro,
                             modo="solo",
@@ -396,7 +399,7 @@ async def chat(ws: WebSocket):
                         } if "sonia" in respostas else None,
                     }
                     res = await loop.run_in_executor(
-                        None,
+                        LEMMON_EXECUTOR,
                         lambda: ag.executar(
                             nome_projeto=nome_projeto,
                             outputs_diretos=snap_outputs,
@@ -423,7 +426,7 @@ async def chat(ws: WebSocket):
                     _modo = "pipeline" if _has_pipeline_context else "solo"
                     _ctx_solo = briefing if not _has_pipeline_context else None
                     res = await loop.run_in_executor(
-                        None,
+                        LEMMON_EXECUTOR,
                         lambda: ag.executar(
                             modo=_modo,
                             duracao_dias=duracao_dias,
@@ -445,12 +448,12 @@ async def chat(ws: WebSocket):
                 while True:
                     await ws.send_json({"type": "agent_start", "agent": name})
                     try:
-                        _t0 = asyncio.get_event_loop().time()
+                        _t0 = asyncio.get_running_loop().time()
                         result = await _run_agent_step(name)
                         if result is None:
                             return True
                         text, cost = result
-                        duracoes[name] = round(asyncio.get_event_loop().time() - _t0, 1)
+                        duracoes[name] = round(asyncio.get_running_loop().time() - _t0, 1)
                         respostas[name] = text
                         custos[name] = cost
                         await _stream(ws, name, text)
@@ -491,7 +494,7 @@ async def chat(ws: WebSocket):
                 try:
                     pedro = PedroAbrahao()
                     gate_res = await loop.run_in_executor(
-                        None,
+                        LEMMON_EXECUTOR,
                         lambda: pedro.executar(
                             pergunta="Valide se o roteiro abaixo está fiel à minha voz, posicionamento e tom.",
                             contexto_opcional=roteiro_salles,
@@ -580,7 +583,7 @@ async def chat(ws: WebSocket):
                     try:
                         ag_s = Salles()
                         res_s = await loop.run_in_executor(
-                            None,
+                            LEMMON_EXECUTOR,
                             lambda bv=bv: ag_s.executar(
                                 briefing=bv,
                                 analise_otto_existente=analise_otto,

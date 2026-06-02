@@ -16,8 +16,11 @@ import anthropic
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from api.deps import _anthropic_client
 from api.routes.agentes import construir_catalogo
 from core.agente_base import classificar_erro_anthropic, formatar_erro_anthropic
+from core.config import HISTORICO_DIR
+from core.similaridade import buscar_historico_similar
 
 # T190.D7 — modelo do Concierge resolvido dinamicamente em vez de hardcoded.
 # Antes: "claude-haiku-4-5" fixo no código → quebra se a Anthropic descontinuar.
@@ -411,8 +414,43 @@ async def conversar(pedido: ConcierePedido):
         else:
             messages.append({"role": role, "content": msg.content})
 
-    client = anthropic.Anthropic(api_key=api_key)
+    # Q-02 — Reusa client singleton em vez de instanciar novo a cada request.
+    # Antes: cada turno do Concierge abria novo httpx pool, vazava conexões.
+    # Singleton em api.deps já cuida disso. Se api_key foi validado acima,
+    # confiamos que _anthropic_client está OK.
+    client = _anthropic_client
     system_prompt = _construir_system_prompt()
+
+    # PROD-1 — Memória persistente. Se é a 1ª mensagem do user, busca histórico
+    # similar e injeta no system prompt pra Concierge poder mencionar "vi que você
+    # fez X parecido antes". Diferencial brutal vs ChatGPT que esquece tudo.
+    if rodadas_user == 1:
+        try:
+            briefing_user = pedido.historico[0].content or ""
+            if len(briefing_user) > 20:  # ignora 1-letter ou "ok"
+                similares = buscar_historico_similar(
+                    briefing=briefing_user,
+                    historico_dir=HISTORICO_DIR,
+                    limite=3,
+                    score_minimo=0.08,
+                )
+                if similares:
+                    contexto = "\n\n## 💭 Sessões anteriores similares\n"
+                    contexto += "O cliente já fez pedidos parecidos. Considere mencionar:\n\n"
+                    for s in similares[:3]:
+                        brief_curto = (s.get("briefing", "") or "")[:120]
+                        data = s.get("timestamp", "")[:10]
+                        ags = ", ".join(s.get("agentes_usados", [])[:5])
+                        contexto += f"- **{data}**: \"{brief_curto}...\" (time: {ags})\n"
+                    contexto += (
+                        "\nSe o pedido atual for muito parecido, ABRA com algo "
+                        "como: \"Vi que você fez X parecido em [data]. Quer continuar "
+                        "essa linha ou pivotar?\" antes de fazer pergunta padrão."
+                    )
+                    system_prompt += contexto
+        except Exception:
+            # Best-effort: se busca falhar, segue sem contexto
+            pass
 
     # T188.m — se já passou 4 rodadas, FORÇA "confirmar" no system prompt.
     # Antes dependia do modelo seguir a instrução (não confiável).

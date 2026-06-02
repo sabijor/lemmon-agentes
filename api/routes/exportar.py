@@ -6,7 +6,7 @@ import re
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse
 
-from api.deps import AYA_GERAR_HTML, AYA_GERAR_PDF, AYA_PDF_ENGINE, HISTORICO_DIR, OUTPUTS_DIR, LEMMON_MODELO_PADRAO, _anthropic_client
+from api.deps import AYA_GERAR_HTML, AYA_GERAR_PDF, AYA_PDF_ENGINE, HISTORICO_DIR, OUTPUTS_DIR, LEMMON_MODELO_PADRAO, _anthropic_client, LEMMON_EXECUTOR
 from api.schemas import ExportarPayload
 from core.exportador_aya import exportar_dossie
 from core.custo import Custo
@@ -133,12 +133,15 @@ async def exportar(payload: ExportarPayload):
     custo_resumo: float | None = None
     if payload.modo == "resumo":
         try:
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             markdown, custo_resumo = await loop.run_in_executor(
-                None, lambda: _gerar_resumo_executivo(markdown)
+                LEMMON_EXECUTOR, lambda: _gerar_resumo_executivo(markdown)
             )
         except Exception as exc:
-            raise HTTPException(status_code=502, detail=f"Falha ao gerar resumo: {exc}") from exc
+            # SEC-G — log interno + mensagem amigável (não vaza traceback Anthropic)
+            import logging
+            logging.getLogger("lemmon.exportar").error("Falha resumo: %s", exc)
+            raise HTTPException(status_code=502, detail="Não consegui gerar o resumo executivo. Tente exportar completo.") from exc
 
     # Define nome do arquivo de saída a partir dos agentes
     if payload.modo == "resumo":
@@ -152,9 +155,9 @@ async def exportar(payload: ExportarPayload):
     out_dir.mkdir(parents=True, exist_ok=True)
     caminho_md = out_dir / f"{payload.session_id}.md"
 
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     resultado = await loop.run_in_executor(
-        None,
+        LEMMON_EXECUTOR,
         lambda: exportar_dossie(
             markdown_original=markdown,
             caminho_md=caminho_md,

@@ -43,3 +43,10 @@ dashboard/app/mockup-gather/
 # Release ZIPs gerados localmente
 *.zip
 release/
+
+# Q-12 — docs internos com threat model (auditoria) não vão pro repo público
+AUDITORIA_*.md
+*_AUDITORIA.md
+.tmp/
+*.tmp
+*.lock

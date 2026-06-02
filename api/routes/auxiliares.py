@@ -6,6 +6,7 @@ import re
 from fastapi import APIRouter, HTTPException
 
 from api.deps import (
+    LEMMON_EXECUTOR,
     LEMMON_MODELO_PADRAO,
     APIConnectionError,
     APIError,
@@ -82,6 +83,24 @@ def _construir_prompt_sugestor(briefing: str, catalogo: list[dict]) -> str:
     )
 
 
+class _SugerirPayload:
+    """Schema simples pro POST de sugerir_pipeline."""
+    pass
+
+
+from pydantic import BaseModel as _BaseModel
+
+
+class SugerirPipelinePayload(_BaseModel):
+    briefing: str
+
+
+@router.post("/sugerir_pipeline")
+async def sugerir_pipeline_post(payload: SugerirPipelinePayload):
+    """SEC-D — Versão POST. Briefing vai no body, não vaza em URL log."""
+    return await sugerir_pipeline(payload.briefing)
+
+
 @router.get("/sugerir_pipeline")
 async def sugerir_pipeline(briefing: str):
     """T28 + T139: Haiku analisa o briefing e sugere quais agentes acionar.
@@ -89,6 +108,9 @@ async def sugerir_pipeline(briefing: str):
     Lê o catálogo dinâmico via /agentes/catalogo (mesma fonte do front).
     Adicionar agente novo: criar a classe com metadados, registrar em
     api/routes/agentes.py — o sugestor passa a considerar automaticamente.
+
+    SEC-D — Versão GET mantida para compat. **Use POST em produção** —
+    briefing em URL pode vazar em logs de proxy/CDN.
     """
     from api.routes.agentes import construir_catalogo
     loop = asyncio.get_running_loop()
@@ -97,7 +119,7 @@ async def sugerir_pipeline(briefing: str):
     prompt = _construir_prompt_sugestor(briefing, catalogo)
     try:
         resp = await loop.run_in_executor(
-            None,
+            LEMMON_EXECUTOR,
             lambda: _anthropic_client.messages.create(
                 model="claude-haiku-4-5-20251001",
                 max_tokens=500,
@@ -160,7 +182,7 @@ async def analisar_briefing_reverso(payload: BriefingReversoPayload):
     )
     try:
         resp = await loop.run_in_executor(
-            None,
+            LEMMON_EXECUTOR,
             lambda: _anthropic_client.messages.create(
                 model=LEMMON_MODELO_PADRAO,
                 max_tokens=1200,
@@ -191,7 +213,7 @@ async def gerar_cortes_prontos(payload: CortesProntosPayload):
     )
     try:
         resp = await loop.run_in_executor(
-            None,
+            LEMMON_EXECUTOR,
             lambda: _anthropic_client.messages.create(
                 model=LEMMON_MODELO_PADRAO,
                 max_tokens=2000,
