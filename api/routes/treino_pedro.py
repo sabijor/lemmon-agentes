@@ -19,8 +19,10 @@ import os
 from datetime import datetime
 from pathlib import Path
 
+import secrets
+
 import anthropic
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Header, HTTPException
 
 from api.deps import _anthropic_client, CALIBRAGEM_FILE
 from core import audit
@@ -48,16 +50,29 @@ def _proxima_versao() -> int:
 
 
 @router.post("/pedro/treinar")
-async def treinar_pedro_espelho():
+async def treinar_pedro_espelho(authorization: str | None = Header(default=None)):
     """Consolida correções de calibragem + gera nova versão do prompt.
 
-    Requer LEMMON_AUTH_TOKEN em produção (não permite chamada anônima).
+    Requer Authorization: Bearer <LEMMON_AUTH_TOKEN>.
+    Em dev: LEMMON_ALLOW_TRAIN_DEV=1 dispensa o token.
     """
-    if not os.getenv("LEMMON_AUTH_TOKEN") and os.getenv("LEMMON_ALLOW_TRAIN_DEV") != "1":
-        raise HTTPException(
-            status_code=403,
-            detail="Treino exige produção ou LEMMON_ALLOW_TRAIN_DEV=1.",
-        )
+    permitir_dev = os.getenv("LEMMON_ALLOW_TRAIN_DEV") == "1"
+    esperado = os.getenv("LEMMON_AUTH_TOKEN", "")
+
+    if not permitir_dev:
+        if not esperado:
+            raise HTTPException(
+                status_code=403,
+                detail="Treino exige LEMMON_AUTH_TOKEN configurada ou LEMMON_ALLOW_TRAIN_DEV=1.",
+            )
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(
+                status_code=403,
+                detail="Authorization header obrigatório (Bearer <token>).",
+            )
+        enviado = authorization[7:].strip()
+        if not secrets.compare_digest(enviado, esperado):
+            raise HTTPException(status_code=403, detail="Token inválido.")
 
     # 1. Lê registros de calibragem
     if not CALIBRAGEM_FILE.exists():

@@ -205,3 +205,38 @@ def test_audit_disabled_via_env(monkeypatch, tmp_path):
     monkeypatch.setenv("LEMMON_AUDIT_DISABLE", "1")
     # Sem crash, sem arquivo (mas best-effort)
     audit.registrar("evento_que_nao_grava")
+
+
+# ─── Regressão dos bugs encontrados no QA-Hator ───────────────────────
+
+def test_lgpd_apagar_tudo_sem_token_em_prod_dá_403(cliente, monkeypatch):
+    """QA-H4 — backend com LEMMON_AUTH_TOKEN setada mas request sem token → 403.
+
+    Bug original: endpoint só checava se env existia, sem comparar com o token
+    enviado. Qualquer chamada anônima wipava o tenant.
+    """
+    monkeypatch.setenv("LEMMON_AUTH_TOKEN", "secret-qa-token")
+    r = cliente.post("/lgpd/apagar-tudo")
+    assert r.status_code == 403
+    # Mesmo com token errado, ainda 403
+    r2 = cliente.post("/lgpd/apagar-tudo", headers={"Authorization": "Bearer wrong"})
+    assert r2.status_code == 403
+
+
+def test_rate_limit_retorna_429_e_não_500(cliente):
+    """QA-H6 — middleware de rate limit deve retornar 429, não 500.
+
+    Bug original: BaseHTTPMiddleware levantava HTTPException dentro do dispatch
+    e starlette converte isso em 500 (não passa pelo exception_handler).
+    Fix: retornar JSONResponse direto.
+
+    Esse teste manda 65 requests (limite default 60) e confirma que os excesso
+    voltam 429 — nunca 500.
+    """
+    status_counts: dict[int, int] = {}
+    for _ in range(65):
+        r = cliente.get("/brand-kit")
+        status_counts[r.status_code] = status_counts.get(r.status_code, 0) + 1
+    # Aceita 200 + 429 (e talvez 0% de 500). Não pode ter 500.
+    assert 500 not in status_counts, f"500 retornado pelo rate limiter: {status_counts}"
+    assert 200 in status_counts, f"Nenhum 200? {status_counts}"

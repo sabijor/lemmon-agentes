@@ -443,8 +443,31 @@ Após honest count revelar só 32% do audit feito, executei os 88 itens restante
 | Tarefa | Status | Obs |
 |---|---|---|
 | REL-D Atualizar PLANO_ACAO v1.46 | ✅ concluído | essa seção |
-| REL-E Manual v1.46 (markdown + HTML + PDF) | ✅ em andamento | próximo |
-| REL-F Commit final v1.46 + push | ⏳ próximo | depois do manual |
+| REL-E Manual v1.46 (markdown + HTML + PDF) | ✅ concluído | commit ebec145 |
+| REL-F Commit final v1.46 + push | ✅ concluído | commit ebec145 push origin main |
+
+### Bloco L — QA Hator pré-Pedro (2026-06-02)
+| Tarefa | Status | Bugs encontrados |
+|---|---|---|
+| QA-H1 Setup tenant Hator + cripto + health | ✅ | versão "1.44" cosmético → corrigido |
+| QA-H2 Brand Kit CRUD | ✅ | 0 |
+| QA-H3 Multi-user lifecycle | ✅ | 0 |
+| QA-H4 LGPD endpoints + auth wall | ✅ | **CRÍTICO #1** — `/lgpd/apagar-tudo` aceitava chamada anônima. Fix: constant-compare via `Authorization: Bearer <token>`. Mesmo fix em `/pedro/treinar` |
+| QA-H5 Treino Pedro Espelho | ⏭️ skipped | exige ANTHROPIC_API_KEY |
+| QA-H6 Segurança (injection + rate + magic) | ✅ | **CRÍTICO #2** — Rate limit retornava 500 (não 429). Causa: `BaseHTTPMiddleware` não captura exceptions → returnar `JSONResponse` direto |
+| QA-H7 Pipeline real Hator | ⏭️ skipped | exige ANTHROPIC_API_KEY |
+| QA-H8 PWA + build | ✅ | **CRÍTICO #3** — ícones `/icon-192.png` e `/icon-512.png` não existiam. Fix: gerados via Pillow. Warning `themeColor` movido pro export `viewport` |
+| QA-H9 Suíte de testes | ✅ | 17/17 features + 19/19 segurança + tsc clean + build clean |
+| QA-H10 Relatório QA + fixes + commit | ✅ | `RELATORIO_QA_v1.46.md` + 2 testes regressão (lgpd auth, rate 429) |
+
+**Veredito QA-Hator:** Sistema pronto pra Pedro receber acesso. 3 bugs críticos pegos antes da entrega.
+
+**Bugs que NÃO existiriam em prod sem o QA:**
+1. Vazamento total dos dados Hator (qualquer um wipava sem token)
+2. Backend parecia "quebrado" (rate limit retornava 500)
+3. Ícone PWA genérico no iPad do Pedro
+
+---
 
 ---
 

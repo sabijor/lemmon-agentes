@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from api.deps import _anthropic_client
@@ -40,9 +41,16 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         while hits and now - hits[0] > 60:
             hits.popleft()
         if len(hits) >= self.max_per_min:
-            raise HTTPException(
+            # T191.RL-fix — BaseHTTPMiddleware não captura HTTPException;
+            # precisa retornar Response direto pra cliente receber 429.
+            return JSONResponse(
                 status_code=429,
-                detail=f"Limite de chamadas atingido ({self.max_per_min}/min). Aguarde alguns segundos.",
+                content={
+                    "detail": (
+                        f"Limite de chamadas atingido ({self.max_per_min}/min). "
+                        "Aguarde alguns segundos."
+                    )
+                },
             )
         hits.append(now)
         return await call_next(request)
@@ -67,7 +75,7 @@ async def health():
 
     Não toca em I/O nem chama LLM — só confirma que o app está rodando.
     """
-    return {"status": "ok", "service": "lemmon-agentes", "version": "1.44"}
+    return {"status": "ok", "service": "lemmon-agentes", "version": "1.46"}
 
 
 @app.get("/health/anthropic")

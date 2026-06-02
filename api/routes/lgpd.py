@@ -15,7 +15,10 @@ import zipfile
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+import os
+import secrets
+
+from fastapi import APIRouter, Header, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
@@ -24,6 +27,24 @@ from core import audit
 from core.tenant import tenant_id
 
 router = APIRouter()
+
+
+def _require_auth_token(authorization: str | None) -> None:
+    """Exige Authorization: Bearer <LEMMON_AUTH_TOKEN>. Constant-time compare."""
+    esperado = os.getenv("LEMMON_AUTH_TOKEN", "")
+    if not esperado:
+        raise HTTPException(
+            status_code=403,
+            detail="Operação destrutiva requer LEMMON_AUTH_TOKEN configurada no servidor.",
+        )
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=403,
+            detail="Authorization header obrigatório (Bearer <token>).",
+        )
+    enviado = authorization[7:].strip()
+    if not secrets.compare_digest(enviado, esperado):
+        raise HTTPException(status_code=403, detail="Token inválido.")
 
 
 @router.get("/lgpd/exportar")
@@ -113,18 +134,13 @@ async def lgpd_deletar_sessao(payload: _DeletarSessaoPayload):
 
 
 @router.post("/lgpd/apagar-tudo")
-async def lgpd_apagar_tudo():
+async def lgpd_apagar_tudo(authorization: str | None = Header(default=None)):
     """🚨 Apaga TODOS os dados do tenant. Irreversível.
 
     G-03 — direito ao esquecimento total (Art. 18, VI LGPD).
-    Exige LEMMON_AUTH_TOKEN setada (não disponível em dev).
+    Exige Authorization: Bearer <LEMMON_AUTH_TOKEN> (constant-time compare).
     """
-    import os
-    if not os.getenv("LEMMON_AUTH_TOKEN"):
-        raise HTTPException(
-            status_code=403,
-            detail="Apagar tudo requer ambiente de produção (LEMMON_AUTH_TOKEN configurada).",
-        )
+    _require_auth_token(authorization)
     t = tenant_id()
     apagados: list[str] = []
     for base in [HISTORICO_DIR / t, OUTPUTS_DIR / t]:
