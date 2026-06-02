@@ -206,6 +206,9 @@ async def chat(ws: WebSocket):
             analise_otto = resume_context.get("analise_otto") or None
             diretrizes_heitor = resume_context.get("diretrizes_heitor") or None
             roteiro_salles = resume_context.get("roteiro_salles") or None
+            # v1.46.1 #13 — Carlos atribuía em roteiro_salles antes, vazando como
+            # "Salles — Roteiro" no PDF. Agora cada agente tem sua variável.
+            roteiro_carlos = resume_context.get("roteiro_carlos") or None
             # T166-T168: outputs dos agentes administrativos da sessão atual.
             # Usado pra alimentar Caíto com visão cruzada dos outros admin.
             admin_outputs: dict[str, str] = {}
@@ -216,6 +219,7 @@ async def chat(ws: WebSocket):
             duracoes: dict[str, float] = {}
             pipeline_cancelled = False
             heitor_risco_vermelho = False  # T29: roteamento condicional
+            nome_projeto_final: str | None = None  # v1.46.1 #12 — persiste no JSON da sessão
 
             # Se resume_context tem briefing e o usuário não digitou nada novo, mantém o original
             if resume_context.get("briefing") and briefing == resume_context["briefing"]:
@@ -238,7 +242,7 @@ async def chat(ws: WebSocket):
 
             async def _run_agent_step(name: str) -> tuple[str, float] | None:
                 """Executa um agente e retorna (text, cost) ou None se cancelado/pulado."""
-                nonlocal analise_otto, diretrizes_heitor, roteiro_salles
+                nonlocal analise_otto, diretrizes_heitor, roteiro_salles, roteiro_carlos, nome_projeto_final
 
                 if name == "otto":
                     ag = Otto()
@@ -321,9 +325,10 @@ async def chat(ws: WebSocket):
                             formato="auto",
                         ),
                     )
-                    # Carlos também pode alimentar Sônia (mesma posição do Salles)
-                    roteiro_salles = res.get("output_humano", "")
-                    return roteiro_salles, res.get("custo_total_usd", 0)
+                    # v1.46.1 #13 — Carlos atribui em SUA variável (não em roteiro_salles).
+                    # Sônia lê roteiro_carlos OR roteiro_salles, o que estiver disponível.
+                    roteiro_carlos = res.get("output_humano", "")
+                    return roteiro_carlos, res.get("custo_total_usd", 0)
 
                 # ─── Agentes administrativos Hator (T166-T168) ────────────────
                 elif name == "ana_maria":
@@ -374,9 +379,29 @@ async def chat(ws: WebSocket):
                     admin_outputs["caito"] = out
                     return out, res.get("custo_total_usd", 0)
 
+                elif name == "pedro_abrahao":
+                    # v1.46.1 #17 — Pedro como agente top-level (Concierge sugere ele direto).
+                    # Antes só rodava via _run_gate_espelho após Salles. Sem case próprio aqui,
+                    # caía no return None silencioso e o pipeline ignorava.
+                    ag = PedroAbrahao()
+                    # Pergunta = briefing; se Carlos/Salles já produziram roteiro, vira contexto opcional
+                    contexto_pedro = roteiro_carlos or roteiro_salles or None
+                    res = await loop.run_in_executor(
+                        LEMMON_EXECUTOR,
+                        lambda: ag.executar(
+                            pergunta=briefing,
+                            contexto_opcional=contexto_pedro,
+                            modo="consulta",
+                        ),
+                    )
+                    if res and not res.get("cancelado"):
+                        return res.get("output_humano", ""), res.get("custo_total_usd", 0)
+                    return "Consulta ao Pedro cancelada.", 0
+
                 elif name == "sonia":
                     ag = Sonia()
-                    roteiro = roteiro_salles or briefing
+                    # v1.46.1 #13 — Sônia agora aceita roteiro vindo de Carlos OU Salles
+                    roteiro = roteiro_carlos or roteiro_salles or briefing
                     com_busca = bool(cfg_sonia.get("com_busca", False))
                     usar_tendencias = bool(cfg_sonia.get("usar_tendencias", True))
                     cb = _make_confirmacao_callback(ws, loop, "sonia")
@@ -398,20 +423,24 @@ async def chat(ws: WebSocket):
 
                 elif name == "aya":
                     ag = Aya()
-                    # D-3 — sanitiza nome do projeto: remove CPF/email/telefone/PII
-                    # antes de virar nome de pasta. Antes briefing[:60] vazava dados.
+                    # v1.46.1 #12 — usa Haiku pra gerar nome bonito do projeto.
+                    # Antes: snake_case truncado feio na capa do PDF.
+                    # Sanitização PII (D-3) ainda aplicada como camada de defesa.
                     import re as _re
+                    from core.nomeador import gerar_nome_projeto
                     if briefing:
-                        _cleaned = _re.sub(r"\d{3}\.?\d{3}\.?\d{3}-?\d{2}", "[cpf]", briefing)  # CPF
+                        _cleaned = _re.sub(r"\d{3}\.?\d{3}\.?\d{3}-?\d{2}", "[cpf]", briefing)
                         _cleaned = _re.sub(r"[\w\.-]+@[\w\.-]+", "[email]", _cleaned)
                         _cleaned = _re.sub(r"\(?\d{2}\)?[\s-]?\d{4,5}-?\d{4}", "[fone]", _cleaned)
-                        _cleaned = _re.sub(r"[^\w\s-]", "", _cleaned)  # só alfanum + espaço + hifen
-                        _cleaned = _re.sub(r"\s+", "_", _cleaned).strip("_")
-                        nome_projeto = _cleaned[:60] or None
+                        # Detecta cliente do tenant
+                        from core.tenant import tenant_id as _tid
+                        _cliente = _tid().capitalize() if _tid() != "default" else None
+                        nome_projeto = gerar_nome_projeto(_cleaned, cliente=_cliente)
+                        nome_projeto_final = nome_projeto  # v1.46.1 #12 — guarda pra salvar
                     else:
                         nome_projeto = None
-                    # Sempre passa os 4 agentes; None = ausente nesta sessão
-                    # (Aya não vai buscar no disco para os ausentes)
+                    # v1.46.1 #13 — adicionados carlos, pedro_abrahao, renata + 4 admin
+                    # Aya rotula cada output pelo agente CORRETO no PDF (não mais Carlos→Salles)
                     snap_outputs: dict[str, dict | None] = {
                         "otto": {
                             "output_humano": respostas.get("otto", ""),
@@ -425,10 +454,38 @@ async def chat(ws: WebSocket):
                             "output_humano": roteiro_salles,
                             "output_tecnico": {},
                         } if roteiro_salles else None,
+                        "carlos": {
+                            "output_humano": roteiro_carlos,
+                            "output_tecnico": {},
+                        } if roteiro_carlos else None,
                         "sonia": {
                             "output_humano": respostas.get("sonia", ""),
                             "output_tecnico": {},
                         } if "sonia" in respostas else None,
+                        "pedro_abrahao": {
+                            "output_humano": respostas.get("pedro_abrahao", ""),
+                            "output_tecnico": {},
+                        } if "pedro_abrahao" in respostas else None,
+                        "renata": {
+                            "output_humano": respostas.get("renata", ""),
+                            "output_tecnico": {},
+                        } if "renata" in respostas else None,
+                        "ana_maria": {
+                            "output_humano": respostas.get("ana_maria", ""),
+                            "output_tecnico": {},
+                        } if "ana_maria" in respostas else None,
+                        "prichina": {
+                            "output_humano": respostas.get("prichina", ""),
+                            "output_tecnico": {},
+                        } if "prichina" in respostas else None,
+                        "caito": {
+                            "output_humano": respostas.get("caito", ""),
+                            "output_tecnico": {},
+                        } if "caito" in respostas else None,
+                        "kelly": {
+                            "output_humano": respostas.get("kelly", ""),
+                            "output_tecnico": {},
+                        } if "kelly" in respostas else None,
                     }
                     res = await loop.run_in_executor(
                         LEMMON_EXECUTOR,
@@ -696,7 +753,7 @@ async def chat(ws: WebSocket):
                 "agentes_usados": all_agents,
             }
             # T27/T106: sandbox salva com origem='sandbox', excluído das listagens default
-            session_path = _salvar_sessao(briefing, all_agents, respostas, custos, contexto_tecnico, duracoes=duracoes, sandbox=sandbox)
+            session_path = _salvar_sessao(briefing, all_agents, respostas, custos, contexto_tecnico, duracoes=duracoes, sandbox=sandbox, nome_projeto=nome_projeto_final)
             session_id = session_path.stem
 
             # Sugerir tags automaticamente via Aya (T15) — nunca em sandbox

@@ -148,11 +148,18 @@ class Otto(AgenteBase):
                 "Resposta inesperada da API."
             )
 
+        # v1.46.1 #18 — defesa contra LLM omitir campos required do tool_use.
+        # Sonnet às vezes esquece output_humano mesmo com schema required, e dava
+        # KeyError quebrando o pipeline inteiro. Agora usa .get() + fallback.
+        out_humano = analise.get("output_humano") or self._montar_output_humano_fallback(analise)
+        meta = analise.get("metadata") or {}
+        modo_eff = meta.get("modo_recomendado", modo_visual) if modo_visual == "auto" else modo_visual
+
         resultado = {
             "output_tecnico": {k: v for k, v in analise.items() if k != "output_humano"},
-            "output_humano": analise["output_humano"],
+            "output_humano": out_humano,
             "modo_solicitado": modo_visual,
-            "modo_efetivo": analise["metadata"]["modo_recomendado"] if modo_visual == "auto" else modo_visual,
+            "modo_efetivo": modo_eff,
             # T131: "custo" dict é breakdown legado — `custo_total_usd` (float)
             # é o campo canônico que TODOS os consumidores usam. Mantido pra
             # backward-compat com exports antigos. Não adicionar novos leitores.
@@ -174,6 +181,32 @@ class Otto(AgenteBase):
         self.logger.info(f"Histórico salvo em: {arquivo_hist.name}")
 
         return cast(AgenteResultado, resultado)
+
+    def _montar_output_humano_fallback(self, analise: dict) -> str:
+        """v1.46.1 #18 — fallback se LLM omitiu output_humano no tool_use.
+        Monta texto humano legível a partir dos outros campos. Não-fatal,
+        sem mensagem técnica vazando pro user. Serializa dicts em markdown bullets.
+        """
+        def _fmt(v):
+            """Converte dict ou string em markdown legível."""
+            if isinstance(v, dict):
+                return "\n" + "\n".join(f"  - **{k.replace('_', ' ').capitalize()}:** {vv}" for k, vv in v.items())
+            return f" {v}"
+
+        partes = ["## Análise estratégica\n"]
+        if (leitura := analise.get("leitura_estrategica")):
+            partes.append(f"\n### Leitura estratégica{_fmt(leitura)}\n")
+        if (tese := analise.get("tese_criativa")):
+            partes.append(f"\n### Tese criativa{_fmt(tese)}\n")
+        if (conceito := analise.get("conceito")):
+            partes.append(f"\n### Conceito{_fmt(conceito)}\n")
+        if (mecanismo := analise.get("mecanismo_estrategico")):
+            partes.append(f"\n### Mecanismo{_fmt(mecanismo)}\n")
+        if (traducao := analise.get("traducao_pratica")):
+            partes.append(f"\n### Tradução prática{_fmt(traducao)}\n")
+        if (objetivo := analise.get("objetivo_real")):
+            partes.append(f"\n### Objetivo real{_fmt(objetivo)}\n")
+        return "\n".join(partes) if len(partes) > 1 else "(Análise vazia — Otto não retornou output reaproveitável.)"
 
     def _construir_mensagem(self, briefing: str, modo_visual: str,
                             contexto_extra: str) -> str:

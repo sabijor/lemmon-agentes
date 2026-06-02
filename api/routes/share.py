@@ -23,7 +23,9 @@ def _load_share(token: str) -> dict:
 @router.post("/share")
 async def criar_share(payload: SharePayload):
     """T36: Gera link de aprovação limpo para uma sessão."""
-    sessao_path = HISTORICO_DIR / "dashboard" / f"{payload.session_id}.json"
+    # v1.46.1 #11 — particionado por tenant
+    from core.historico_index import dashboard_dir as _dash
+    sessao_path = _dash() / f"{payload.session_id}.json"
     if not sessao_path.exists():
         raise HTTPException(status_code=404, detail="Sessão não encontrada")
     sessao = json.loads(sessao_path.read_text(encoding="utf-8"))

@@ -99,7 +99,9 @@ async def exportar(payload: ExportarPayload):
     T158: aceita `agentes` (lista) pra exportar combinado, OU `agente` singular.
     T159: `modo="resumo"` pede ao Haiku 1 página executiva do dossiê.
     """
-    session_dir = HISTORICO_DIR / "dashboard"
+    # v1.46.1 #11 — particionado por tenant
+    from core.historico_index import dashboard_dir as _dash
+    session_dir = _dash()
     path = session_dir / f"{payload.session_id}.json"
     if not path.exists():
         raise HTTPException(status_code=404, detail="Sessão não encontrada")
@@ -155,6 +157,10 @@ async def exportar(payload: ExportarPayload):
     out_dir.mkdir(parents=True, exist_ok=True)
     caminho_md = out_dir / f"{payload.session_id}.md"
 
+    # v1.46.1 #12 — passa nome_projeto do JSON da sessão pro exportador
+    # usar na capa do PDF (gerado por Haiku no fim do pipeline).
+    nome_projeto_session = dados.get("nome_projeto")
+
     loop = asyncio.get_running_loop()
     resultado = await loop.run_in_executor(
         LEMMON_EXECUTOR,
@@ -165,6 +171,7 @@ async def exportar(payload: ExportarPayload):
             gerar_html=AYA_GERAR_HTML,
             gerar_pdf=AYA_GERAR_PDF,
             pdf_engine=AYA_PDF_ENGINE,
+            nome_projeto_session=nome_projeto_session,
         ),
     )
 

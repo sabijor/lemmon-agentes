@@ -171,7 +171,14 @@ AYA_OUTPUT_AGENTE_MAX_CHARS = 15000
 AYA_DOSSIE_MAX_CHARS_TOTAL = 100000
 
 # Agentes que Aya tenta detectar (em ordem de aparição no dossiê)
-AYA_AGENTES_PADRAO = ["otto", "heitor", "salles", "sonia"]
+# v1.46.1 — adicionados carlos (roteirista publicitário), pedro_abrahao (espelho médico),
+# renata (distribuição), e os 4 admin Hator (ana_maria, prichina, caito, kelly).
+# Sem isso, output de Carlos vazava como "Salles" no PDF (bug #13).
+AYA_AGENTES_PADRAO = [
+    "otto", "heitor", "salles", "carlos", "sonia",
+    "pedro_abrahao", "renata",
+    "ana_maria", "prichina", "caito", "kelly",
+]
 
 # Tamanho do resumo de cada agente na página 1 (chars máximos)
 AYA_RESUMO_AGENTE_MAX_CHARS = 400

@@ -29,7 +29,9 @@ def _path_da_sessao(session_id: str) -> Path:
     """
     if not _SESSION_ID_RE.match(session_id):
         raise HTTPException(status_code=400, detail="session_id inválido")
-    session_dir = (HISTORICO_DIR / "dashboard").resolve()
+    # v1.46.1 #11 — particionado por tenant
+    from core.historico_index import dashboard_dir as _dash
+    session_dir = _dash().resolve()
     path = (session_dir / f"{session_id}.json").resolve()
     try:
         path.relative_to(session_dir)
@@ -54,7 +56,9 @@ async def listar_historico(incluir_sandbox: bool = Query(False)):
         return list(reversed(entradas))[:200]
 
     # Fallback: glob direto (índice ainda não criado)
-    session_dir = HISTORICO_DIR / "dashboard"
+    # v1.46.1 #11 — particionado por tenant
+    from core.historico_index import dashboard_dir as _dash
+    session_dir = _dash()
     if not session_dir.exists():
         return []
     all_files = sorted(

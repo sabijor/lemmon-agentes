@@ -21,7 +21,9 @@ async def latencias_agente(agente: str, dias: int = 30):
     lenta=true para coloração no frontend.
     """
     dias = max(7, min(dias, 365))
-    session_dir = HISTORICO_DIR / "dashboard"
+    # v1.46.1 #11 — particionado por tenant
+    from core.historico_index import dashboard_dir as _dash
+    session_dir = _dash()
     if not session_dir.exists():
         return {"semanas": []}
 

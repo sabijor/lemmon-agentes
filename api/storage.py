@@ -5,6 +5,7 @@ from pathlib import Path
 
 from core.config import HISTORICO_DIR
 from core.historico_index import adicionar_entrada
+from core.tenant import tenant_namespace  # v1.46.1 #11 — sessões particionadas por tenant
 
 # T134 — Versão do schema do JSON de sessão. Incrementar quando o formato mudar
 # (ex: renomear/remover campo). Leitores podem usar esse número pra disparar
@@ -24,8 +25,9 @@ def _salvar_sessao_reuniao(
     sandbox: bool = False,
 ) -> tuple[str, Path]:
     """Cria ou atualiza sessão de reunião conversacional no histórico."""
-    session_dir = HISTORICO_DIR / "dashboard"
-    session_dir.mkdir(parents=True, exist_ok=True)
+    # v1.46.1 #11 — particionar por tenant (LEMMON_TENANT_ID). Sem isso,
+    # sessões de tenants diferentes misturavam em historico/dashboard/ comum.
+    session_dir = tenant_namespace(HISTORICO_DIR, "dashboard")
 
     if session_path and session_path.exists():
         registro = json.loads(session_path.read_text(encoding="utf-8"))
@@ -71,11 +73,13 @@ def _salvar_sessao(
     contexto_tecnico: dict | None = None,
     duracoes: dict[str, float] | None = None,
     sandbox: bool = False,
+    nome_projeto: str | None = None,  # v1.46.1 #12 — nome bonito (Haiku)
 ) -> Path:
     """Salva sessão completa da dashboard no histórico."""
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    session_dir = HISTORICO_DIR / "dashboard"
-    session_dir.mkdir(parents=True, exist_ok=True)
+    # v1.46.1 #11 — particionar por tenant (LEMMON_TENANT_ID). Sem isso,
+    # sessões de tenants diferentes misturavam em historico/dashboard/ comum.
+    session_dir = tenant_namespace(HISTORICO_DIR, "dashboard")
 
     origem = "sandbox" if sandbox else "dashboard"
     registro = {
@@ -83,6 +87,7 @@ def _salvar_sessao(
         "timestamp": datetime.now().isoformat(),
         "origem": origem,
         "briefing": briefing,
+        "nome_projeto": nome_projeto,  # v1.46.1 #12 — usado na capa do PDF
         "agentes_usados": agentes_usados,
         "respostas": respostas,
         "custos_usd": custos,

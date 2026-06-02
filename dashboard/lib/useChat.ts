@@ -89,8 +89,25 @@ export function useChat() {
   // (em done=true). Antes: localStorage.setItem 500x por segundo durante streaming.
   const [persistedMessages, setPersistedMessages] = useLocalStorage<Message[]>('lemmon-last-messages', [])
   const [messages, setMessages] = useState<Message[]>(persistedMessages)
+  // T-bug-Hator-#4 — useLocalStorage retorna defaultValue ([]) no primeiro render
+  // pra ser SSR-safe; só lê do storage no useEffect. Como inicializávamos messages
+  // com persistedMessages NO PRIMEIRO RENDER, perdemos o valor real do storage.
+  // Resultado: navegar pra outra rota e voltar zerava as bolhas do chat MAS o
+  // conciergeHistory permanecia, deixando o backend respondendo com base num
+  // histórico que o user não estava vendo. Fix: rehidrata 1 vez quando o
+  // useLocalStorage termina de ler o storage.
+  const hasHydratedRef = useRef(false)
+  useEffect(() => {
+    if (!hasHydratedRef.current && persistedMessages.length > 0 && messages.length === 0) {
+      setMessages(persistedMessages)
+      hasHydratedRef.current = true
+    } else if (persistedMessages.length === 0 && !hasHydratedRef.current) {
+      // storage vazio confirmado — marca hidratado pra não interferir depois
+      hasHydratedRef.current = true
+    }
+  }, [persistedMessages, messages.length])
   // Sincroniza state ↔ localStorage só em momentos "stables":
-  // (1) ao montar (já feito acima via useState com initial value)
+  // (1) ao montar (já feito acima via useState com initial value + rehidrata se preciso)
   // (2) quando alguma msg vira done=true (final de cada agente)
   // (3) quando array fica vazio (reset)
   const lastPersistedCount = useRef(persistedMessages.length)

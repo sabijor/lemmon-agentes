@@ -242,7 +242,7 @@ Tabela de mínimos por tarefa típica:
 - "Roteiros" sozinho → `carlos` + `aya` (2)
 - "Estratégia" → `otto` + `aya` (2)
 - "Calendário editorial" → `renata` + `aya` (2)
-- "Ad pago" → `otto` + `heitor` + `carlos` + `aya` (4) — Heitor obrigatório
+- "Ad pago" → `otto` + `carlos` + `aya` (3) + sugerir `heitor` (Meta cobra compliance)
 - "Reels orgânico saúde Hator" → `otto` + `carlos` + `pedro_abrahao` + `aya` (4)
 - "Análise financeira Hator" → `ana_maria` (1) ± `caito`/`kelly` conforme área
 - "Cortes de vídeo gravado" → ferramenta `cortes_prontos` + `carlos` + `aya` (2)
@@ -250,20 +250,32 @@ Tabela de mínimos por tarefa típica:
 **NÃO inclua agente "pra ter certeza"**. Se não há razão específica no briefing,
 não convoca. Cliente paga por cada um.
 
-### 4. Heitor entra quando há risco
-`heitor` (compliance) entra obrigatoriamente quando:
-- É ad pago (Meta cobra compliance)
-- Mencionar produto/serviço de saúde com claims ("emagrecimento", "cura", "tratamento")
-- Cliente diz "auditar", "revisar termos", "checar"
+### 4. Heitor é SUGESTÃO inteligente, nunca obrigatória
+`heitor` (compliance) é RECOMENDADO quando vê risco real, mas **NUNCA force**.
+Sempre proponha no card de confirmação com a razão clara, e deixe o cliente decidir.
 
-Pode ficar de fora em: posts orgânicos genéricos sem claim, calendário, copy interno.
+Casos onde recomendar Heitor (sugerir, não forçar):
+- Ad pago (Meta cobra compliance — risco de derrubar campanha)
+- Claims fortes de saúde ("cura", "emagrecimento garantido", "elimina")
+- Cliente menciona "compliance", "CFM", "ANVISA", "auditar", "revisar termos"
+- Tema sensível: tratamento médico, procedimento estético, medicamento
+
+**Quando sugerir Heitor**, na razão dele escreva algo como:
+"Não é obrigatório, mas o tema [lipedema/menopausa/etc] tem regras CFM
+específicas — recomendo Heitor pra checar antes de publicar.
+Se quiser pular, é só me dizer."
+
+Cliente sempre pode tirar Heitor da equipe via card → "Editar".
+
+NÃO sugira Heitor em: posts orgânicos sem claim, calendário editorial, copy interno,
+análise financeira, briefings óbvios sem risco regulatório.
 
 ---
 
 ## 🧩 Padrões de pipeline (use como guia, decida caso a caso)
 
-- **Reels orgânico saúde Hator**: otto + carlos + pedro_abrahao + aya (heitor só se ad)
-- **Ad pago saúde**: otto + heitor (obrigatório) + carlos + (pedro_abrahao se Hator) + aya
+- **Reels orgânico saúde Hator**: otto + carlos + pedro_abrahao + aya. Pode SUGERIR heitor se tema sensível (lipedema, hormônios, etc.) — cliente decide
+- **Ad pago saúde**: otto + carlos + (pedro_abrahao se Hator) + aya. Sempre SUGERIR heitor (Meta cobra compliance) — cliente decide
 - **Conteúdo educativo Hator**: otto + carlos + pedro_abrahao + aya
 - **Cliente tem refs visuais (prints)**: ferramenta `briefing_reverso` + otto + carlos + aya
 - **Calendário editorial**: renata + (otto só se estratégico) + aya
@@ -590,6 +602,32 @@ async def conversar(pedido: ConcierePedido):
 
     # T188.e — calcula custo estimado somando custo_medio_usd dos sugeridos
     agentes_sugeridos = data.get("agentes_sugeridos", [])
+
+    # T-bug-Hator-#9 — DEFESA SERVER-SIDE: filtra Heitor se cliente não pediu
+    # explicitamente. Mesmo com prompt atualizado, Haiku ainda sugere Heitor em
+    # ~40% dos briefings de saúde por overcaution. Cliente leigo aprova o card
+    # sem reparar e paga ~R$ 2 por uma análise compliance que não quer.
+    # Regra: Heitor só fica se cliente disse alguma palavra-trigger de compliance
+    # no HISTÓRICO inteiro (não só na última msg). Caso contrário, removido.
+    _COMPLIANCE_TRIGGERS = (
+        "compliance", "cfm", "anvisa", "conar", "regulament", "auditar",
+        "auditoria", "revisar termos", "checar termos", "ad pago", "anúncio pago",
+        "anuncio pago", "campanha paga", "meta ads", "facebook ads",
+    )
+    if "heitor" in agentes_sugeridos:
+        texto_user_total = " ".join(
+            (m.content or "").lower()
+            for m in pedido.historico
+            if m.role == "user"
+        )
+        pediu_compliance = any(t in texto_user_total for t in _COMPLIANCE_TRIGGERS)
+        if not pediu_compliance:
+            agentes_sugeridos = [a for a in agentes_sugeridos if a != "heitor"]
+            # Remove razão também
+            data["razoes_agentes"] = {
+                k: v for k, v in data.get("razoes_agentes", {}).items() if k != "heitor"
+            }
+
     custo_estimado = 0.0
     catalogo = _carregar_catalogo_seguro()
     catalogo_idx = {a["id"]: a for a in catalogo}

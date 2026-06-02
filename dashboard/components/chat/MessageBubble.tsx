@@ -93,7 +93,9 @@ export const AgentMessage = memo(function AgentMessage({ msg, progress }: { msg:
                 /* T153 — feedback mais informativo enquanto agente trabalha */
                 <span className="text-stone-400 dark:text-stone-500 animate-pulse">
                   {agent.name.toLowerCase()} {progress !== undefined && progress > 0
-                    ? `pensando · ${Math.round(progress * 100)}%`
+                    /* T-bug-Hator-#6: progress já vem em escala 0-100 do useChat.ts:338 (Math.min(95, ... * 100)).
+                       Multiplicar de novo por 100 dava "9500%". Agora só Math.round, que é o necessário. */
+                    ? `pensando · ${Math.round(progress)}%`
                     : 'pensando...'}
                 </span>
               )}

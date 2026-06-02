@@ -212,14 +212,15 @@ export default function Home() {
         const agent = AGENTS.find(a => a.id === id)
         return agent && !agent.reuniaoOnly
       }) as AgentId[]
-      // T160 — compliance toggle ainda sobrepõe
-      if (complianceMode === 'sempre' && !ids.includes('heitor')) {
-        const idx = ids.indexOf('otto')
-        ids = idx >= 0 ? [...ids.slice(0, idx + 1), 'heitor', ...ids.slice(idx + 1)] : ['heitor', ...ids]
-        notify.info('🛡️ Compliance forçado: Heitor adicionado.')
-      } else if (complianceMode === 'nunca' && ids.includes('heitor')) {
+      // T-bug-Hator-#5/#8 — Concierge agora é fonte única da verdade pra equipe.
+      // ANTES: complianceMode='sempre' INJETAVA Heitor escondido (sem aparecer no card),
+      // o cliente clicava OK achando que aprovou X agentes e o pipeline rodava X+heitor.
+      // Quebra de promessa visual + custo extra. AGORA: 'sempre' é no-op, 'nunca' ainda
+      // remove Heitor (kill switch transparente: cliente vê Heitor no card e pode ter
+      // configurado 'nunca' antes — respeitamos a preferência explícita de remover).
+      if (complianceMode === 'nunca' && ids.includes('heitor')) {
         ids = ids.filter(id => id !== 'heitor')
-        notify.warning('🚫 Compliance pulado conforme sua preferência.')
+        notify.warning('🚫 Compliance removido conforme sua preferência (toggle 🛡️ Nunca).')
       }
       if (ids.length === 0) {
         notify.warning('Concierge não conseguiu escolher agentes. Tente reformular.')

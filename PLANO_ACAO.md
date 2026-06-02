@@ -531,3 +531,330 @@ Após honest count revelar só 32% do audit feito, executei os 88 itens restante
 - **30 vulnerabilidades de segurança** (5 críticas, 10 altas)
 - **3 gaps LGPD/GDPR** (dados médicos)
 - **Cobertura de testes ~8%** (frontend = 0)
+
+---
+
+## 🐛 QA-H7 ao vivo com o Calebe — bugs reais descobertos (2026-06-02)
+
+Sessão de teste real com briefing do Pedro/Hator (lipedema + implante hormonal).
+Pipeline rodou end-to-end mas vários bugs apareceram. Tabela consolidada:
+
+| # | Bug | Severidade | Status | Causa raiz | Fix / Pendência |
+|---|---|---|---|---|---|
+| **#4** | Bolhas do chat sumiam ao navegar entre rotas (`/saude`, `/historico` e voltar) | 🔴 alto | ✅ fixado | `useState<Message[]>(persistedMessages)` capturava `[]` (defaultValue SSR-safe) no primeiro render, `useLocalStorage` lia storage depois mas `messages` ficava preso em `[]`. Resultado: localStorage tinha mensagens, backend recebia histórico completo, mas tela mostrava vazio | `useChat.ts:90-108` — hidratação one-shot via `hasHydratedRef` |
+| **#5** | Heitor entrava no pipeline mesmo sem o cliente pedir compliance | 🟠 alto (custo desnecessário ~R$ 2/rodada) | ✅ fixado | System prompt do Concierge dizia "Heitor entra obrigatoriamente quando ad pago / claims fortes / cliente pede compliance" — Haiku interpretava qualquer tema médico como gatilho | `concierge.py:253-273` — reescrito pra "Heitor é SUGESTÃO inteligente, nunca obrigatória. Proponha no card com 'não é obrigatório, mas...' e deixe cliente decidir" |
+| **#6** | "9500%" no agente pensando (estado "lemon pensando · 9500%") | 🟠 alto (cliente fica chocado) | ✅ fixado | Dupla multiplicação: `useChat.ts:338` já guarda progress em escala 0-100, mas `MessageBubble.tsx:96` fazia `Math.round(progress * 100)%` | `MessageBubble.tsx:96` — só `Math.round(progress)%` agora |
+| **#7** | Pipeline "fantasma" continua na UI após reinício do backend (WS antigo morto, frontend sem reconectar) | 🟡 médio | ⚠️ workaround | WS morre abruptamente quando kill -9 no backend; frontend mantém `isRunning=true` e `agentStatus.X='thinking'` indefinidamente | Workaround: `LIMPAR` no chat + `Cmd+Shift+R`. Fix real: detectar WS dead → toast "conexão perdida, recarregue" + auto-recovery |
+| **#8** | `complianceMode='sempre'` no localStorage adicionava Heitor escondido (sem aparecer no card) | 🔴 alto (quebra de promessa visual + custo invisível) | ✅ fixado | Em `page.tsx:216`, lógica antiga `if (complianceMode === 'sempre' && !ids.includes('heitor'))` injetava Heitor depois do clique OK, sem aparecer no card de confirmação. Toast "🛡️ Compliance forçado" passava batido | `page.tsx:216-225` — removida injeção. `complianceMode='sempre'` agora é no-op. Só `'nunca'` mantém efeito (kill switch transparente) |
+| **#9** | Defesa em profundidade: backend filtra Heitor server-side se cliente não pediu compliance | — | ✅ implementado | Mesmo com prompt atualizado, Haiku ainda sugeria Heitor em ~40% dos briefings de saúde. Frontend pode mostrar agentes em `agentes_sugeridos` ANTES do filtro complianceMode rodar | `concierge.py:603-628` — checa `_COMPLIANCE_TRIGGERS` (compliance, cfm, anvisa, conar, auditar, ad pago, meta ads, etc) no histórico do user antes de retornar agentes. Sem trigger → remove Heitor + razão. **10/10 validações sem Heitor sem trigger, 4/4 com trigger** |
+| **#10** | Carlos loga warning `'Historico' object has no attribute 'salvar'` | 🟡 médio | ⏳ pendente | Carlos chama método `.salvar()` que não existe na classe `Historico`. Provavelmente refatoraram pra `.save()`/`.gravar()` em algum momento e Carlos ficou pra trás | Investigar `agentes/carlos.py` + `core/historico.py` (ou onde estiver Historico). Renomear método pro nome correto |
+| **#11** | Sessão do Calebe salva em `historico/dashboard/` (não em `historico/hator/dashboard/`) — tenant namespace falhou | 🔴 alto (vazamento entre tenants) | ⏳ pendente | `ws_chat.py:_salvar_sessao()` usa caminho literal `historico/dashboard/...` em vez de `tenant_namespace(HISTORICO_DIR, "dashboard")` | Refatorar `_salvar_sessao` em `ws_chat.py` e `core/historico_index.py` pra usar `tenant_namespace()`. **CRÍTICO pra B2B SaaS — se Pedro e outro cliente usam mesma instância, sessões misturam** |
+| **#12** | Capa do PDF mostra briefing literal truncado em snake_case (`Funil_de_retargeting_em_cascata_5_estágios_para_implante_hor`) ao invés de nome bonito | 🟠 alto (capa amadora) | ⏳ pendente | `ws_chat.py:410` faz `nome_projeto = _cleaned[:60]` do briefing direto. Nunca chama Haiku pra nomear o projeto. JSON da sessão nem persiste `nome_projeto`, então export busca via regex no markdown da Aya e cai no fallback "(sem nome)" ou no título feio | Adicionar agente nano (Haiku, ~$0.001) que gera "Funil Implante Hormonal — Hator" a partir do briefing. Persistir em `sessao.nome_projeto` |
+| **#13** | Carlos aparece rotulado como **"Salles"** no índice e seções do PDF da Aya | 🟠 alto (confusão profissional) | ⏳ pendente | `core/config.py:AYA_AGENTES_PADRAO = ["otto", "heitor", "salles", "sonia"]`. Carlos não está na lista — Aya cai no fallback Salles ao detectar agente. Quando user pede só Carlos, vira "## 1. Salles — Roteiro" com conteúdo de Carlos | Adicionar `carlos`, `pedro_abrahao`, `renata`, `ana_maria`, `prichina`, `caito`, `kelly` em `AYA_AGENTES_PADRAO`. Aya precisa rotular correto pelo `respostas.keys()` real |
+| **#14** | "Resumo dos agentes" na pág 1 fala de agentes que não rodaram (export seletivo) | 🟡 médio | ⏳ pendente | Export seletivo (só roteiro) usa o mesmo markdown da Aya que tem resumo de todos. Filtro só corta seções específicas, não atualiza o índice/resumo | Export seletivo deve regenerar o resumo só com agentes selecionados |
+| **#15** | Pop-up de export apareceu travado, fechou sozinho, depois funcionou | 🟡 médio | ⏳ pendente | Race condition em `ExportModal.tsx` — provavelmente estado inicial não carregou opções a tempo. UX: cliente vê modal congelado, fecha sozinho, segunda tentativa funciona | Investigar `dashboard/components/export/ExportModal.tsx`. Adicionar loading state explícito + fallback se backend demorar |
+| **#16** | Texto descritivo amador no PDF — sem letra maiúscula no início de frases, "Formato: FUNIL EM CASCATA..." | 🟢 baixo | ⏳ pendente | Carlos não capitaliza output. Aya também não normaliza. Prompt do Carlos precisa de "escreva texto profissional com capitalização correta" | Reforçar prompt de Carlos. Pós-processamento opcional na Aya |
+
+---
+
+## 📋 RELATÓRIO CONSOLIDADO — O que falta implementar (priorizado)
+
+### 🔴 BLOQUEADORES pra entregar pro Pedro (ainda pendentes)
+
+| Prioridade | Item | Esforço | Observação |
+|---|---|---|---|
+| **P0** | Bug #11 — Tenant namespace em ws_chat.py | M | Sem isso, sessões de clientes diferentes misturam. CRÍTICO pra B2B. Multi-tenant da v1.46 só funciona em endpoints, não no WS |
+| **P0** | Bug #12 — Nome de projeto bonito via Haiku | S | Capa "Funil_de_retargeting_em_cascata_5_estágios" é INSUSTENTÁVEL pra mostrar pro cliente final. Pedro não vai exibir esse PDF |
+| **P0** | Bug #13 — Carlos aparece como "Salles" no PDF | S | Confusão grave de identidade dos agentes. Cliente lê "Salles — Roteiro" e fica perdido. Apenas atualiza AYA_AGENTES_PADRAO + lógica de detecção |
+| **P1** | Bug #10 — Carlos.salvar() não existe | S | Não bloqueia output visível, mas perde histórico interno do Carlos. Pode afetar memória entre sessões |
+
+### 🟠 ALTO IMPACTO pós-Pedro (Sprint v1.47)
+
+| Item | Esforço | Categoria |
+|---|---|---|
+| Bug #14 — Resumo da pág 1 atualiza com export seletivo | M | UX export |
+| Bug #15 — Pop-up de export travado | M | UX frontend |
+| Bug #16 — Capitalização do texto do Carlos | S | Prompt engineering |
+| Bug #7 — Reconexão WS automática quando backend reinicia | M | Robustez |
+| Auth obrigatório por default (hoje só dev) — V-01 do audit | M | Segurança SaaS |
+| ChatPanel.tsx refactor 1773 → 6 componentes — F-14 | L | Tech debt |
+| useChat reduce 34 → 8 returns via Zustand — F-07 | L | Tech debt |
+| ws_chat.py 703 → strategy pattern — A-10 | L | Tech debt |
+| Mobile breakpoints — F-15 | L | Pedro usa iPad |
+| Frontend Vitest setup (0 testes hoje) | M | Testes |
+
+### 🟡 MÉDIO IMPACTO (Sprint v1.48+)
+
+- A-11 Salles alternativas perde 2/3 dos roteiros
+- A-13 `_stream` finge streaming (sleep 60ms)
+- A-19 callback `_make_confirmacao_callback` pode bloquear 5min
+- A-20 `sugerir_pipeline` prompt monolítico 60 linhas
+- V-13 DoS via WS abrindo 10 conexões satura threadpool
+- V-14 Cancel não interrompe Anthropic em curso (queima crédito)
+- V-15 `'unsafe-inline'` em CSP + script inline /share
+- F-04 60 props pro ChatPanel + callbacks inline
+- F-08 a F-13 state management (Zustand)
+
+### ✅ JÁ FECHADO no QA-H7 ao vivo
+
+- ✅ #4 Hidratação one-shot do messages
+- ✅ #5 Prompt Concierge atenuado (Heitor sugestão)
+- ✅ #6 Progress não mostra 9500%
+- ✅ #8 complianceMode='sempre' removido
+- ✅ #9 Defesa server-side anti-Heitor (3 camadas validadas)
+
+---
+
+## 📈 PROGRESSO HONESTO HOJE
+
+**v1.46 publicada:** 40% dos 134 achados resolvidos.
+**QA-H7 ao vivo:** descobriu 13 bugs novos (#4 a #16), fixou 5, deixou 8 pendentes.
+
+**Pra ir pro Pedro sem vergonha:** precisamos fechar P0 (#10, #11, #12, #13). Tudo S/M esforço — 1 dia de trabalho focado. Depois disso, sistema fica pronto pra Pedro receber acesso em piloto controlado.
+
+**Estimativa pra fechar P0:** 4-6 horas de codificação + testes.
+
+---
+
+# 🗺️ PLANO DE EXECUÇÃO — 4 SPRINTS ATÉ SAAS
+
+> Estratégia em sprints com objetivo claro, dependências e critério de done.
+> Cada sprint tem entrega visível pro Calebe testar antes de prosseguir.
+
+## 📐 Princípio de ordenação
+
+1. **Sempre fechar bloqueador antes de polimento.** Pedro não recebe acesso até P0 estar 100%.
+2. **Tech debt depois de feature, nunca antes.** Refactor pra escala só faz sentido se tem cliente real (PMF confirmado).
+3. **Segurança aumenta junto com superfície.** Auth obrigatório quando tiver 2º cliente, não antes (custo > benefício).
+4. **Testes seguram regressão, não viram blocker.** Vitest setup é P1, não P0.
+
+---
+
+## 🏃 SPRINT v1.46.1 — "Pedro recebe acesso" ✅ COMPLETO (2026-06-02, ~3h)
+
+**Resultado:** 3 rounds de QA real end-to-end com briefing Pedro/Hator.
+Round 3 final: pipeline 4 agentes (Otto + Carlos + Pedro + Aya) executou em
+4min50s, custo $0.26 (~R$ 1,40), PDF 244KB com TODOS os agentes visíveis,
+capa "Retargeting Cascata Lipedema — Pedro", sessão em `historico/hator/`.
+
+**Bugs fechados neste sprint:**
+- ✅ #10 Carlos.salvar() → registrar() (método alinhado com classe Historico)
+- ✅ #11 Tenant namespace em ws_chat._salvar_sessao + 6 rotas (historico, exportar, share, sessoes, saude, historico_index)
+- ✅ #12 Nome bonito do projeto via Haiku — novo módulo `core/nomeador.py` com cache por hash, persistido em `sessao.nome_projeto`, exportador usa
+- ✅ #13 Carlos rotulado como "Salles" → variável `roteiro_carlos` separada + AYA_AGENTES_PADRAO expandido pra 11 agentes
+- ✅ #17 Pedro_abrahao não rodava como agente top-level — case próprio em `_run_agent_step`
+- ✅ #18 Otto KeyError 'output_humano' quando LLM omite campo — `_montar_output_humano_fallback` formatado
+- ✅ #19 Aya schema só com 4 cards (Otto/Heitor/Salles/Sonia) — expandido pra 11. `_montar_markdown` iterativo
+
+**Validação final (round 3 com briefing real do Pedro):**
+- ✅ Heitor não entrou (Concierge sugere só [otto, carlos, pedro_abrahao, aya])
+- ✅ Todos os 4 agentes rodaram com `agent_done`
+- ✅ Carlos terminou sem warning de histórico
+- ✅ Pipeline FIM enviado, sessão salva
+- ✅ Sessão em `historico/hator/dashboard/` (tenant correto, não no path default)
+- ✅ `nome_projeto = "Retargeting Cascata Lipedema — Pedro"` no JSON
+- ✅ PDF 244KB com capa correta, Carlos como Carlos (não Salles), Pedro com seu próprio header
+
+---
+
+## 🏃 SPRINT v1.46.1 (original — agora ✅ done)
+
+**Objetivo:** PDF apresentável + multi-tenant funcionando. Pedro pode mostrar dossiê pra paciente sem vergonha.
+
+**Critério de done:**
+- [ ] Rodar QA-H7 com briefing real do Pedro
+- [ ] Capa do PDF: "Funil Implante Hormonal — Hator" (não snake_case feio)
+- [ ] Índice: "1. Carlos — Roteiro" (não "Salles")
+- [ ] Arquivo salvo em `historico/hator/dashboard/` (não no path default)
+- [ ] Zero warnings no log do Carlos
+- [ ] Pedro consegue baixar e abrir o PDF, ficou no padrão de qualidade Hator
+
+**Sequência (ordem importa por dependência):**
+
+### Bloco A — Quick fixes (30min)
+| Ordem | Bug | Esforço | Arquivos |
+|---|---|---|---|
+| 1 | #13 Atualizar `AYA_AGENTES_PADRAO` | 15min | `core/config.py:174` (adicionar carlos, pedro_abrahao, renata, admin agents) + `agentes/aya.py` detecção |
+| 2 | #10 Renomear método `salvar()` → `gravar()` (ou inverso) | 15min | Investigar `core/historico.py` + `agentes/carlos.py`. Alinhar nome do método |
+
+### Bloco B — Tenant fix (1h)
+| Ordem | Bug | Esforço | Estratégia |
+|---|---|---|---|
+| 3 | #11 Tenant em `ws_chat._salvar_sessao()` | 30min | Refatorar pra usar `tenant_namespace(HISTORICO_DIR, "dashboard")` em vez de path literal |
+| 4 | #11.b Mesmo fix em `core/historico_index.py` | 20min | `sanity_check()`, `listar_sessoes()`, `marcar_favorito()` etc — todos devem usar `tenant_namespace()` |
+| 5 | #11.c Migração: copiar sessões antigas de `historico/dashboard/` pra `historico/default/dashboard/` se LEMMON_TENANT_ID=default | 10min | Script one-shot pra não perder histórico |
+
+### Bloco C — Nome do projeto (1h)
+| Ordem | Bug | Esforço | Estratégia |
+|---|---|---|---|
+| 6 | #12 Função `gerar_nome_projeto(briefing) -> str` via Haiku | 30min | Nova função em `core/nomeador.py`. Prompt: "Gere um título curto e profissional (máx 50 chars) pra esse projeto de marketing. Exemplos: 'Funil Implante Hormonal — Hator', 'Reels Menopausa Q3'". Cache por hash do briefing pra não repetir Haiku |
+| 7 | #12.b Persistir `nome_projeto` no JSON da sessão | 15min | `_salvar_sessao()` adiciona campo. Schema bump pra v2 |
+| 8 | #12.c Exportador busca `nome_projeto` do JSON antes do regex no markdown | 15min | `core/exportador_aya.py:140` — prioridade: JSON > regex no markdown > fallback "Sem nome" |
+
+### Bloco D — Validação + commit (1h)
+| Ordem | Tarefa | Esforço |
+|---|---|---|
+| 9 | Reiniciar backend, rodar QA-H7 real (custo ~R$ 2-3) | 30min |
+| 10 | Validar capa + agentes + path | 5min |
+| 11 | Commit "fix(v1.46.1): bugs Pedro recebe acesso (#10-#13)" + push | 10min |
+| 12 | Atualizar `PLANO_ACAO.md` marcando P0 como ✅ | 15min |
+
+**Risco:** Bug #11 (tenant) pode ter mais lugares hardcoded que não vi (ex: rotas de download, share). Buffer de +1h.
+
+---
+
+## 🏃 SPRINT v1.47 — "Polimento UX desktop + integração planilha" (2-3 dias)
+
+**Objetivo:** UX impecável no desktop (Pedro vai usar no PC do consultório). Preparar terreno pra próxima feature do Calebe (integrar planilha financeira da clínica).
+
+**REVISÃO (2026-06-02 conversa Calebe):** Mobile/responsivo **REMOVIDO** — sistema é localhost privado, Pedro acessa pelo Mac do consultório. Auth obrigatório/CSP estrito também **DEFERIDO pro v1.49** (só faz sentido quando expor pra internet). Foco agora: deixar o sistema sólido pra receber dado sensível (planilha financeira da clínica).
+
+**Critério de done:**
+- [ ] Export seletivo gera PDF coerente (resumo bate com conteúdo)
+- [ ] Modal de export nunca trava
+- [ ] Textos do Carlos com formatação profissional
+- [ ] Se backend cair durante pipeline, frontend recupera gracefully
+- [ ] Pasta `inputs/planilhas/` + endpoint pra upload XLSX (preparação pra próxima feature)
+- [ ] Ana Maria consegue ler XLSX da clínica e gerar análise financeira
+
+**Sequência:**
+
+### Bloco A — Export sem amadorismo (4h)
+1. **#14** Export seletivo regenera resumo da pág 1 só com agentes selecionados
+2. **#15** ExportModal race condition — adicionar `useEffect` que aguarda opções carregarem antes de renderizar botões
+3. **#16** Reforçar prompt do Carlos pra capitalização. Adicionar pós-processamento Aya como segurança
+
+### Bloco B — Robustez frontend (3h)
+4. **#7** Detectar WS dead → toast "conexão perdida, recarregue?" + tentar reconectar 3x antes de desistir
+
+### Bloco C — Preparação planilha financeira (5h)
+5. **PROD-FIN-1** Endpoint `POST /financeiro/upload` aceita XLSX/CSV, valida estrutura, salva em `historico/<tenant>/financeiro/`
+6. **PROD-FIN-2** Cripto-at-rest aplica automático nos arquivos da clínica (LEMMON_ENCRYPT_KEY)
+7. **PROD-FIN-3** Ana Maria lê planilha via `openpyxl`, gera análise (DRE simplificado, ticket médio, top 5 procedimentos)
+8. **PROD-FIN-4** Audit log pra cada acesso (LGPD — dado sensível financeiro)
+
+### Bloco D — Testes (4h)
+9. **Vitest setup** — `package.json`, `vitest.config.ts`, primeiro teste smoke
+10. **5 testes core** — useChat hidratação (#4 regressão), Concierge defesa Heitor (#9 regressão), MessageBubble progress format (#6 regressão), ExportModal init, ChatPanel render
+
+**Não entra mais:**
+- ~~Mobile breakpoints (F-15)~~ — sistema é localhost, Pedro usa no Mac do consultório
+- ~~Auth obrigatório default (V-01)~~ — desnecessário em localhost privado, defere pra v1.49
+- ~~CSP estrito (V-15)~~ — só importa em domínio público
+
+**Risco:** integração planilha pode revelar bugs em Ana Maria (agente menos testado). Buffer de +2h.
+
+---
+
+## 🏃 SPRINT v1.48 — "Refactor pra escalar" (1-2 semanas)
+
+**Objetivo:** Próxima feature de produto custa metade. Pré-requisito pra time aumentar.
+
+**Critério de done:**
+- [ ] ChatPanel em 6 componentes < 300 linhas cada
+- [ ] useChat retorna max 8 valores (Zustand store cuida do resto)
+- [ ] ws_chat.py com strategy pattern — 1 arquivo por agente, < 200 linhas cada
+- [ ] Adicionar novo agente leva < 1h (criar classe + registrar strategy)
+- [ ] Zero `as any` em locais críticos
+
+**Sequência:**
+
+### Bloco A — Backend strategy pattern (3 dias)
+1. **A-10** `ws_chat.py` 703 linhas → 1 strategy por agente em `api/agent_strategies/`
+2. **A-20** `sugerir_pipeline` prompt monolítico → templates modulares
+3. **A-11** Salles alternativas — não sobrescrever, criar lista de variantes
+4. **A-13** `_stream` real (não sleep 60ms fake) — usar `anthropic.AsyncStream` real
+
+### Bloco B — Frontend state mgmt (4 dias)
+5. **F-07** Migrar `useChat` 34 returns → Zustand store
+6. **F-14** Quebrar `ChatPanel.tsx` (1773 linhas) em:
+   - `ChatHeader.tsx` (header + toggles)
+   - `MessageList.tsx` (lista + virtualization)
+   - `MessageBubble.tsx` (já existe, expande)
+   - `ChatInput.tsx` (textarea + upload)
+   - `ChatFooter.tsx` (custo + ações)
+   - `AgentMacroBar.tsx` (avatares running)
+7. **F-04** Props ChatPanel: usar Zustand em vez de prop drilling
+8. **F-08 a F-13** Zod validation, Tanstack Query no useHistory, `cva` pra Tailwind dups
+
+### Bloco C — Tech debt menor (1 dia)
+9. **A-19** Callback bloqueante 5min — converter pra async com timeout
+10. **F-12** Remover `as any` críticos — tipar WS payload com Zod
+
+**Risco:** Refactor é onde projetos morrem. Definir incremento: cada refactor termina com testes passando antes de começar próximo. Sem big-bang.
+
+---
+
+## 🏃 SPRINT v1.49 — "SaaS-ready" (1 semana)
+
+**Objetivo:** 2º cliente entra (não só Pedro). Pronto pra cobrar.
+
+**Critério de done:**
+- [ ] DB SQLite substituindo JSON em disco
+- [ ] Painel `/pricing` com checkout (Stripe ou Asaas)
+- [ ] WhatsApp notification "dossiê pronto" (PROD-5)
+- [ ] Onboarding self-serve (criar tenant via UI, não env var)
+- [ ] Rate limit por tenant (não só por IP)
+
+**Sequência:**
+
+### Bloco A — Persistência (2 dias)
+1. **A-05** SQLite com `tenant_id` em todas tabelas
+2. Migração one-shot de JSON → SQLite
+3. Backup automático diário (cron)
+
+### Bloco B — Monetização (2 dias)
+4. **PROD-14b** Stripe/Asaas checkout no `/pricing`
+5. **Webhook** atualiza `tenant.subscription_status`
+6. Middleware de feature flag por plano (Solo / Clínica / Agência)
+
+### Bloco C — Segurança SaaS (2 dias)
+7. **V-01** Auth obrigatório por default — quando hospedar em IP público, sistema EXIGE `LEMMON_AUTH_TOKEN`. Hoje aceita modo dev silencioso
+8. **V-13** Rate limit por tenant + por endpoint pesado
+9. **V-14** Cancel real do Anthropic (passar `signal: AbortController`)
+10. **V-04** WS CSWSH — origin check estrito por tenant
+11. **V-15** CSP estrito — remover `unsafe-inline`, mover scripts pra arquivos
+
+### Bloco D — Produtos (2 dias)
+10. **PROD-5** WhatsApp notify via Twilio quando Aya termina
+11. **PROD-1.b** Concierge consulta `/historico/similar` com cross-cliente desligado por default
+12. **Onboarding** — wizard 5 passos cria tenant + brand kit + admin user
+
+---
+
+## 📊 Cronograma agregado
+
+| Sprint | Duração | Saída | Pré-requisito |
+|---|---|---|---|
+| **v1.46.1** | 1 dia | Pedro recebe acesso | — |
+| **v1.47** | 2-3 dias | UX impecável + mobile + testes baseline | v1.46.1 done |
+| **v1.48** | 1-2 semanas | Refactor pra escala | v1.47 done **+ PMF confirmado** (Pedro usando 2+ semanas) |
+| **v1.49** | 1 semana | SaaS-ready (2º cliente) | v1.48 done **+ pricing validado com lead real** |
+
+**Total até SaaS B2B: 3-5 semanas trabalho focado.**
+
+---
+
+## 🚦 Decisões de roteamento
+
+### Pula direto pra v1.48 se…
+- Pedro pediu features novas (e o sistema ainda não escala bem pra adicionar)
+- Time de dev cresce (mais de 1 pessoa precisa mexer no mesmo arquivo)
+
+### Pula direto pra v1.49 se…
+- 2º cliente real bate na porta antes de v1.47/v1.48 terminarem
+- Pedro pediu cobrança (validou produto, quer pagar)
+
+### Pausa tudo se…
+- Pedro abandonar (sem PMF, refactor é desperdício)
+- Anthropic mudar pricing > 2x (modelo de negócio quebra)
+
+---
+
+## ✅ Próxima ação imediata
+
+**Aguardando OK do Calebe pra começar Sprint v1.46.1.**
+
+Sequência: #13 → #10 → #11 → #12 → QA-H7 real → commit/push.
+
+Tempo estimado total: 4-6h. Posso começar agora se aprovar.

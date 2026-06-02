@@ -106,19 +106,18 @@ class Carlos(AgenteBase):
         if not texto:
             raise RuntimeError("Carlos não retornou conteúdo.")
 
-        # Salva no histórico próprio do agente
+        # v1.46.1 #10 — Carlos chamava self.historico.salvar() que não existe.
+        # API correta da classe Historico é registrar(registro: dict). Igual otto/heitor/etc.
         try:
-            self.historico.salvar(
-                input_resumido=briefing[:300],
-                output={
-                    "formato_solicitado": formato,
-                    "output_humano": texto,
-                    "tem_contexto_otto": bool(contexto_otto),
-                    "tem_contexto_heitor": bool(contexto_heitor),
-                },
-                custo=custo,
-                duracao_segundos=duracao,
-            )
+            self.historico.registrar({
+                "input_resumido": briefing[:300],
+                "formato_solicitado": formato,
+                "output_humano": texto,
+                "tem_contexto_otto": bool(contexto_otto),
+                "tem_contexto_heitor": bool(contexto_heitor),
+                "custo_usd": custo.custo_usd if hasattr(custo, "custo_usd") else custo,
+                "duracao_segundos": duracao,
+            })
         except Exception as exc:  # noqa: BLE001
             self.logger.warning("Falha ao salvar histórico do Carlos: %s", exc)
 
