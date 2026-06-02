@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from api.deps import _anthropic_client
-from api.routes import agentes, auxiliares, calibragem, concierge, exemplares, exportar, historico, saude, sessoes, share, transcrever
+from api.routes import agentes, auxiliares, calibragem, concierge, exemplares, exportar, historico, lgpd, saude, sessoes, share, transcrever
 from api.ws_chat import chat
 from api.ws_mesa import mesa_redonda
 from api.ws_reuniao import reuniao
@@ -126,6 +126,7 @@ app.include_router(calibragem.router)
 app.include_router(sessoes.router)
 app.include_router(saude.router)
 app.include_router(concierge.router)  # T186 — orquestrador conversacional
+app.include_router(lgpd.router)  # G-01/02/03 — LGPD compliance
 
 app.websocket("/ws/chat")(chat)
 app.websocket("/ws/reuniao")(reuniao)

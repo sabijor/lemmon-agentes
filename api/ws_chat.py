@@ -117,6 +117,27 @@ async def chat(ws: WebSocket):
             ALLOWED_MEDIA = {"image/jpeg", "image/png", "image/gif", "image/webp"}
             if image_base64 and image_media_type not in ALLOWED_MEDIA:
                 image_base64 = None  # tipo desconhecido = ignora
+            # V-26 — valida magic bytes (anti-evasão: cliente diz "image/png" mas manda EXE)
+            if image_base64:
+                try:
+                    import base64 as _b64
+                    _head = _b64.b64decode(image_base64[:32], validate=False)[:8]
+                    MAGIC = {
+                        b"\xff\xd8\xff": "image/jpeg",
+                        b"\x89PNG\r\n\x1a\n": "image/png",
+                        b"GIF87a": "image/gif",
+                        b"GIF89a": "image/gif",
+                        b"RIFF": "image/webp",  # WebP começa com RIFF...WEBP
+                    }
+                    ok = False
+                    for m, t in MAGIC.items():
+                        if _head.startswith(m) and (t == image_media_type or (t == "image/webp" and image_media_type == "image/webp")):
+                            ok = True
+                            break
+                    if not ok:
+                        image_base64 = None  # magic bytes não bate com declarado
+                except Exception:
+                    image_base64 = None  # se nem decoda primeiros bytes, abortar
             if image_base64:
                 try:
                     _resp = _anthropic_client.messages.create(
@@ -377,7 +398,18 @@ async def chat(ws: WebSocket):
 
                 elif name == "aya":
                     ag = Aya()
-                    nome_projeto = briefing[:60] if briefing else None
+                    # D-3 — sanitiza nome do projeto: remove CPF/email/telefone/PII
+                    # antes de virar nome de pasta. Antes briefing[:60] vazava dados.
+                    import re as _re
+                    if briefing:
+                        _cleaned = _re.sub(r"\d{3}\.?\d{3}\.?\d{3}-?\d{2}", "[cpf]", briefing)  # CPF
+                        _cleaned = _re.sub(r"[\w\.-]+@[\w\.-]+", "[email]", _cleaned)
+                        _cleaned = _re.sub(r"\(?\d{2}\)?[\s-]?\d{4,5}-?\d{4}", "[fone]", _cleaned)
+                        _cleaned = _re.sub(r"[^\w\s-]", "", _cleaned)  # só alfanum + espaço + hifen
+                        _cleaned = _re.sub(r"\s+", "_", _cleaned).strip("_")
+                        nome_projeto = _cleaned[:60] or None
+                    else:
+                        nome_projeto = None
                     # Sempre passa os 4 agentes; None = ausente nesta sessão
                     # (Aya não vai buscar no disco para os ausentes)
                     snap_outputs: dict[str, dict | None] = {
