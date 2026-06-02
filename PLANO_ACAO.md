@@ -453,7 +453,7 @@ Após honest count revelar só 32% do audit feito, executei os 88 itens restante
 | QA-H2 Brand Kit CRUD | ✅ | 0 |
 | QA-H3 Multi-user lifecycle | ✅ | 0 |
 | QA-H4 LGPD endpoints + auth wall | ✅ | **CRÍTICO #1** — `/lgpd/apagar-tudo` aceitava chamada anônima. Fix: constant-compare via `Authorization: Bearer <token>`. Mesmo fix em `/pedro/treinar` |
-| QA-H5 Treino Pedro Espelho | ⏭️ skipped | exige ANTHROPIC_API_KEY |
+| QA-H5 Treino Pedro Espelho | ✅ | RODADO end-to-end (28s real). 5 calibragens fake (notas 1-3) → POST `/pedro/treinar` com Bearer → Haiku consolidou em v2 do prompt (8401 chars, 5 padrões "Recuse/Prefira/Padrão"). Idempotência ok (todas notas=5 → "IA tá indo bem"). Auth wall validado (403/403/200). Audit log gravando |
 | QA-H6 Segurança (injection + rate + magic) | ✅ | **CRÍTICO #2** — Rate limit retornava 500 (não 429). Causa: `BaseHTTPMiddleware` não captura exceptions → returnar `JSONResponse` direto |
 | QA-H7 Pipeline real Hator | ⏭️ skipped | exige ANTHROPIC_API_KEY |
 | QA-H8 PWA + build | ✅ | **CRÍTICO #3** — ícones `/icon-192.png` e `/icon-512.png` não existiam. Fix: gerados via Pillow. Warning `themeColor` movido pro export `viewport` |
