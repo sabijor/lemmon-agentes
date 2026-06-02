@@ -39,7 +39,7 @@ export default function Home() {
   const { sugerir: sugerirPipeline } = useAutoRouter()
   // T186.b — Concierge orquestrador: conversa pra refinar briefing antes de mobilizar equipe
   // T193.b — também precisa do `error` pra distinguir sem-crédito/auth/rate-limit
-  const { conversar: conciergeConversar, error: conciergeError } = useConcierge()
+  const { conversar: conciergeConversar, error: conciergeError, loading: conciergeLoading } = useConcierge()
   // T188.i — histórico Concierge persiste em refresh (em vez de zerar via useState)
   const [conciergeHistory, setConciergeHistory] = useLocalStorage<ConciergeMsg[]>('lemmon-concierge-history', [])
   // T148 — flag pra mostrar "recomendado" no Auto Mode até 1ª sessão concluir
@@ -173,8 +173,24 @@ export default function Home() {
       })
 
       // Adiciona resposta do Concierge no chat
+      // Refinamento — se for "confirmar", anexa metadata pro ConciergeConfirmCard renderizar
       const conciergeId = crypto.randomUUID()
-      setMessages(prev => [...prev, { id: conciergeId, role: 'concierge' as AgentId, content: resp.conteudo, done: true }])
+      const novaMensagem = {
+        id: conciergeId,
+        role: 'concierge' as AgentId,
+        content: resp.conteudo,
+        done: true,
+        ...(resp.tipo === 'confirmar' && {
+          conciergeConfirmar: {
+            agentes: resp.agentes_sugeridos as AgentId[],
+            razoes: resp.razoes_agentes,
+            ferramentas: resp.ferramentas_extras,
+            custoEstimadoUsd: resp.custo_estimado_usd ?? 0,
+            briefingRefinado: resp.briefing_refinado,
+          },
+        }),
+      }
+      setMessages(prev => [...prev, novaMensagem])
 
       if (resp.tipo === 'pergunta' || resp.tipo === 'confirmar') {
         // T188.a — pergunta E confirmar funcionam igual no fluxo: espera próximo
@@ -391,6 +407,11 @@ export default function Home() {
               agentProgressMeta={agentProgressMeta}
               inMeeting={inMeeting}
               isRunning={isRunning}
+              conciergeLoading={conciergeLoading}
+              onConfirmConcierge={(approve) => {
+                // Reaproveita handleSend — manda "sim" ou "edita" pro Concierge.
+                handleSend(approve ? 'ok pode rodar' : 'edita a equipe')
+              }}
               sessionId={sessionId}
               favoritado={favoritado}
               resumedFrom={resumedFrom}

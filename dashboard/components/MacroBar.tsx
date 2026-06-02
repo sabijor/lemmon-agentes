@@ -36,7 +36,22 @@ export function MacroBar({ activeAgentIds, agentStatus, agentProgress, isVisible
             const isActive = status === 'thinking' || status === 'speaking'
 
             return (
-              <div key={id} className="flex flex-col items-center gap-0.5 min-w-[44px]" title={agent.title}>
+              <motion.div
+                key={id}
+                className="flex flex-col items-center gap-0.5 min-w-[44px] relative"
+                title={agent.title}
+                animate={isActive ? { scale: [1, 1.05, 1] } : { scale: 1 }}
+                transition={isActive ? { duration: 1.8, repeat: Infinity, ease: 'easeInOut' } : { duration: 0.2 }}
+              >
+                {/* Glow no agente ativo */}
+                {isActive && (
+                  <motion.div
+                    className="absolute inset-0 -m-1 rounded-lg blur-md -z-10"
+                    style={{ background: agent.color, opacity: 0.25 }}
+                    animate={{ opacity: [0.15, 0.35, 0.15] }}
+                    transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
+                  />
+                )}
                 <span className="text-[8px] font-mono font-bold uppercase tracking-widest"
                   style={{ color: agent.color }}>
                   {agent.name}
@@ -48,7 +63,7 @@ export function MacroBar({ activeAgentIds, agentStatus, agentProgress, isVisible
                 <span className={`text-[10px] transition-colors ${
                   status === 'done' ? 'text-green-500' :
                   status === 'error' ? 'text-red-500' :
-                  isActive ? 'text-stone-700' : 'text-stone-300'
+                  isActive ? 'text-stone-700 dark:text-stone-100' : 'text-stone-300 dark:text-stone-600'
                 }`}>
                   {STATUS_ICON[status]}
                 </span>
@@ -62,7 +77,7 @@ export function MacroBar({ activeAgentIds, agentStatus, agentProgress, isVisible
                     />
                   </div>
                 )}
-              </div>
+              </motion.div>
             )
           })}
         </motion.div>

@@ -25,6 +25,8 @@ import { ProgressBar } from '../ProgressBar'
 import { MacroBar } from '../MacroBar'
 import ExportMenu from '../export/ExportMenu'  // T191.a — menu granular de export (3 modos)
 import { formatCustoBRL } from '@/lib/formatCusto'  // T190.B3 — USD → R$
+import { ConciergeTyping } from './ConciergeTyping'  // Refinamento — loading "pensando..."
+import { ConciergeConfirmCard } from './ConciergeConfirmCard'  // Refinamento — card "confirmar"
 
 interface AttachedImage extends ImageData {
   preview: string
@@ -92,6 +94,10 @@ interface Props {
   autoMode?: boolean
   /** T150 — esconde toggles avançados (fast-track, sandbox) em sessão 1 pra reduzir ruído cognitivo do leigo. */
   hideAdvancedToggles?: boolean
+  /** Refinamento — Concierge está esperando resposta da API. Mostra bolha "pensando..." */
+  conciergeLoading?: boolean
+  /** Refinamento — Card "confirmar": callback do OK/Editar. */
+  onConfirmConcierge?: (approve: boolean) => void
 }
 
 // ─── Main panel ──────────────────────────────────────────────────────
@@ -109,6 +115,7 @@ export default function ChatPanel({
   loopActive, loopTurn, loopCost, loopStatus, onLoopStop,
   onExportar, onClose, onSetInMeeting,
   tagsSugeridas = [], autoMode = false, hideAdvancedToggles = false,
+  conciergeLoading = false, onConfirmConcierge,
 }: Props) {
   // Mode-aware aliases
   const activeMessages    = mode === 'reuniao' ? reunMessages    : messages
@@ -967,12 +974,22 @@ export default function ChatPanel({
           const min = Math.ceil(segundosRestantes / 60)
           const label = min < 1 ? 'menos de 1 min' : min === 1 ? '~1 min' : `~${min} min`
           return (
-            <div className="px-4 py-1.5 border-b border-stone-100 dark:border-stone-800 bg-emerald-50/60 dark:bg-emerald-900/20 flex items-center gap-2 text-[10px] font-mono uppercase tracking-widest text-emerald-700 dark:text-emerald-300">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-              </svg>
-              <span>Restam {label} — não feche a aba</span>
-            </div>
+            <motion.div
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="px-4 py-2 border-b border-emerald-200/40 dark:border-emerald-800/40 bg-gradient-to-r from-emerald-50/80 to-emerald-100/40 dark:from-emerald-950/40 dark:to-emerald-900/20 flex items-center gap-2 text-[10px] font-mono uppercase tracking-widest text-emerald-700 dark:text-emerald-300"
+            >
+              <motion.svg
+                width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+                animate={{ rotate: 360 }}
+                transition={{ duration: 8, repeat: Infinity, ease: 'linear' }}
+              >
+                <circle cx="12" cy="12" r="10"/>
+                <polyline points="12 6 12 12 16 14"/>
+              </motion.svg>
+              <span className="font-bold">Restam {label}</span>
+              <span className="opacity-70">— não feche a aba</span>
+            </motion.div>
           )
         })()}
 
@@ -1069,6 +1086,21 @@ export default function ChatPanel({
           <AnimatePresence mode="popLayout">
             {activeMessages.map(msg => {
               if (msg.role === 'user') return <UserMessage key={msg.id} msg={msg} />
+              // Refinamento — renderiza card "confirmar" se mensagem tem metadata
+              if (msg.role === 'concierge' && msg.conciergeConfirmar) {
+                return (
+                  <ConciergeConfirmCard
+                    key={msg.id}
+                    mensagem={msg.content}
+                    agentes={msg.conciergeConfirmar.agentes}
+                    razoes={msg.conciergeConfirmar.razoes}
+                    ferramentas={msg.conciergeConfirmar.ferramentas}
+                    custoEstimadoUsd={msg.conciergeConfirmar.custoEstimadoUsd}
+                    onApprove={() => onConfirmConcierge?.(true)}
+                    onEdit={() => onConfirmConcierge?.(false)}
+                  />
+                )
+              }
               const agentId = msg.role as AgentId
               const activeProgress = mode === 'reuniao' ? (reunAgentProgress ?? {}) : agentProgress
               const activeProgressMeta = mode === 'reuniao' ? (reunAgentProgressMeta ?? {}) : agentProgressMeta
@@ -1092,6 +1124,11 @@ export default function ChatPanel({
                 </div>
               )
             })}
+            {/* Refinamento — bolha "Concierge pensando..." enquanto API responde.
+                Aparece após user mandar msg e some quando resposta real chega. */}
+            {conciergeLoading && mode === 'pipeline' && (
+              <ConciergeTyping key="__concierge-typing__" />
+            )}
           </AnimatePresence>
           <div ref={bottomRef} />
         </div>}

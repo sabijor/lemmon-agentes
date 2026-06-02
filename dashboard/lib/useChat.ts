@@ -16,6 +16,15 @@ export interface Message {
   cost?: number
   error?: string
   hasImage?: boolean
+  /** Quando role='concierge' E tipo='confirmar', renderiza ConciergeConfirmCard
+   *  em vez da bolha de texto padrão. */
+  conciergeConfirmar?: {
+    agentes: AgentId[]
+    razoes: Record<string, string>
+    ferramentas: string[]
+    custoEstimadoUsd: number
+    briefingRefinado: string | null
+  }
 }
 
 export interface ImageData {

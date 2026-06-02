@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion'
 import { AGENT_MAP, type AgentId } from '@/lib/agents'
 import { type Message } from '@/lib/useChat'
+import { formatCustoBRL } from '@/lib/formatCusto'  // Refinamento — custo em R$
 import CharacterSprite from '../office/CharacterSprite'
 
 export function exportTxt(messages: Message[]) {
@@ -74,7 +75,9 @@ export function AgentMessage({ msg, progress }: { msg: Message; progress?: numbe
           </span>
           <span className="text-[9px] font-mono text-stone-400">{agent.rpgClass} · {agent.title}</span>
           {msg.cost !== undefined && msg.cost > 0 && (
-            <span className="text-[9px] font-mono text-stone-300 ml-auto">${msg.cost.toFixed(5)}</span>
+            <span className="text-[9px] font-mono text-stone-400 dark:text-stone-500 ml-auto" title={`$${msg.cost.toFixed(5)} USD`}>
+              {formatCustoBRL(msg.cost)}
+            </span>
           )}
         </div>
         <div className="rounded-2xl rounded-tl-sm px-4 py-3 border shadow-sm"
