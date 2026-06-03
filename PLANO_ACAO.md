@@ -921,16 +921,16 @@ Ana Maria é exatamente o agente da próxima feature (planilha financeira). Pedr
 | # | ID | Severidade | Descrição | Onde |
 |---|---|---|---|---|
 | 1 | QA-B01 | ✅ FIXED | "E aí, ficou bom?" feedback card aparecia DESDE a welcome screen (`isVisible={!!sessionId}` em ChatPanel.tsx:1276 + sessionId é persistido em localStorage → sobrevive reloads). **FIX**: novo state `pipelineCompletoNestaSessao` em useChat.ts, não-persistido, só vira true em `pipeline_done`. ChatPanel agora usa `isVisible={!!pipelineCompletoNestaSessao}`. | `dashboard/lib/useChat.ts` + `dashboard/components/chat/ChatPanel.tsx` |
-| 2 | QA-B02 | 🟡 MÉDIO | Pills do escritório só mostram 3 agentes (OTTO · CARLOS · AYA), Pedro e Renata somem do display | `dashboard/app/page.tsx` ou `components/office-pixel/PixelOfficeScene.tsx` — limite `.slice(0, 3)` |
-| 3 | QA-B03 | 🟡 MÉDIO | Toast "Concierge ativou" não inclui Pedro Abrahão (mostra "Otto · Carlos · Renata · Aya") | `dashboard/lib/useChat.ts` ou onde toast é disparado pós-confirmar |
-| 4 | QA-B04 | 🟢 BAIXO | Avatar "L" central tá com fundo branco em dark mode (deveria inverter pra preto) | `dashboard/app/page.tsx` welcome screen (`bg-stone-900` sem `dark:bg-stone-100`) |
+| 2 | QA-B02 | ✅ FIXED | Pills do escritório só mostravam 7 agentes hardcoded (faltavam Renata + 4 admin Hator). FIX: lista expandida pra 12 agentes em `page.tsx:460`. | `dashboard/app/page.tsx:460` |
+| 3 | QA-B03 | ✅ FIXED | Toast "Concierge ativou" não incluía Pedro porque flag `reuniaoOnly` filtrava ele (mesmo bug raiz de B09). | Resolvido por fix de B09 |
+| 4 | QA-B04 | ⚠️ NÃO É BUG | Avatar "L" tem `dark:bg-stone-100` correto (inversão proposital). Cliente pode preferir outro design mas tecnicamente está ok. | (sem ação) |
 | 5 | QA-B05 | 🟢 BAIXO | Label "SESSÃO FAVORITA?" muito pálida em dark | `dashboard/components/chat/ChatPanel.tsx` |
-| 6 | QA-B06 | 🟡 MÉDIO | Quando user clica em exemplo do welcome, texto vai pro composer mas NÃO envia automaticamente (UX confusa — espera-se enviar) | `dashboard/app/page.tsx` welcome exemplos onClick |
+| 6 | QA-B06 | ✅ FIXED | Welcome exemplos: clique agora envia direto (não só preenche composer). | `dashboard/components/chat/ChatPanel.tsx:1083` |
 | 7 | QA-B07 | 🟡 MÉDIO | Backend congelou após pipeline anterior (workers em executor sem retornar). Reset manual necessário. Investigar timeout em LEMMON_EXECUTOR ou healthcheck que mata workers órfãos | `api/deps.py` (executor) + `api/ws_chat.py` |
 | 8 | QA-B08 | 🟢 BAIXO | Otto entregou conteúdo brilhante mas demorou ~30s (alerta "Mais lento que o normal" disparou). Avaliar se vale cache de prompt ou modelo mais rápido pro Otto | `agentes/otto.py` |
 | 9 | QA-B09 | ✅ FIXED | **Pedro Abrahão era force-incluído pelo Concierge mas NÃO RODAVA no pipeline**. Causa raiz: `dashboard/lib/agents.ts:107` Pedro tinha `reuniaoOnly: true` (flag legacy do tempo que ele só era gate-espelho). O filtro `!agent.reuniaoOnly` em `app/page.tsx:236` removia Pedro silenciosamente da lista `ids` antes do `send()`. Backend tinha case próprio desde v1.46.1 #17. **FIX**: removida a flag `reuniaoOnly` do Pedro. | `dashboard/lib/agents.ts:107` |
-| 10 | QA-B10 | 🟠 ALTO | **Renata aparece em `agentes_usados` mas sem resposta persistida** (`respostas` não tem `renata`, `custos_usd` não tem `renata`). Sessão fechou sem rodar ela ou rodou e crashou silenciosamente. Investigar logs do agente. | `api/ws_chat.py` Renata path |
-| 11 | QA-B11 | 🟡 MÉDIO | **Custo estimado do Concierge muito alto**: mostrou R$ 2,53 (~$0.50) mas custo real foi $0.135 (R$ 0,70). Estimativa 3,6x maior que real. Recalibrar `custo_medio_usd` dos agentes no catálogo | `agentes/*.py` campo `custo_medio_usd` |
+| 10 | QA-B10 | ⚠️ MITIGADO | **Renata aparece em `agentes_usados` mas sem resposta persistida**. FIX parcial: `all_agents` agora só inclui agentes que produziram resposta (não os que falharam silenciosamente). Causa raiz da falha do Renata.executar não diagnosticada ainda (exception capturada por `_execute_with_approval` retorna True). Próximo passo: log estruturado do exception. | `api/ws_chat.py:851` mitigado / causa real pendente |
+| 11 | QA-B11 | ✅ FIXED | **Custo estimado do Concierge muito alto** (R$ 2,53 vs real R$ 0,70). FIX: recalibrado `custo_medio_usd` baseado em dados reais — Carlos $0.10 → $0.05, Aya $0.08 → $0.05. Outros agentes precisam mais dados antes de calibrar. | `agentes/carlos.py` + `agentes/aya.py` |
 
 ### Melhorias sugeridas (UX)
 - **MEL-01**: Welcome exemplos → clicar deveria ENVIAR direto, não só preencher composer (1 clique vs 2)

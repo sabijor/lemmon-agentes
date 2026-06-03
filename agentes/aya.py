@@ -201,7 +201,8 @@ class Aya(AgenteBase):
         "operador só queria tirar uma dúvida solta",
     ]
     categoria = "compilacao"
-    custo_medio_usd = 0.08
+    # v1.49 QA-B11 — recalibrado 0.08 → 0.05 (real $0.030 na sessão Reels menopausa)
+    custo_medio_usd = 0.05
     system_prompt_reuniao = (
         "Você é Aya, assistente virtual da Lemmon Produções. "
         "Em reuniões conversacionais você responde de forma natural, direta e prestativa. "

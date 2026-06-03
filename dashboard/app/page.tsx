@@ -453,11 +453,17 @@ export default function Home() {
 
               {/* v1.47 A4a-008 — feedback de "vida" durante pipeline.
                   Antes: tela central estática durante 15-30s → Pedro pensava "travou" → F5 → perdia sessão paga.
-                  Agora: bolas verde-pulsantes pra cada agente ativo + agentes concluídos em check verde. */}
+                  Agora: bolas verde-pulsantes pra cada agente ativo + agentes concluídos em check verde.
+                  v1.49 QA-B02 — antes hardcoded com 7 agentes (faltavam Renata + 4 admin Hator);
+                  Pedro + Renata sumiam do display mesmo rodando. Agora lista completa de 12. */}
               {isRunning && (
                 <div className="mt-6 flex flex-col items-center gap-3">
-                  <div className="flex items-center gap-2">
-                    {(['otto', 'heitor', 'salles', 'carlos', 'pedro_abrahao', 'sonia', 'aya'] as AgentId[]).map(aid => {
+                  <div className="flex items-center gap-2 flex-wrap justify-center max-w-[700px]">
+                    {([
+                      'otto', 'heitor', 'salles', 'carlos', 'sonia', 'aya',
+                      'pedro_abrahao', 'renata',
+                      'ana_maria', 'prichina', 'caito', 'kelly',
+                    ] as AgentId[]).map(aid => {
                       const status = agentStatus[aid]
                       if (status === 'idle') return null
                       const isDone = status === 'done'

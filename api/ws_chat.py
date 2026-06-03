@@ -848,7 +848,16 @@ async def chat(ws: WebSocket):
                 _ = ok
 
             # Salva sessão completa e envia o ID para o frontend avaliar
-            all_agents = list(dict.fromkeys(list(resume_context.get("agentes_usados", [])) + names))
+            # v1.49 QA-B10 — antes: `all_agents` somava `names` (o que foi PEDIDO),
+            # então Renata aparecia em `agentes_usados` mesmo quando falhava silenciosamente
+            # (sem `respostas["renata"]`). Frontend mostrava pill da Renata em sessão
+            # salva sem conteúdo dela, confundindo o cliente. Agora inclui só agentes
+            # que realmente produziram resposta. Pedro só tem entrada em `respostas`
+            # se rodou (case próprio em ws_chat:474). Mantém ordem original via names.
+            _agentes_executados = [a for a in names if a in respostas]
+            all_agents = list(dict.fromkeys(
+                list(resume_context.get("agentes_usados", [])) + _agentes_executados
+            ))
             contexto_tecnico = {
                 "briefing": briefing,
                 "analise_otto": analise_otto,

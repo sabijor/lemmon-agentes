@@ -42,7 +42,9 @@ class Carlos(AgenteBase):
         "calendário editorial sem conteúdo específico",
     ]
     categoria = "conteudo"
-    custo_medio_usd = 0.10
+    # v1.49 QA-B11 — recalibrado de 0.10 → 0.05 baseado em sessão real
+    # (Reels menopausa 2026-06-03: custo real $0.025).
+    custo_medio_usd = 0.05
 
     def executar(
         self,

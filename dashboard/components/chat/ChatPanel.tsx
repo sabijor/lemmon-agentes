@@ -1080,6 +1080,9 @@ export default function ChatPanel({
                     <p className="text-[10px] font-mono uppercase tracking-widest text-stone-400 dark:text-stone-500">
                       Tente um exemplo:
                     </p>
+                    {/* v1.49 QA-B06 — antes onClick só preenchia composer (`setInput`) e
+                        user precisava clicar de novo no botão de enviar. Agora clica =
+                        envia direto. Se cliente quiser editar, pode cancelar e digitar. */}
                     {[
                       'Quero atrair pacientes pra consulta de menopausa pelo Instagram.',
                       'Preciso de um calendário editorial de Reels pro próximo mês.',
@@ -1088,7 +1091,12 @@ export default function ChatPanel({
                       <button
                         key={i}
                         type="button"
-                        onClick={() => setInput(ex)}
+                        onClick={() => {
+                          // QA-B06 — só faz sentido em modo Pipeline (Concierge);
+                          // o welcome com exemplos só é renderizado nesse modo.
+                          onSend(ex)
+                          setInput('')
+                        }}
                         className="text-left text-[12px] text-stone-700 dark:text-stone-200 bg-stone-100 dark:bg-stone-800/60 hover:bg-stone-200 dark:hover:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-lg px-3 py-2 transition-colors leading-snug"
                       >
                         {ex}
