@@ -537,12 +537,33 @@ async def chat(ws: WebSocket):
                         or cfg_renata.get("cliente_id")
                         or None
                     )
-                    # Dossiê da Aya nesta sessão tem prioridade; fallback: auto-detect no historico
+                    # v1.48 A1a-008 — FALLBACK CHAIN da Renata documentada:
+                    # ─────────────────────────────────────────────────────
+                    # Renata é Social Media → quer contexto rico pra montar
+                    # calendário editorial. Ordem de preferência do contexto:
+                    #
+                    # 1. dossie_aya (output da Aya neste pipeline) — IDEAL.
+                    #    Aya compila tudo: estratégia, roteiros, compliance.
+                    # 2. roteiro_salles (output direto do Salles) — bom 2º.
+                    #    Briefing já refinado pra produção.
+                    # 3. analise_sonia + diretrizes_heitor — sinais extras
+                    #    (performance + compliance), não substituem 1/2 mas
+                    #    enriquecem.
+                    # 4. briefing puro (modo solo) — FALLBACK FINAL.
+                    #    Renata sozinha, sem pipeline antes. Acontece quando
+                    #    cliente quer só calendário ("planejar 30 dias de
+                    #    posts") e ninguém roda antes dela.
+                    #
+                    # A flag `_has_pipeline_context` decide modo:
+                    # - True (Aya ou Salles presente) → modo "pipeline"
+                    # - False → modo "solo" + contexto = briefing original
+                    #
+                    # Renata SEMPRE roda mesmo sem Aya — Aya quebrar não
+                    # pode bloquear calendário do cliente.
                     _dossie_aya = respostas.get("aya") or None
                     _rot_salles = roteiro_salles or None
                     _an_sonia   = respostas.get("sonia") or None
                     _dir_heitor = diretrizes_heitor or None
-                    # Se não há contexto de pipeline, cai em modo solo com o briefing
                     _has_pipeline_context = bool(_dossie_aya or _rot_salles)
                     _modo = "pipeline" if _has_pipeline_context else "solo"
                     _ctx_solo = briefing if not _has_pipeline_context else None

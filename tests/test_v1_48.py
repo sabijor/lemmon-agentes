@@ -477,6 +477,58 @@ def test_storage_persiste_estruturadas_no_json(tmp_path, monkeypatch):
     assert dados["respostas_estruturadas"]["salles"]["variantes"][1]["label"] == "impactante"
 
 
+# ─── A1a-008 — Fallback chain Renata documentada + teste sem Aya ──────
+
+def test_renata_documenta_fallback_chain():
+    """v1.48 A1a-008 — código de ws_chat tem comentário explicando cadeia de fallback."""
+    src = open("api/ws_chat.py", encoding="utf-8").read()
+    assert "FALLBACK CHAIN da Renata documentada" in src, (
+        "v1.48 A1a-008 — falta comentário explicando cadeia de prioridade Renata"
+    )
+    # Cadeia ordenada
+    for item in ("dossie_aya", "roteiro_salles", "briefing puro"):
+        assert item in src.split("FALLBACK CHAIN")[1].split("def _execute_with_approval")[0], (
+            f"Comentário não menciona '{item}' na cadeia"
+        )
+
+
+def test_renata_modo_pipeline_requer_aya_ou_salles(monkeypatch):
+    """v1.48 A1a-008 — Renata em modo pipeline exige pelo menos um contexto upstream."""
+    # Patch direto na constante (lida no import time, não pelo getenv)
+    monkeypatch.setattr("core.agente_base.ANTHROPIC_API_KEY", "sk-stub-for-test")
+    monkeypatch.setattr("core.config.ANTHROPIC_API_KEY", "sk-stub-for-test")
+    from agentes.renata import Renata
+    import pytest as _pytest
+    ag = Renata()
+    # Modo pipeline sem dossie_aya nem roteiro_salles → ValueError documentado
+    with _pytest.raises(ValueError, match="pipeline requer"):
+        ag.executar(modo="pipeline", duracao_dias=7)
+
+
+def test_renata_modo_solo_aceita_so_briefing(monkeypatch):
+    """v1.48 A1a-008 — Renata em modo solo aceita só briefing (fallback chain final).
+
+    Smoke test: valida que construtor + validação aceitam modo solo sem dossie/salles.
+    Não chama API real — apenas valida que a chain não bloqueia o caminho.
+    """
+    monkeypatch.setattr("core.agente_base.ANTHROPIC_API_KEY", "sk-stub-for-test")
+    monkeypatch.setattr("core.config.ANTHROPIC_API_KEY", "sk-stub-for-test")
+    from agentes.renata import Renata
+    ag = Renata()
+    # Modo solo com contexto_solo: validação passa (a chamada do LLM viria depois,
+    # mas o `_validar_inputs` é nosso ponto de teste — não falha aqui).
+    try:
+        ag._validar_inputs(  # type: ignore[attr-defined]
+            modo="solo",
+            duracao_dias=7,
+            dossie_aya=None,
+            roteiro_salles=None,
+            contexto_solo="cliente quer 7 dias de posts no IG sobre nutrição",
+        )
+    except ValueError as e:
+        assert False, f"Modo solo deveria passar validação, falhou: {e}"
+
+
 # ─── A1a-005 — Timeout em ws.receive_json ──────────────────────────────
 
 def test_safe_receive_json_existe_e_tem_timeout():
