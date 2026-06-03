@@ -193,6 +193,62 @@ def test_lgpd_rejeita_session_id_dotdot(monkeypatch, tmp_path):
     assert r.status_code in (400, 403)
 
 
+# ─── A1a-003/004 — Aya/Renata fora do for-loop + dedup snap_outputs ───
+
+def test_montar_snap_outputs_dedup():
+    """v1.49 A1a-003/004 — _montar_snap_outputs cobre todos 11 agentes via tabela."""
+    from api.ws_chat import _montar_snap_outputs
+
+    # Caso 1: pipeline cheio
+    r = _montar_snap_outputs(
+        respostas={"sonia": "perf", "pedro_abrahao": "espelho", "renata": "calend"},
+        analise_otto={"briefing_aberto": "x"},
+        diretrizes_heitor={"risco_geral": "baixo"},
+        roteiro_salles="roteiro1",
+        roteiro_carlos="copy1",
+    )
+    # Otto/Heitor têm output_tecnico próprio
+    assert r["otto"]["output_tecnico"]["briefing_aberto"] == "x"
+    assert r["heitor"]["output_tecnico"]["risco_geral"] == "baixo"
+    # Salles/Carlos têm output_humano direto
+    assert r["salles"]["output_humano"] == "roteiro1"
+    assert r["carlos"]["output_humano"] == "copy1"
+    # Simples: usa respostas[k]
+    assert r["sonia"]["output_humano"] == "perf"
+    assert r["pedro_abrahao"]["output_humano"] == "espelho"
+    assert r["renata"]["output_humano"] == "calend"
+    # Admin não chamado → None
+    assert r["ana_maria"] is None
+    assert r["kelly"] is None
+
+
+def test_montar_snap_outputs_pipeline_vazio():
+    """v1.49 A1a-003/004 — sem nenhum upstream, todos os 11 agentes ficam None."""
+    from api.ws_chat import _montar_snap_outputs
+    r = _montar_snap_outputs(
+        respostas={},
+        analise_otto=None,
+        diretrizes_heitor=None,
+        roteiro_salles=None,
+        roteiro_carlos=None,
+    )
+    esperados = (
+        "otto", "heitor", "salles", "carlos", "sonia", "pedro_abrahao",
+        "renata", "ana_maria", "prichina", "caito", "kelly",
+    )
+    for ag in esperados:
+        assert ag in r, f"agente {ag} ausente no snap_outputs"
+        assert r[ag] is None, f"agente {ag} deveria ser None com pipeline vazio: {r[ag]}"
+
+
+def test_aya_renata_fora_do_for_loop_documentado():
+    """v1.49 A1a-003 — comentário no for-loop confirma Aya/Renata são tratados fora."""
+    src = open("api/ws_chat.py", encoding="utf-8").read()
+    assert 'if name in ("aya", "renata")' in src, (
+        "v1.49 A1a-003 — for-loop principal deveria skipar aya/renata explicitamente"
+    )
+
+
 # ─── A6a-004/005/008 — health full + .env docs ───────────────────────
 
 def test_health_full_retorna_disco_status(monkeypatch):

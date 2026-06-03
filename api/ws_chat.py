@@ -33,6 +33,66 @@ async def _safe_receive_json(ws, label: str, timeout: float = WS_APPROVAL_TIMEOU
     except _asyncio.TimeoutError:
         return {"type": "cancel", "_timeout": True, "_label": label}
 
+
+# v1.49 A1a-003/004 — helper pra construir snap_outputs DRY.
+# Antes: 11 blocos `"agente": {output_humano, output_tecnico} if condition else None`
+# duplicados literal em ws_chat.py linha 476-521. Adicionar agente novo exigia
+# copiar-colar o bloco. Agora: tabela explícita + 1 loop.
+#
+# Convenção: 3 fontes podem alimentar o output_humano:
+#   - respostas[k] (string padrão, vinda de _execute_with_approval)
+#   - outputs especiais (analise_otto, diretrizes_heitor, roteiro_salles, roteiro_carlos)
+#
+# output_tecnico só existe pra Otto (analise) e Heitor (diretrizes).
+def _montar_snap_outputs(
+    respostas: dict[str, str],
+    analise_otto: dict | None,
+    diretrizes_heitor: dict | None,
+    roteiro_salles: str | None,
+    roteiro_carlos: str | None,
+) -> dict[str, dict | None]:
+    """Constrói o dicionário de outputs que Aya recebe pra compilar.
+
+    Retorna dict com chave=agente_id, valor=None se ausente OU
+    {"output_humano": str, "output_tecnico": dict}.
+    """
+    snap: dict[str, dict | None] = {}
+
+    # Casos especiais (têm output_tecnico próprio)
+    snap["otto"] = (
+        {"output_humano": respostas.get("otto", ""), "output_tecnico": analise_otto}
+        if analise_otto is not None
+        else None
+    )
+    snap["heitor"] = (
+        {"output_humano": respostas.get("heitor", ""), "output_tecnico": diretrizes_heitor or {}}
+        if diretrizes_heitor
+        else None
+    )
+    snap["salles"] = (
+        {"output_humano": roteiro_salles, "output_tecnico": {}}
+        if roteiro_salles
+        else None
+    )
+    snap["carlos"] = (
+        {"output_humano": roteiro_carlos, "output_tecnico": {}}
+        if roteiro_carlos
+        else None
+    )
+
+    # Agentes simples (output_humano vem direto de respostas[k], output_tecnico vazio)
+    _agentes_simples = (
+        "sonia", "pedro_abrahao", "renata",
+        "ana_maria", "prichina", "caito", "kelly",
+    )
+    for ag in _agentes_simples:
+        snap[ag] = (
+            {"output_humano": respostas.get(ag, ""), "output_tecnico": {}}
+            if ag in respostas
+            else None
+        )
+    return snap
+
 from agentes.aya import Aya
 from agentes.heitor import Heitor
 from agentes.otto import Otto
@@ -473,52 +533,16 @@ async def chat(ws: WebSocket):
                         nome_projeto = None
                     # v1.46.1 #13 — adicionados carlos, pedro_abrahao, renata + 4 admin
                     # Aya rotula cada output pelo agente CORRETO no PDF (não mais Carlos→Salles)
-                    snap_outputs: dict[str, dict | None] = {
-                        "otto": {
-                            "output_humano": respostas.get("otto", ""),
-                            "output_tecnico": analise_otto,
-                        } if analise_otto is not None else None,
-                        "heitor": {
-                            "output_humano": respostas.get("heitor", ""),
-                            "output_tecnico": diretrizes_heitor or {},
-                        } if diretrizes_heitor else None,
-                        "salles": {
-                            "output_humano": roteiro_salles,
-                            "output_tecnico": {},
-                        } if roteiro_salles else None,
-                        "carlos": {
-                            "output_humano": roteiro_carlos,
-                            "output_tecnico": {},
-                        } if roteiro_carlos else None,
-                        "sonia": {
-                            "output_humano": respostas.get("sonia", ""),
-                            "output_tecnico": {},
-                        } if "sonia" in respostas else None,
-                        "pedro_abrahao": {
-                            "output_humano": respostas.get("pedro_abrahao", ""),
-                            "output_tecnico": {},
-                        } if "pedro_abrahao" in respostas else None,
-                        "renata": {
-                            "output_humano": respostas.get("renata", ""),
-                            "output_tecnico": {},
-                        } if "renata" in respostas else None,
-                        "ana_maria": {
-                            "output_humano": respostas.get("ana_maria", ""),
-                            "output_tecnico": {},
-                        } if "ana_maria" in respostas else None,
-                        "prichina": {
-                            "output_humano": respostas.get("prichina", ""),
-                            "output_tecnico": {},
-                        } if "prichina" in respostas else None,
-                        "caito": {
-                            "output_humano": respostas.get("caito", ""),
-                            "output_tecnico": {},
-                        } if "caito" in respostas else None,
-                        "kelly": {
-                            "output_humano": respostas.get("kelly", ""),
-                            "output_tecnico": {},
-                        } if "kelly" in respostas else None,
-                    }
+                    # v1.49 A1a-003/004 — dedup: snap_outputs construído via _montar_snap
+                    # (era 11 blocos quase idênticos, troca de agente nova exigia
+                    # duplicar). Agora 1 chamada com mapeamento.
+                    snap_outputs = _montar_snap_outputs(
+                        respostas=respostas,
+                        analise_otto=analise_otto,
+                        diretrizes_heitor=diretrizes_heitor,
+                        roteiro_salles=roteiro_salles,
+                        roteiro_carlos=roteiro_carlos,
+                    )
                     res = await loop.run_in_executor(
                         LEMMON_EXECUTOR,
                         lambda: ag.executar(
