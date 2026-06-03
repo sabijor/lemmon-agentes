@@ -365,6 +365,11 @@ export default function Home() {
               <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
             </svg>
           </Link>
+          {/* PROD-FIN v1.47 — atalho pra Análise Financeira (Ana Maria + planilha XLSX) */}
+          <Link href="/financeiro" title="Análise Financeira (Ana Maria)"
+            className="w-8 h-8 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 flex items-center justify-center hover:bg-stone-50 dark:hover:bg-stone-800 hover:border-stone-400 dark:hover:border-stone-500 transition-all text-stone-500 dark:text-stone-400 text-xs">
+            💼
+          </Link>
           {/* T190.A3 — esconde toggles avançados até cliente completar 1ª sessão.
               Hall of Fame, Briefing Reverso, Cortes, Calibragem e SVG/PIX só aparecem
               depois do onboarding pra evitar paralisia em leigo no 1º acesso. */}

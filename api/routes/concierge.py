@@ -245,6 +245,10 @@ Tabela de mínimos por tarefa típica:
 - "Ad pago" → `otto` + `carlos` + `aya` (3) + sugerir `heitor` (Meta cobra compliance)
 - "Reels orgânico saúde Hator" → `otto` + `carlos` + `pedro_abrahao` + `aya` (4)
 - "Análise financeira Hator" → `ana_maria` (1) ± `caito`/`kelly` conforme área
+- "Planilha XLSX/CSV / DRE / ticket médio / receita / despesa" → `ana_maria` (1) +
+  AVISO obrigatório: "📋 Sua planilha pode ser carregada em /financeiro pra eu
+  analisar via Ana Maria com Excel real. Se ainda não subiu, faça isso primeiro
+  e volta aqui." (v1.47 PROD-FIN)
 - "Cortes de vídeo gravado" → ferramenta `cortes_prontos` + `carlos` + `aya` (2)
 
 **NÃO inclua agente "pra ter certeza"**. Se não há razão específica no briefing,
