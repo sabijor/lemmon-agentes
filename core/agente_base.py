@@ -124,11 +124,31 @@ class AgenteBase(ABC):
         return arquivo.read_text(encoding="utf-8")
 
     def _chamar_api(self, mensagens: list, tools: list = None,
-                    tool_choice: dict = None, system_override: str = None):
+                    tool_choice: dict = None, system_override: str = None,
+                    cache_system: bool = False):
+        """v1.49 QA-B08 — opt-in prompt caching no system block.
+
+        Quando `cache_system=True`, manda o system prompt como bloco com
+        `cache_control: {"type": "ephemeral"}`. Anthropic reusa o cache por
+        5 minutos. Reduz drasticamente input tokens cobrados + latência em
+        agentes com system prompt grande (Otto ~12k chars, Heitor ~8k).
+
+        Custo de write na 1ª chamada é 1.25× do input, mas read é 0.1×.
+        Compensa pra system prompts grandes em sessões com 2+ chamadas
+        seguidas. Por isso é opt-in (cada agente decide).
+        """
+        if cache_system:
+            system_block = [{
+                "type": "text",
+                "text": system_override or self.system_prompt,
+                "cache_control": {"type": "ephemeral"},
+            }]
+        else:
+            system_block = system_override or self.system_prompt
         params = {
             "model": self.modelo,
             "max_tokens": self.max_tokens,
-            "system": system_override or self.system_prompt,
+            "system": system_block,
             "messages": mensagens,
         }
         if tools:
@@ -148,7 +168,18 @@ class AgenteBase(ABC):
             response.usage.output_tokens,
             modelo=self.modelo,
         )
-        self.logger.info(f"Execução em {duracao}s | {custo.resumo()}")
+        # v1.49 QA-B08 — log cache hit se rolou (debug perf)
+        if cache_system:
+            cached = getattr(response.usage, "cache_read_input_tokens", 0) or 0
+            written = getattr(response.usage, "cache_creation_input_tokens", 0) or 0
+            if cached or written:
+                self.logger.info(
+                    f"Execução em {duracao}s | {custo.resumo()} | cache hit={cached} write={written}"
+                )
+            else:
+                self.logger.info(f"Execução em {duracao}s | {custo.resumo()}")
+        else:
+            self.logger.info(f"Execução em {duracao}s | {custo.resumo()}")
 
         return response, custo, duracao
 

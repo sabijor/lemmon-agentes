@@ -145,10 +145,13 @@ async def treinar_pedro_espelho(authorization: str | None = Header(default=None)
             raise HTTPException(status_code=403, detail="Token inválido.")
 
     # 1. Lê registros de calibragem
-    if not CALIBRAGEM_FILE.exists():
+    # v1.51 — usa _calibragem_path() pra pegar arquivo do tenant atual
+    from api.routes.calibragem import _calibragem_path
+    arquivo_cal = _calibragem_path()
+    if not arquivo_cal.exists():
         raise HTTPException(status_code=404, detail="Nenhum registro de calibragem ainda.")
     try:
-        registros = json.loads(CALIBRAGEM_FILE.read_text(encoding="utf-8"))
+        registros = json.loads(arquivo_cal.read_text(encoding="utf-8"))
     except Exception as e:
         raise HTTPException(status_code=500, detail="Arquivo de calibragem corrompido.") from e
 

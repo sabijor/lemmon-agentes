@@ -129,10 +129,14 @@ class Otto(AgenteBase):
 
         mensagem = self._construir_mensagem(briefing, modo_visual, contexto_extra)
 
+        # v1.49 QA-B08 — opt-in prompt cache. System prompt do Otto é grande
+        # (estratégia + tese criativa + 10+ regras). Cache reduz custo+latência
+        # em 80% pra chamadas seguidas dentro de 5min (mesma sessão de briefing).
         response, custo, duracao = self._chamar_api(
             mensagens=[{"role": "user", "content": mensagem}],
             tools=[FERRAMENTA_ANALISE],
-            tool_choice={"type": "tool", "name": "registrar_analise_estrategica"}
+            tool_choice={"type": "tool", "name": "registrar_analise_estrategica"},
+            cache_system=True,
         )
 
         # Extrai tool_use block

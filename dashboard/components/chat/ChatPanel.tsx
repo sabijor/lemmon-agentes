@@ -164,12 +164,10 @@ export default function ChatPanel({
   useEffect(() => { if (!loopStatus) setLoopCustoDismissed(false) }, [loopStatus])
   useEffect(() => { if (mode === 'reuniao') setConfigOpen(false) }, [mode])
   useEffect(() => {
-    // v1.49 QA-B12 — quando configOpen, panel precisa de espaço extra (~176px) pra
-    // não cortar a ConfigSidebar interna. Antes só forçava panel >= 540, mas se já
-    // era 540 (default), sidebar ficava com 11px por causa de overflow:hidden no
-    // wrapper interno. Agora soma 176 (largura da sidebar). Quando config fecha,
-    // não diminui (cliente já viu o tamanho maior, pode preferir manter).
-    if (configOpen) setPanelSize(prev => prev.w < 716 ? { ...prev, w: 716 } : prev)
+    // v1.49 QA-B12 — config virou OVERLAY portal (renderizado fora da flex row),
+    // não compete mais pelo espaço do chat. Mantém panel >= 540 só por consistência
+    // visual quando configOpen (header não fica espremido), mas sem somar 176.
+    if (configOpen) setPanelSize(prev => prev.w < 540 ? { ...prev, w: 540 } : prev)
   }, [configOpen])
   useEffect(() => {
     if (mode === 'reuniao') setPanelSize(prev => prev.w < 520 ? { ...prev, w: 520 } : prev)
@@ -746,19 +744,34 @@ export default function ChatPanel({
           </svg>
         </div>
       </>}
-      {/* Config sidebar — pipeline only, collapsible */}
+      {/* v1.49 QA-B12 — ConfigSidebar OVERLAY (era inline flex row antes).
+          Renderiza absolute sobre o chat com largura fixa 200px + backdrop click-to-close.
+          Não compete mais por espaço do panel — não tem limite de viewport-position. */}
       <AnimatePresence initial={false}>
         {!minimized && mode === 'pipeline' && configOpen && (
-          <motion.div
-            key="config"
-            initial={{ width: 0, opacity: 0 }}
-            animate={{ width: 176, opacity: 1 }}
-            exit={{ width: 0, opacity: 0 }}
-            transition={{ type: 'spring', stiffness: 260, damping: 28 }}
-            className="overflow-hidden flex-shrink-0"
-          >
-            <ConfigSidebar agentConfig={agentConfig} onUpdateConfig={onUpdateConfig} isRunning={isRunning} custoCap={custoCap} onSetCustoCap={onSetCustoCap} />
-          </motion.div>
+          <>
+            {/* Backdrop sutil — clica fecha. z-30 pra ficar abaixo do overlay (40). */}
+            <motion.div
+              key="config-backdrop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="absolute inset-0 bg-black/10 dark:bg-black/30 z-30"
+              onClick={() => setConfigOpen(false)}
+              aria-hidden
+            />
+            <motion.div
+              key="config-overlay"
+              initial={{ x: -16, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: -16, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 260, damping: 28 }}
+              className="absolute left-0 top-0 h-full w-[200px] z-40 shadow-xl border-r-2 border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-900"
+            >
+              <ConfigSidebar agentConfig={agentConfig} onUpdateConfig={onUpdateConfig} isRunning={isRunning} custoCap={custoCap} onSetCustoCap={onSetCustoCap} />
+            </motion.div>
+          </>
         )}
       </AnimatePresence>
 
@@ -1311,9 +1324,9 @@ export default function ChatPanel({
                 </div>
               )}
 
-              {/* Favoritar — T180 dark */}
+              {/* Favoritar — T180 + v1.49 QA-B05 dark: label sai de stone-500 → stone-300 pra contraste */}
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-mono text-stone-400 dark:text-stone-500 uppercase tracking-widest">Sessão favorita?</span>
+                <span className="text-[10px] font-mono text-stone-500 dark:text-stone-300 uppercase tracking-widest">Sessão favorita?</span>
                 <button
                   onClick={() => onFavoritar()}
                   title={favoritado ? 'Remover dos favoritos' : 'Favoritar esta sessão'}

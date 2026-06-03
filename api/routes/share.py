@@ -14,15 +14,32 @@ router = APIRouter()
 
 
 def _load_share(token: str) -> dict:
+    """v1.51 multi-tenant — share só funciona dentro do tenant que criou.
+
+    Antes: qualquer backend rodando podia ler /shares/{token}.json. Em
+    multi-tenant prod, se cliente A descobrisse token do cliente B (improvável
+    mas defesa em profundidade), conseguiria ler dados de outro tenant.
+
+    Agora: cada share grava `tenant` no JSON. Lookup valida que tenant_id()
+    atual == share['tenant']. Shares legacy (sem campo tenant) continuam
+    funcionando (assume tenant='default' — comportamento histórico).
+    """
+    from core.tenant import tenant_id
     path = SHARES_DIR / f"{token}.json"
     if not path.exists():
         raise HTTPException(status_code=404, detail="Link não encontrado")
-    return json.loads(path.read_text(encoding="utf-8"))
+    share = json.loads(path.read_text(encoding="utf-8"))
+    share_tenant = share.get("tenant", "default")
+    if tenant_id() != share_tenant:
+        # Não vaza informação — 404 idêntico ao "token inexistente".
+        raise HTTPException(status_code=404, detail="Link não encontrado")
+    return share
 
 
 @router.post("/share")
 async def criar_share(payload: SharePayload):
     """T36: Gera link de aprovação limpo para uma sessão."""
+    from core.tenant import tenant_id
     # v1.46.1 #11 — particionado por tenant
     from core.historico_index import dashboard_dir as _dash
     sessao_path = _dash() / f"{payload.session_id}.json"
@@ -32,6 +49,7 @@ async def criar_share(payload: SharePayload):
     token = secrets.token_urlsafe(16)
     share = {
         "token": token,
+        "tenant": tenant_id(),  # v1.51 — vincula share ao tenant
         "session_id": payload.session_id,
         "created_at": datetime.now().isoformat(),
         "briefing": sessao.get("briefing", ""),

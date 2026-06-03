@@ -617,6 +617,27 @@ async def chat(ws: WebSocket):
                         _t0 = asyncio.get_running_loop().time()
                         result = await _run_agent_step(name)
                         if result is None:
+                            # v1.49 QA-B10 — antes: silent success quando agent não foi
+                            # mapeado. Renata em alguns paths caía aqui sem trace.
+                            # Agora: log + audit + WS warning pra cliente perceber.
+                            _log.warning(
+                                "agent_skipped_silently name=%s reason=run_agent_step_returned_None",
+                                name,
+                            )
+                            try:
+                                from core import audit
+                                audit.registrar(
+                                    "agent_skipped_silently",
+                                    agent=name,
+                                    reason="run_agent_step_returned_None",
+                                )
+                            except Exception:
+                                pass
+                            await ws.send_json({
+                                "type": "agent_error",
+                                "agent": name,
+                                "error": f"{name} não foi executado (mapeamento ausente — bug)",
+                            })
                             return True
                         text, cost = result
                         duracoes[name] = round(asyncio.get_running_loop().time() - _t0, 1)
@@ -635,6 +656,23 @@ async def chat(ws: WebSocket):
                         return True
 
                     except Exception as e:
+                        # v1.49 QA-B10 — antes exception era só enviada pro WS e silenciada.
+                        # Agora: log estruturado com traceback + audit pra rastrear.
+                        import traceback as _tb
+                        _log.error(
+                            "agent_exception name=%s err=%s tb=%s",
+                            name, str(e), _tb.format_exc(),
+                        )
+                        try:
+                            from core import audit
+                            audit.registrar(
+                                "agent_exception",
+                                agent=name,
+                                error_type=type(e).__name__,
+                                error_msg=str(e)[:500],
+                            )
+                        except Exception:
+                            pass
                         if manual_mode:
                             await ws.send_json({"type": "agent_error", "agent": name, "error": str(e), "awaiting_retry": True})
                             ctrl = await _safe_receive_json(ws, "manual_approval")

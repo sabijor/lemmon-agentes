@@ -15,7 +15,10 @@ interface Props {
 // ganham dark:bg-stone-800. Toggles invertem cor da pista também.
 export function ConfigSidebar({ agentConfig, onUpdateConfig, isRunning, custoCap, onSetCustoCap }: Props) {
   return (
-    <div className="w-44 h-full flex-shrink-0 border-r border-stone-200/50 dark:border-stone-700/50 flex flex-col bg-stone-50/70 dark:bg-stone-900/40">
+    <div className="w-full h-full border-r border-stone-200/50 dark:border-stone-700/50 flex flex-col bg-stone-50 dark:bg-stone-900">
+      {/* v1.49 QA-B12 — antes `w-44 flex-shrink-0`. Agora `w-full` pra preencher
+          o wrapper overlay (200px). Bg sólido (era /70 transparente) pra cobrir
+          o chat por baixo quando o overlay desliza por cima. */}
       <div className="px-3 py-2.5 border-b border-stone-200/40 dark:border-stone-700/40">
         <span className="text-[9px] font-mono uppercase tracking-widest text-stone-400 dark:text-stone-500">Configurações</span>
       </div>
