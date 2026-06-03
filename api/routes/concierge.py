@@ -607,30 +607,70 @@ async def conversar(pedido: ConcierePedido):
     # T188.e — calcula custo estimado somando custo_medio_usd dos sugeridos
     agentes_sugeridos = data.get("agentes_sugeridos", [])
 
-    # T-bug-Hator-#9 — DEFESA SERVER-SIDE: filtra Heitor se cliente não pediu
-    # explicitamente. Mesmo com prompt atualizado, Haiku ainda sugere Heitor em
-    # ~40% dos briefings de saúde por overcaution. Cliente leigo aprova o card
-    # sem reparar e paga ~R$ 2 por uma análise compliance que não quer.
-    # Regra: Heitor só fica se cliente disse alguma palavra-trigger de compliance
-    # no HISTÓRICO inteiro (não só na última msg). Caso contrário, removido.
+    # T-bug-Hator-#9 + v1.48 A1b-004 — DEFESA SERVER-SIDE bidirecional pra Heitor.
+    # Filtra Heitor se cliente não pediu compliance.
+    # E adiciona Heitor (force-include) se cliente PEDIU mas Haiku esqueceu.
+    # Sem isso: cliente pede "ad pago" + Haiku omite Heitor → ad cai em Meta sem
+    # compliance → cliente perde dinheiro real. Lista expandida pra cobrir sinônimos
+    # comuns (ANS, ads, Google Ads, tráfego pago, conar, anvisa).
     _COMPLIANCE_TRIGGERS = (
-        "compliance", "cfm", "anvisa", "conar", "regulament", "auditar",
-        "auditoria", "revisar termos", "checar termos", "ad pago", "anúncio pago",
-        "anuncio pago", "campanha paga", "meta ads", "facebook ads",
+        # Termos regulatórios oficiais
+        "compliance", "cfm", "anvisa", "conar", "ans", "cremesp", "cremerj",
+        "regulament", "regulação", "regulacao",
+        # Verbos de revisão
+        "auditar", "auditoria", "revisar termos", "checar termos",
+        "validar termos", "compliance check",
+        # Plataformas pagas (Heitor entra obrigatório)
+        "ad pago", "anúncio pago", "anuncio pago", "campanha paga", "campanha de ad",
+        "meta ads", "facebook ads", "google ads", "instagram ads", "tiktok ads",
+        "tráfego pago", "trafego pago", "ads",
+        # Claims sensíveis
+        "milagre", "garanto", "100% garantido", "elimina", "cura definitiva",
     )
-    if "heitor" in agentes_sugeridos:
-        texto_user_total = " ".join(
-            (m.content or "").lower()
-            for m in pedido.historico
-            if m.role == "user"
+    # 1) Sempre que cliente PEDIU compliance, Heitor entra (mesmo que Haiku esqueceu)
+    texto_user_total = " ".join(
+        (m.content or "").lower()
+        for m in pedido.historico
+        if m.role == "user"
+    )
+    pediu_compliance = any(t in texto_user_total for t in _COMPLIANCE_TRIGGERS)
+
+    if pediu_compliance and "heitor" not in agentes_sugeridos and agentes_sugeridos:
+        # Force-include Heitor APÓS otto (ou no início se não tiver otto)
+        idx_otto = agentes_sugeridos.index("otto") if "otto" in agentes_sugeridos else -1
+        if idx_otto >= 0:
+            agentes_sugeridos = (
+                agentes_sugeridos[:idx_otto + 1]
+                + ["heitor"]
+                + agentes_sugeridos[idx_otto + 1:]
+            )
+        else:
+            agentes_sugeridos = ["heitor"] + agentes_sugeridos
+        # Adiciona razão padrão (Haiku não criou)
+        razoes = data.get("razoes_agentes") or {}
+        razoes["heitor"] = (
+            "Cliente mencionou termos regulatórios/ads pagos — Heitor entra pra "
+            "validar compliance (CFM, ANVISA, Meta Ads policy). Sem isso, ad pode "
+            "ser derrubado pela plataforma. Se quiser pular, é só me dizer."
         )
-        pediu_compliance = any(t in texto_user_total for t in _COMPLIANCE_TRIGGERS)
-        if not pediu_compliance:
-            agentes_sugeridos = [a for a in agentes_sugeridos if a != "heitor"]
-            # Remove razão também
-            data["razoes_agentes"] = {
-                k: v for k, v in data.get("razoes_agentes", {}).items() if k != "heitor"
-            }
+        data["razoes_agentes"] = razoes
+        # Adiciona audit pra rastrear quando Heitor é force-included
+        try:
+            from core import audit
+            audit.registrar(
+                "concierge_heitor_force_included",
+                triggers_encontrados=[t for t in _COMPLIANCE_TRIGGERS if t in texto_user_total][:5],
+            )
+        except Exception:
+            pass
+
+    # 2) Se cliente NÃO pediu mas Haiku incluiu Heitor por overcaution, remove
+    elif "heitor" in agentes_sugeridos and not pediu_compliance:
+        agentes_sugeridos = [a for a in agentes_sugeridos if a != "heitor"]
+        # Remove razão também
+        data["razoes_agentes"] = {
+            k: v for k, v in data.get("razoes_agentes", {}).items() if k != "heitor"
+        }
 
     custo_estimado = 0.0
     catalogo = _carregar_catalogo_seguro()

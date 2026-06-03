@@ -13,6 +13,26 @@ WS_MAX_PAYLOAD_BYTES = 6 * 1024 * 1024
 # imagem grande; conexão idle além disso é desconectada (libera worker).
 WS_RECEIVE_TIMEOUT_S = 300
 
+# v1.48 A1a-005 — timeout pra approval/confirmation manual via WS.
+# Antes: await ws.receive_json() em manual_mode/cost_cap/gate ficava indefinido.
+# Cliente que fechasse browser sem mandar "cancel" travava worker no executor —
+# agente "esperando aprovação" pra sempre, custos não fechados, leak de threads.
+# Agora: 10 minutos de janela manual antes de cancelar automaticamente (loga).
+WS_APPROVAL_TIMEOUT_S = 600
+
+
+async def _safe_receive_json(ws, label: str, timeout: float = WS_APPROVAL_TIMEOUT_S) -> dict:
+    """v1.48 A1a-005 — wrapper de ws.receive_json com timeout + tratamento.
+
+    Em timeout: retorna {"type": "cancel", "_timeout": True, "_label": label}.
+    O caller checa _timeout e cancela pipeline gracefully (sem deadlock).
+    """
+    import asyncio as _asyncio
+    try:
+        return await _asyncio.wait_for(ws.receive_json(), timeout=timeout)
+    except _asyncio.TimeoutError:
+        return {"type": "cancel", "_timeout": True, "_label": label}
+
 from agentes.aya import Aya
 from agentes.heitor import Heitor
 from agentes.otto import Otto
@@ -557,7 +577,7 @@ async def chat(ws: WebSocket):
 
                         if manual_mode:
                             await ws.send_json({"type": "agent_done", "agent": name, "cost": cost, "awaiting_approval": True})
-                            ctrl = await ws.receive_json()
+                            ctrl = await _safe_receive_json(ws, "manual_approval")
                             if ctrl.get("type") == "cancel":
                                 pipeline_cancelled = True
                                 return False
@@ -568,7 +588,7 @@ async def chat(ws: WebSocket):
                     except Exception as e:
                         if manual_mode:
                             await ws.send_json({"type": "agent_error", "agent": name, "error": str(e), "awaiting_retry": True})
-                            ctrl = await ws.receive_json()
+                            ctrl = await _safe_receive_json(ws, "manual_approval")
                             action = ctrl.get("type", "skip")
                             if action == "retry":
                                 continue  # reinicia o while
@@ -624,7 +644,7 @@ async def chat(ws: WebSocket):
                             f"{gate_text[:500]}\n\nContinuar para Sônia mesmo assim?"
                         )
                         await ws.send_json({"type": "confirmar", "agent": "gate_espelho", "mensagem": msg})
-                        ctrl = await ws.receive_json()
+                        ctrl = await _safe_receive_json(ws, "manual_approval")
                         if ctrl.get("type") != "confirmar_sim":
                             pipeline_cancelled = True
                             return False
@@ -655,7 +675,7 @@ async def chat(ws: WebSocket):
                         "total_atual": round(total_atual, 5),
                         "cap": custo_cap_autorizado,
                     })
-                    ctrl = await ws.receive_json()
+                    ctrl = await _safe_receive_json(ws, "manual_approval")
                     if ctrl.get("type") == "autorizar_custo":
                         custo_cap_autorizado += max(0.1, float(ctrl.get("valor", 0.5)))
                     else:
@@ -695,7 +715,7 @@ async def chat(ws: WebSocket):
                         await _stream(ws, variant_id, texto_s)
                         if manual_mode and idx == len(variacoes) - 1:
                             await ws.send_json({"type": "agent_done", "agent": variant_id, "cost": custo_s, "awaiting_approval": True})
-                            ctrl = await ws.receive_json()
+                            ctrl = await _safe_receive_json(ws, "manual_approval")
                             if ctrl.get("type") == "cancel":
                                 pipeline_cancelled = True
                                 return False

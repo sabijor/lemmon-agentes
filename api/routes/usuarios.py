@@ -56,19 +56,15 @@ def _usuarios_path() -> Path:
 
 
 def _carregar() -> list[dict]:
-    path = _usuarios_path()
-    if not path.exists():
-        return []
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
-        return []
+    # v1.48 A3a-003 — usuarios.json contém TOKENS de cada user (super sensível).
+    # Antes plaintext. Agora cifrado com Fernet se LEMMON_ENCRYPT_KEY setada.
+    from core.criptojson import ler_json_cifrado
+    return ler_json_cifrado(_usuarios_path(), default=[])
 
 
 def _salvar(usuarios: list[dict]) -> None:
-    _usuarios_path().write_text(
-        json.dumps(usuarios, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    from core.criptojson import escrever_json_cifrado
+    escrever_json_cifrado(_usuarios_path(), usuarios)
 
 
 @router.get("/usuarios")

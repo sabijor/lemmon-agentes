@@ -47,11 +47,17 @@ def _brand_kit_path() -> Path:
 
 @router.get("/brand-kit")
 async def obter_brand_kit() -> BrandKit:
-    """Retorna brand kit do tenant atual. Default se não existe."""
+    """Retorna brand kit do tenant atual. Default se não existe.
+
+    v1.48 A3a-003 — agora usa ler_json_cifrado (decifra se LEMMON_ENCRYPT_KEY).
+    Brand kit tem dados que cliente considera competitivamente sensíveis (público-alvo,
+    palavras-chave, voz). Cifra-at-rest protege se disco vazar.
+    """
+    from core.criptojson import ler_json_cifrado
     path = _brand_kit_path()
-    if path.exists():
+    dados = ler_json_cifrado(path, default=None)
+    if dados:
         try:
-            dados = json.loads(path.read_text(encoding="utf-8"))
             return BrandKit(**dados)
         except Exception:
             pass
@@ -60,9 +66,13 @@ async def obter_brand_kit() -> BrandKit:
 
 @router.put("/brand-kit")
 async def salvar_brand_kit(kit: BrandKit) -> dict:
-    """Salva/atualiza brand kit do tenant."""
+    """Salva/atualiza brand kit do tenant.
+
+    v1.48 A3a-003 — cifra com Fernet se LEMMON_ENCRYPT_KEY setada.
+    """
+    from core.criptojson import escrever_json_cifrado
     path = _brand_kit_path()
-    path.write_text(kit.model_dump_json(indent=2), encoding="utf-8")
+    escrever_json_cifrado(path, kit.model_dump(mode="json"))
     audit.registrar("brand_kit_updated", campos=list(kit.model_dump().keys()))
     return {"ok": True, "tenant": tenant_id()}
 
