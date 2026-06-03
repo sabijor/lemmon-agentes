@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
+import { useTheme } from 'next-themes'
 import { AGENT_MAP } from '@/lib/agents'
 import { type HistoryDetail } from '@/lib/useHistory'
 import { API_URL } from '@/lib/api'
@@ -8,6 +9,21 @@ import CharacterSprite from '../office/CharacterSprite'
 import { favoritarSessao } from '@/lib/api-client'
 import { notify } from '@/lib/toast'
 import ExportMenu from '../export/ExportMenu'
+
+// v1.49 QA — mesmo helper de bubble dark do MessageBubble
+function bubbleStyle(agent: { color: string; colorDim: string }, isDark: boolean) {
+  if (isDark) {
+    return { background: 'rgb(41 37 36)', borderColor: `${agent.color}60` }
+  }
+  return { background: agent.colorDim, borderColor: `${agent.color}30` }
+}
+
+function pillStyle(agent: { color: string; colorDim: string }, isDark: boolean) {
+  if (isDark) {
+    return { background: `${agent.color}30`, color: agent.colorDim }
+  }
+  return { background: agent.colorDim, color: agent.color }
+}
 
 interface ExportResult {
   html_gerado: boolean
@@ -41,6 +57,8 @@ interface SessionDetailProps {
 export function SessionDetail({
   detail, loadingDetail, bodyH, onBack, onResume, onRemix,
 }: SessionDetailProps) {
+  const { resolvedTheme } = useTheme()
+  const isDark = resolvedTheme === 'dark'
   const bottomRef = useRef<HTMLDivElement>(null)
   const [briefingExpanded, setBriefingExpanded] = useState(false)
   const [exemplaresMarked, setExemplaresMarked] = useState<Record<string, boolean>>({})
@@ -154,26 +172,26 @@ export function SessionDetail({
               {isReuniao ? 'Reunião' : 'Briefing'}
             </p>
             {isReuniao && (
-              <span className="text-[8px] font-mono px-1.5 py-0.5 rounded-full bg-violet-50 border border-violet-200 text-violet-600">
+              <span className="text-[8px] font-mono px-1.5 py-0.5 rounded-full bg-violet-50 dark:bg-violet-950/30 border border-violet-200 dark:border-violet-700/60 text-violet-600 dark:text-violet-300">
                 conversacional
               </span>
             )}
           </div>
           <div style={briefingExpanded ? { maxHeight: 120, overflowY: 'auto' } : undefined}>
-            <p className={`text-xs font-mono text-stone-700 leading-relaxed ${briefingExpanded ? '' : 'line-clamp-2'}`}>
+            <p className={`text-xs font-mono text-stone-700 dark:text-stone-200 leading-relaxed ${briefingExpanded ? '' : 'line-clamp-2'}`}>
               {detail.briefing}
             </p>
           </div>
           <button
             onClick={() => setBriefingExpanded(v => !v)}
-            className="text-[8px] font-mono text-stone-400 hover:text-stone-600 mt-0.5 transition-colors"
+            className="text-[8px] font-mono text-stone-400 hover:text-stone-600 dark:text-stone-500 dark:hover:text-stone-300 mt-0.5 transition-colors"
           >
             {briefingExpanded ? '▲ ver menos' : '▼ ver mais'}
           </button>
           <div className="flex items-center gap-3 mt-1.5">
-            <span className="text-[8px] font-mono text-stone-400">{detail.timestamp ? fmt(detail.timestamp) : ''}</span>
+            <span className="text-[8px] font-mono text-stone-400 dark:text-stone-500">{detail.timestamp ? fmt(detail.timestamp) : ''}</span>
             {detail.custo_total_usd > 0 && (
-              <span className="text-[8px] font-mono text-stone-400">Total: ${detail.custo_total_usd.toFixed(5)}</span>
+              <span className="text-[8px] font-mono text-stone-400 dark:text-stone-500">Total: ${detail.custo_total_usd.toFixed(5)}</span>
             )}
             <button
               onClick={handleFavoritar}
@@ -189,7 +207,7 @@ export function SessionDetail({
             <div className="flex items-center gap-1">
               <button
                 onClick={() => onResume(detail)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-stone-900 text-white text-[9px] font-mono uppercase tracking-widest hover:bg-stone-700 transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-900 text-[9px] font-mono uppercase tracking-widest hover:bg-stone-700 dark:hover:bg-stone-200 transition-colors"
               >
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                   <polygon points="5 3 19 12 5 21 5 3"/>
@@ -200,7 +218,7 @@ export function SessionDetail({
                 <button
                   onClick={() => onRemix(detail)}
                   title="Remix: carrega sessão com Salles+Sônia+Aya pré-selecionados — ideal para reutilizar tese com novo formato/cliente"
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-100 border border-violet-200 text-violet-700 text-[9px] font-mono uppercase tracking-widest hover:bg-violet-200 transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-100 dark:bg-violet-900/30 border border-violet-200 dark:border-violet-700/60 text-violet-700 dark:text-violet-200 text-[9px] font-mono uppercase tracking-widest hover:bg-violet-200 dark:hover:bg-violet-900/50 transition-colors"
                 >
                   🔀 Remix
                 </button>
@@ -211,8 +229,8 @@ export function SessionDetail({
           {/* T158 — menu unificado de exportação granular (substitui botões fixos por agente) */}
           <ExportMenu sessionId={detail.session_id} respostas={detail.respostas} align="bottom" />
           <button onClick={onBack}
-            className="w-7 h-7 rounded-lg border border-stone-200 bg-white flex items-center justify-center hover:bg-stone-50 hover:border-stone-400 transition-all">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#78716c" strokeWidth="2.5">
+            className="w-7 h-7 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 flex items-center justify-center hover:bg-stone-50 dark:hover:bg-stone-700 hover:border-stone-400 dark:hover:border-stone-500 transition-all">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-stone-500 dark:text-stone-400">
               <polyline points="15 18 9 12 15 6"/>
             </svg>
           </button>
@@ -230,12 +248,12 @@ export function SessionDetail({
               return (
                 <div key={i} className="flex flex-col items-end gap-1">
                   <div className="flex items-center gap-1.5 pr-1">
-                    <span className="text-[9px] font-mono text-stone-400 uppercase tracking-widest">Você</span>
-                    <div className="w-5 h-5 rounded-full bg-stone-900 flex items-center justify-center">
-                      <span className="text-white text-[8px] font-bold">V</span>
+                    <span className="text-[9px] font-mono text-stone-400 dark:text-stone-500 uppercase tracking-widest">Você</span>
+                    <div className="w-5 h-5 rounded-full bg-stone-900 dark:bg-stone-100 flex items-center justify-center">
+                      <span className="text-white dark:text-stone-900 text-[8px] font-bold">V</span>
                     </div>
                   </div>
-                  <div className="max-w-[88%] bg-stone-900 text-white rounded-2xl rounded-tr-sm px-4 py-2.5 shadow-sm">
+                  <div className="max-w-[88%] bg-stone-900 dark:bg-stone-700 text-white rounded-2xl rounded-tr-sm px-4 py-2.5 shadow-sm border border-transparent dark:border-stone-600">
                     <p className="text-sm font-mono leading-relaxed text-stone-100 whitespace-pre-wrap">{entry.content}</p>
                   </div>
                 </div>
@@ -246,17 +264,17 @@ export function SessionDetail({
             return (
               <div key={i} className="flex gap-2.5 items-start">
                 <div className="flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center border"
-                  style={{ background: agent.colorDim, borderColor: `${agent.color}30` }}>
+                  style={bubbleStyle(agent, isDark)}>
                   <CharacterSprite id={agent.id} size={0.6} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <span className="text-[9px] font-mono uppercase tracking-widest font-bold px-1.5 py-0.5 rounded-full inline-block mb-1"
-                    style={{ background: agent.colorDim, color: agent.color }}>
+                    style={pillStyle(agent, isDark)}>
                     {agent.name}
                   </span>
                   <div className="rounded-2xl rounded-tl-sm px-3 py-2.5 border"
-                    style={{ background: agent.colorDim, borderColor: `${agent.color}20` }}>
-                    <p className="text-sm font-mono leading-relaxed whitespace-pre-wrap text-stone-800">{entry.content}</p>
+                    style={bubbleStyle(agent, isDark)}>
+                    <p className="text-sm font-mono leading-relaxed whitespace-pre-wrap text-stone-800 dark:text-stone-100">{entry.content}</p>
                   </div>
                 </div>
               </div>
@@ -275,25 +293,25 @@ export function SessionDetail({
                 initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
                 className="flex gap-3 items-start">
                 <div className="flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center border"
-                  style={{ background: agent.colorDim, borderColor: `${agent.color}30` }}>
+                  style={bubbleStyle(agent, isDark)}>
                   <CharacterSprite id={agent.id} size={0.65} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1.5">
                     <span className="text-[10px] font-mono uppercase tracking-widest font-bold px-2 py-0.5 rounded-full"
-                      style={{ background: agent.colorDim, color: agent.color }}>
+                      style={pillStyle(agent, isDark)}>
                       {agent.name}
                     </span>
-                    <span className="text-[8px] font-mono text-stone-400">{agent.title}</span>
+                    <span className="text-[8px] font-mono text-stone-400 dark:text-stone-500">{agent.title}</span>
                     {cost !== undefined && cost > 0 && (
-                      <span className="text-[8px] font-mono text-stone-300">${cost.toFixed(5)}</span>
+                      <span className="text-[8px] font-mono text-stone-400 dark:text-stone-500">${cost.toFixed(5)}</span>
                     )}
                     {(() => {
                       const dur = (detail.duracoes_segundos ?? {})[agentId]
                       if (!dur) return null
                       const slow = dur > 120
                       return (
-                        <span className={`text-[8px] font-mono ${slow ? 'text-amber-500' : 'text-stone-300'}`}>
+                        <span className={`text-[8px] font-mono ${slow ? 'text-amber-500 dark:text-amber-400' : 'text-stone-400 dark:text-stone-500'}`}>
                           ⏱ {dur}s
                         </span>
                       )
@@ -313,8 +331,8 @@ export function SessionDetail({
                     )}
                   </div>
                   <div className="rounded-2xl rounded-tl-sm px-4 py-3 border"
-                    style={{ background: agent.colorDim, borderColor: `${agent.color}20` }}>
-                    <p className="text-sm font-mono leading-relaxed whitespace-pre-wrap text-stone-800">{text}</p>
+                    style={bubbleStyle(agent, isDark)}>
+                    <p className="text-sm font-mono leading-relaxed whitespace-pre-wrap text-stone-800 dark:text-stone-100">{text}</p>
                   </div>
                 </div>
               </motion.div>
@@ -323,16 +341,16 @@ export function SessionDetail({
         )}
 
         {detail.observacoes_operador && (
-          <div className="px-3 py-2.5 rounded-xl bg-amber-50 border border-amber-200">
-            <p className="text-[9px] font-mono text-amber-600 uppercase tracking-widest mb-1">Observações</p>
-            <p className="text-xs font-mono text-amber-800">{detail.observacoes_operador}</p>
+          <div className="px-3 py-2.5 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/60">
+            <p className="text-[9px] font-mono text-amber-600 dark:text-amber-300 uppercase tracking-widest mb-1">Observações</p>
+            <p className="text-xs font-mono text-amber-800 dark:text-amber-200">{detail.observacoes_operador}</p>
           </div>
         )}
 
         {detail.tags?.length > 0 && (
           <div className="flex flex-wrap gap-1">
             {detail.tags.map(t => (
-              <span key={t} className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-stone-100 border border-stone-200 text-stone-500">
+              <span key={t} className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-stone-100 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 text-stone-500 dark:text-stone-300">
                 {t}
               </span>
             ))}
