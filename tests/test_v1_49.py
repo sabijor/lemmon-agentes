@@ -268,6 +268,43 @@ def test_qa_b09_pedro_sem_reuniao_only_no_frontend():
     )
 
 
+def test_qa_b14_body_size_limit_rejeita_payload_grande(monkeypatch):
+    """v1.49 QA-B14 — middleware BodySizeLimit rejeita payloads > 1MB
+    em endpoints não-upload com 413.
+    """
+    from fastapi.testclient import TestClient
+    monkeypatch.setenv("LEMMON_RATE_LIMIT_PER_MIN", "5000")
+    monkeypatch.delenv("LEMMON_AUTH_TOKEN", raising=False)
+    from api.main import app
+    c = TestClient(app)
+    # 2MB de payload em endpoint normal → deve dar 413
+    payload = {"nome": "X" * (2 * 1024 * 1024)}
+    r = c.put("/brand-kit", json=payload)
+    assert r.status_code == 413, (
+        f"v1.49 QA-B14 — esperado 413 pra payload 2MB, veio {r.status_code}"
+    )
+    assert "muito grande" in r.text.lower() or "payload" in r.text.lower()
+
+
+def test_qa_b15_brand_kit_rejeita_html_tags():
+    """v1.49 QA-B15 — Pydantic rejeita `<script>` no campo nome.
+
+    Defesa em profundidade contra XSS — mesmo que React escape por default,
+    se algum dia o nome for renderizado em PDF/HTML via Aya, bloqueia.
+    """
+    from api.routes.brand_kit import BrandKit
+    import pytest as _pytest
+    with _pytest.raises(Exception):
+        BrandKit(nome='<script>alert("XSS")</script>')
+    with _pytest.raises(Exception):
+        BrandKit(tom_voz="<b>bold</b>")
+    with _pytest.raises(Exception):
+        BrandKit(publico_alvo="usuários <img>")
+    # Valores legítimos passam
+    bk = BrandKit(nome="Hator Clinic", tom_voz="íntimo, científico")
+    assert bk.nome == "Hator Clinic"
+
+
 def test_qa_b13_exemplares_rejeita_path_traversal():
     """v1.49 QA-B13 — exemplares.salvar/carregar/remover rejeitam agente_id
     com path traversal. Antes aceitava `../../etc/passwd` direto no path.

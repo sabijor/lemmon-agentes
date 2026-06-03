@@ -48,6 +48,45 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
         return response
 
 
+# v1.49 QA-B14 — Rejeita payloads grandes via Content-Length.
+# Antes: backend aceitava JSON de 10MB+ sem limit → DoS por memória.
+# Endpoints de upload (transcrever, financeiro) têm cap próprio maior,
+# então só aplicamos esse middleware nos endpoints JSON normais.
+# Limite 1MB cobre briefings normais (texto até ~500k chars) com folga.
+# Imagens vão como image_base64 no Concierge — 6.7MB base64 (~5MB binário)
+# permitido pelo Pydantic, então elas pulam esse middleware.
+_PATHS_BODY_LIMITE_GRANDE = (
+    "/transcrever",
+    "/financeiro/upload",
+    "/concierge/conversar",  # pode ter image_base64 ~6.7MB
+)
+_BODY_LIMITE_DEFAULT = 1 * 1024 * 1024  # 1MB
+_BODY_LIMITE_GRANDE = 30 * 1024 * 1024  # 30MB pra upload/imagem
+
+
+class BodySizeLimitMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        cl = request.headers.get("content-length")
+        if cl and cl.isdigit():
+            tamanho = int(cl)
+            limite = (
+                _BODY_LIMITE_GRANDE
+                if any(request.url.path.startswith(p) for p in _PATHS_BODY_LIMITE_GRANDE)
+                else _BODY_LIMITE_DEFAULT
+            )
+            if tamanho > limite:
+                return JSONResponse(
+                    status_code=413,
+                    content={
+                        "detail": (
+                            f"Payload muito grande: {tamanho // 1024}KB. "
+                            f"Limite pra este endpoint: {limite // 1024}KB."
+                        )
+                    },
+                )
+        return await call_next(request)
+
+
 # T190.D5 — Rate limit simples em memória.
 # 60 requisições por minuto por IP (suficiente pra uso normal Lemmon,
 # detecta cliente/bot martelando). Não usa Redis pra manter zero-deps.
@@ -244,6 +283,9 @@ app.add_middleware(RateLimitMiddleware, max_per_min=_rate_limit_per_min)
 # v1.48 A6a-006 — Request ID propagado pra logs estruturados.
 # Cliente recebe X-Request-ID na resposta; logs internos têm rid correlacionado.
 app.add_middleware(RequestIdMiddleware)
+
+# v1.49 QA-B14 — rejeita payloads grandes (1MB default, 30MB pra upload/imagem)
+app.add_middleware(BodySizeLimitMiddleware)
 
 app.include_router(agentes.router)
 app.include_router(historico.router)
