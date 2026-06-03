@@ -920,7 +920,7 @@ Ana Maria é exatamente o agente da próxima feature (planilha financeira). Pedr
 
 | # | ID | Severidade | Descrição | Onde |
 |---|---|---|---|---|
-| 1 | QA-B01 | 🔴 ALTO | "E aí, ficou bom?" feedback card aparece DESDE o início, antes do pipeline rodar. `isVisible` mal calculado. | `dashboard/components/chat/FeedbackPosPipeline.tsx` + `useChat.ts` (condição `pipelineCompleto`) |
+| 1 | QA-B01 | ✅ FIXED | "E aí, ficou bom?" feedback card aparecia DESDE a welcome screen (`isVisible={!!sessionId}` em ChatPanel.tsx:1276 + sessionId é persistido em localStorage → sobrevive reloads). **FIX**: novo state `pipelineCompletoNestaSessao` em useChat.ts, não-persistido, só vira true em `pipeline_done`. ChatPanel agora usa `isVisible={!!pipelineCompletoNestaSessao}`. | `dashboard/lib/useChat.ts` + `dashboard/components/chat/ChatPanel.tsx` |
 | 2 | QA-B02 | 🟡 MÉDIO | Pills do escritório só mostram 3 agentes (OTTO · CARLOS · AYA), Pedro e Renata somem do display | `dashboard/app/page.tsx` ou `components/office-pixel/PixelOfficeScene.tsx` — limite `.slice(0, 3)` |
 | 3 | QA-B03 | 🟡 MÉDIO | Toast "Concierge ativou" não inclui Pedro Abrahão (mostra "Otto · Carlos · Renata · Aya") | `dashboard/lib/useChat.ts` ou onde toast é disparado pós-confirmar |
 | 4 | QA-B04 | 🟢 BAIXO | Avatar "L" central tá com fundo branco em dark mode (deveria inverter pra preto) | `dashboard/app/page.tsx` welcome screen (`bg-stone-900` sem `dark:bg-stone-100`) |

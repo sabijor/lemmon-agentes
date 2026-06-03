@@ -42,6 +42,10 @@ interface Props {
   inMeeting: Set<AgentId>
   isRunning: boolean
   sessionId: string | null
+  /** v1.49 QA-B01 — true só quando pipeline_done foi recebido nesta instance
+   * (não persiste). Usado pra esconder FeedbackPosPipeline na welcome screen
+   * quando sessionId vem de localStorage de execução anterior. */
+  pipelineCompletoNestaSessao?: boolean
   favoritado: boolean
   manualMode: boolean
   fastTrack: boolean
@@ -108,7 +112,7 @@ interface Props {
 // ─── Main panel ──────────────────────────────────────────────────────
 export default function ChatPanel({
   mode, onToggleMode,
-  messages, agentStatus, inMeeting, isRunning, sessionId, favoritado, resumedFrom,
+  messages, agentStatus, inMeeting, isRunning, sessionId, pipelineCompletoNestaSessao, favoritado, resumedFrom,
   manualMode, fastTrack, sandbox, custoCap, custoCapAtingido, custoAviso, awaitingApproval, agentConfig, dragControls,
   agentProgress, agentProgressMeta,
   reunAgentProgress, reunAgentProgressMeta,
@@ -1273,7 +1277,10 @@ export default function ChatPanel({
               className="mx-4 mb-1 flex flex-col gap-3 px-4 py-3 rounded-xl border border-stone-200/60 dark:border-stone-700/60 bg-stone-50/80 dark:bg-stone-900/60 flex-shrink-0"
             >
               {/* PROD-4 — feedback pós-pipeline (reacao loop) */}
-              <FeedbackPosPipeline sessionId={sessionId} isVisible={!!sessionId} />
+              {/* v1.49 QA-B01 — antes: `isVisible={!!sessionId}` aparecia desde a welcome screen
+                  porque sessionId é persistido em localStorage entre reloads. Agora usa flag
+                  específica que só vira true quando pipeline_done chega NESTA instance. */}
+              <FeedbackPosPipeline sessionId={sessionId} isVisible={!!pipelineCompletoNestaSessao} />
 
               {/* Tags sugeridas — T180 dark */}
               {tagsAceitas.length > 0 && (

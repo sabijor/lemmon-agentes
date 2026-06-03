@@ -51,7 +51,7 @@ export default function Home() {
   const [conciergeHistory, setConciergeHistory] = useLocalStorage<ConciergeMsg[]>('lemmon-concierge-history', [])
   // T148 — flag pra mostrar "recomendado" no Auto Mode até 1ª sessão concluir
   const [hasCompletedFirstSession, setHasCompletedFirstSession] = useLocalStorage<boolean>('lemmon-first-session-done', false)
-  const { messages, agentStatus, isRunning, sessionId, favoritado, resumedFrom, manualMode, fastTrack, sandbox, custoCap, custoCapAtingido, custoAviso, awaitingApproval, agentConfig, tagsSugeridas, agentProgress, agentProgressMeta, send, approve, abort, toggleManualMode, toggleFastTrack, toggleSandbox, setCustoCap, autorizarCusto, recusarCustoExtra, updateConfig, favoritar, exportar, reset, loadSession, setMessages } = useChat()
+  const { messages, agentStatus, isRunning, sessionId, pipelineCompletoNestaSessao, favoritado, resumedFrom, manualMode, fastTrack, sandbox, custoCap, custoCapAtingido, custoAviso, awaitingApproval, agentConfig, tagsSugeridas, agentProgress, agentProgressMeta, send, approve, abort, toggleManualMode, toggleFastTrack, toggleSandbox, setCustoCap, autorizarCusto, recusarCustoExtra, updateConfig, favoritar, exportar, reset, loadSession, setMessages } = useChat()
   const {
     messages: reunMessages, agentStatus: reunAgentStatus, isRunning: reunIsRunning,
     agentProgress: reunAgentProgress, agentProgressMeta: reunAgentProgressMeta,
@@ -518,6 +518,7 @@ export default function Home() {
                 handleSend(approve ? 'ok pode rodar' : 'edita a equipe')
               }}
               sessionId={sessionId}
+              pipelineCompletoNestaSessao={pipelineCompletoNestaSessao}
               favoritado={favoritado}
               resumedFrom={resumedFrom}
               manualMode={manualMode}

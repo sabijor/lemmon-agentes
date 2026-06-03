@@ -124,6 +124,11 @@ export function useChat() {
   })
   const [isRunning, setIsRunning] = useState(false)
   const [sessionId, setSessionId] = useLocalStorage<string | null>('lemmon-last-session-id', null)
+  // v1.49 QA-B01 — distingue "sessão atual concluída agora" de "sessionId
+  // persistido em localStorage de execução anterior". O `sessionId` sobrevive
+  // reload da página; este flag NÃO. Usado pelo FeedbackPosPipeline pra
+  // não aparecer na welcome screen quando o usuário ainda nem mandou briefing.
+  const [pipelineCompletoNestaSessao, setPipelineCompletoNestaSessao] = useState(false)
   const [favoritado, setFavoritado] = useState(false)
   const [manualMode, setManualMode] = useState(false)
   const [awaitingApproval, setAwaitingApproval] = useState<ApprovalRequest | null>(null)
@@ -266,6 +271,7 @@ export function useChat() {
 
     sessionStartTimeRef.current = Date.now()  // T140 — pra reconciliar via histórico se WS cair
     setSessionId(null)
+    setPipelineCompletoNestaSessao(false)  // v1.49 QA-B01 — reset flag pra esconder feedback card
     setFavoritado(false)
     setAwaitingApproval(null)
     setTagsSugeridas([])
@@ -474,6 +480,7 @@ export function useChat() {
       if (data.type === 'pipeline_done') {
         setIsRunning(false)
         setAwaitingApproval(null)
+        setPipelineCompletoNestaSessao(true)  // v1.49 QA-B01
         if (data.session_id) {
           setSessionId(data.session_id)
         } else {
@@ -633,6 +640,7 @@ export function useChat() {
     messages, agentStatus, isRunning, sessionId, favoritado, resumedFrom,
     manualMode, fastTrack, sandbox, custoCap, custoCapAtingido, custoAviso,
     awaitingApproval, agentConfig, tagsSugeridas, agentProgress, agentProgressMeta,
+    pipelineCompletoNestaSessao,  // v1.49 QA-B01
     send, approve, abort, toggleManualMode, toggleFastTrack, toggleSandbox,
     setCustoCap, autorizarCusto, recusarCustoExtra,
     updateConfig, favoritar, exportar, reset, loadSession,
