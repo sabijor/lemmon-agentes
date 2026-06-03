@@ -268,6 +268,28 @@ def test_qa_b09_pedro_sem_reuniao_only_no_frontend():
     )
 
 
+def test_qa_b13_exemplares_rejeita_path_traversal():
+    """v1.49 QA-B13 — exemplares.salvar/carregar/remover rejeitam agente_id
+    com path traversal. Antes aceitava `../../etc/passwd` direto no path.
+    """
+    from core.exemplares import (
+        carregar_exemplares, remover_exemplar, salvar_exemplar
+    )
+    import pytest as _pytest
+    # Salvar: levanta ValueError
+    with _pytest.raises(ValueError):
+        salvar_exemplar("../etc", "trecho", "")
+    with _pytest.raises(ValueError):
+        salvar_exemplar("a/b", "trecho", "")
+    with _pytest.raises(ValueError):
+        salvar_exemplar("", "trecho", "")
+    # Carregar: retorna lista vazia (não raise)
+    assert carregar_exemplares("../etc") == []
+    assert carregar_exemplares("a/b") == []
+    # Remover: retorna False
+    assert remover_exemplar("../etc", "any") is False
+
+
 # ─── A1b-007 — Concierge usando tool-use mode ─────────────────────────
 
 def test_concierge_tem_ferramenta_responder_definida():
