@@ -6,6 +6,15 @@ trap 'kill 0' EXIT
 
 echo "▶ Iniciando backend (agentes Lemmon)..."
 source .venv/bin/activate
+# v1.49 — exporta .env explicitamente. core/config.py chama load_dotenv() mas
+# /health/full faz os.getenv("ANTHROPIC_API_KEY") direto no startup; sem o
+# `set -a; source .env; set +a` o health probe reporta key ausente mesmo com
+# .env válido. Esse padrão também serve pra rodar uvicorn fora do start.sh.
+if [ -f .env ]; then
+  set -a
+  source .env
+  set +a
+fi
 .venv/bin/uvicorn api.main:app --reload --port 8000 --log-level info &
 
 # Espera backend ficar pronto antes de abrir browser
