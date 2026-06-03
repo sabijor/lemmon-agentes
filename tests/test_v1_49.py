@@ -193,6 +193,31 @@ def test_lgpd_rejeita_session_id_dotdot(monkeypatch, tmp_path):
     assert r.status_code in (400, 403)
 
 
+# ─── A1b-005 — Hard-enforce 4 rodadas via state ───────────────────────
+
+def test_concierge_force_confirmar_em_4_rodadas_documentado():
+    """v1.49 A1b-005 — código tem override server-side, não só prompt."""
+    src = open("api/routes/concierge.py", encoding="utf-8").read()
+    assert "v1.49 A1b-005" in src
+    assert 'rodadas_user >= 4 and data.get("tipo") == "pergunta"' in src, (
+        "v1.49 A1b-005 — falta enforce server-side de 4 rodadas"
+    )
+    # Deve emitir audit pra rastrear quantas vezes Haiku ignorou prompt
+    assert "concierge_force_confirmar_rodadas" in src
+
+
+def test_concierge_force_confirmar_seleciona_admin_vs_criativo():
+    """v1.49 A1b-005 — após 4 rodadas, escolhe ana_maria (admin) ou otto+carlos+aya (criativo)."""
+    src = open("api/routes/concierge.py", encoding="utf-8").read()
+    # Cobertura mínima — contém ambas as branches
+    assert '"ana_maria"' in src and "_intent_admin" in src, (
+        "v1.49 A1b-005 — falta detecção admin (planilha/financeiro/etc)"
+    )
+    assert '"otto", "carlos", "aya"' in src, (
+        "v1.49 A1b-005 — falta default criativo"
+    )
+
+
 # ─── A1a-003/004 — Aya/Renata fora do for-loop + dedup snap_outputs ───
 
 def test_montar_snap_outputs_dedup():

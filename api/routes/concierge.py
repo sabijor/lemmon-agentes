@@ -741,6 +741,60 @@ async def conversar(pedido: ConcierePedido):
             ),
         )
 
+    # v1.49 A1b-005 — HARD-ENFORCE 4 rodadas via STATE (não só prompt).
+    # Antes: confiava no Haiku seguir instrução do prompt. Mas testes reais
+    # mostraram que ele às vezes ignora e continua perguntando (loop infinito
+    # frustrando cliente). Agora: se o STATE diz que passou de 4 rodadas E
+    # modelo ainda voltou "pergunta", override pra "confirmar" com defaults.
+    if rodadas_user >= 4 and data.get("tipo") == "pergunta":
+        try:
+            from core import audit
+            audit.registrar(
+                "concierge_force_confirmar_rodadas",
+                rodadas=rodadas_user,
+                tipo_original=data.get("tipo"),
+            )
+        except Exception:
+            pass
+        # Detecta intent admin vs criativo pelo histórico
+        _todo_texto = " ".join(
+            (m.content or "").lower() for m in pedido.historico if m.role == "user"
+        )
+        _palavras_admin = (
+            "financeiro", "planilha", "fluxo de caixa", "dre", "imposto",
+            "contas a pagar", "contas a receber", "folha", "rh", "tributário",
+        )
+        _intent_admin = any(p in _todo_texto for p in _palavras_admin)
+        if _intent_admin:
+            data["agentes_sugeridos"] = ["ana_maria"]
+            data["razoes_agentes"] = {
+                "ana_maria": "Análise financeira / DRE / fluxo (default v1.49 após 4 rodadas)"
+            }
+        else:
+            data["agentes_sugeridos"] = ["otto", "carlos", "aya"]
+            data["razoes_agentes"] = {
+                "otto": "Decodifica briefing em tese criativa",
+                "carlos": "Escreve roteiros publicitários",
+                "aya": "Compila o dossiê final",
+            }
+        data["tipo"] = "confirmar"
+        data["conteudo"] = (
+            "Já trocamos várias mensagens — pra não te travar, vou montar "
+            "um time inicial padrão com o que tenho:\n\n"
+            + "\n".join(
+                f"• {ag} — {data['razoes_agentes'].get(ag, '')}"
+                for ag in data["agentes_sugeridos"]
+            )
+            + "\n\nOK rodar assim? Se quiser tirar ou trocar alguém, me diz."
+        )
+        # briefing_refinado simples — usa última msg do user
+        ultima_user = next(
+            (m.content for m in reversed(pedido.historico) if m.role == "user"),
+            "",
+        )
+        if ultima_user:
+            data["briefing_refinado"] = ultima_user[:280]
+
     # T188.e — calcula custo estimado somando custo_medio_usd dos sugeridos
     agentes_sugeridos = data.get("agentes_sugeridos", [])
 
