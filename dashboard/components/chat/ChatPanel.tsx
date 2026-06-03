@@ -99,6 +99,10 @@ interface Props {
   conciergeLoading?: boolean
   /** Refinamento — Card "confirmar": callback do OK/Editar. */
   onConfirmConcierge?: (approve: boolean) => void
+  /** v1.47 A4a-002 — texto pra preencher o input (sem enviar). Útil pro "Experimentar exemplo".
+   *  Quando muda, ChatPanel popula o input. Limpa após popular (one-shot). */
+  prefillInput?: string
+  onPrefillConsumed?: () => void
 }
 
 // ─── Main panel ──────────────────────────────────────────────────────
@@ -117,6 +121,7 @@ export default function ChatPanel({
   onExportar, onClose, onSetInMeeting,
   tagsSugeridas = [], autoMode = false, hideAdvancedToggles = false,
   conciergeLoading = false, onConfirmConcierge,
+  prefillInput, onPrefillConsumed,
 }: Props) {
   // Mode-aware aliases
   const activeMessages    = mode === 'reuniao' ? reunMessages    : messages
@@ -355,9 +360,43 @@ export default function ChatPanel({
     setIsRecording(true)
   }
 
+  // v1.47 A2a-003 — smooth scroll só DEPOIS de mensagem terminar (não por token).
+  // Antes scrollava em cada token streamado com behavior:smooth, causando jank.
+  // Agora: scroll instantâneo durante streaming, smooth no final.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const allDone = activeMessages.length === 0 || activeMessages.every(m => m.done)
+    bottomRef.current?.scrollIntoView({
+      behavior: allDone ? 'smooth' : 'auto',
+    })
   }, [activeMessages])
+
+  // v1.47 A2a-005 — cleanup do SpeechRecognition no unmount. Antes deixava
+  // listener ativo segurando referência ao componente desmontado.
+  useEffect(() => {
+    return () => {
+      try {
+        recognitionRef.current?.stop()
+      } catch {
+        // ignore — pode já estar parado
+      }
+      recognitionRef.current = null
+      // T190.B4 — também cancela qualquer speak() do TTS pendente
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        try { window.speechSynthesis.cancel() } catch { /* ignore */ }
+      }
+    }
+  }, [])
+
+  // v1.47 A4a-002 — quando WelcomeModal "Experimentar" é clicado, preenche o input
+  // (não envia automaticamente). User revisa e decide clicar Enviar.
+  // Antes: dispara handleSend(EXEMPLO) direto → primeiro clique no produto é envio
+  // sem revisão. Pedro queria entender antes.
+  useEffect(() => {
+    if (prefillInput) {
+      setInput(prefillInput)
+      onPrefillConsumed?.()
+    }
+  }, [prefillInput, onPrefillConsumed])
 
   const handleAudioSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]

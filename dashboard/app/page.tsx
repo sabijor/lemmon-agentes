@@ -28,6 +28,9 @@ export default function Home() {
   const [chatMode, setChatMode] = useState<'pipeline' | 'reuniao'>('pipeline')
   const [historyOpen, setHistoryOpen] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
+  // v1.47 A4a-002 — briefing pendente pra preencher input do chat (sem enviar).
+  // WelcomeModal "Experimentar" agora usa isso em vez de handleSend direto.
+  const [prefillBriefing, setPrefillBriefing] = useState<string | undefined>(undefined)
   // T192 — Layout SVG isométrico removido em 2026-06-01 (pedido Calebe pós-teste Pedro).
   // Mantemos só PixelOfficeScene (top-down pixel art).
   // T139 Sprint 2 — Modo Auto (default ligado): IA escolhe os agentes ao enviar briefing.
@@ -288,7 +291,7 @@ export default function Home() {
   return (
     <div className="h-screen w-screen flex flex-col overflow-hidden bg-stone-50 dark:bg-stone-950">
       {/* T147 — modal de boas-vindas na 1ª visita; quando clica "experimentar", já manda o briefing exemplo */}
-      <WelcomeModal onTryExample={(b) => { handleSend(b) }} />
+      <WelcomeModal onTryExample={(b) => { setPrefillBriefing(b) }} />
       {/* Top nav */}
       <header className="flex-shrink-0 h-12 flex items-center justify-between px-6 glass border-b border-stone-200/60 dark:border-stone-800/60 z-50">
         <div className="flex items-center gap-3">
@@ -492,6 +495,8 @@ export default function Home() {
               agentConfig={agentConfig}
               autoMode={autoMode}
               hideAdvancedToggles={!hasCompletedFirstSession}
+              prefillInput={prefillBriefing}
+              onPrefillConsumed={() => setPrefillBriefing(undefined)}
               onSend={handleSend}
               onReset={reset}
               onFavoritar={favoritar}

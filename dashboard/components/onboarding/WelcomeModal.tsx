@@ -48,13 +48,19 @@ export default function WelcomeModal({ onTryExample }: Props) {
     }
   }, [])
 
-  const close = () => {
-    try { localStorage.setItem(STORAGE_KEY, '1') } catch {}
+  // v1.47 A4a-003 — backdrop NÃO marca onboarded (user pode estar lendo e clicou fora).
+  // Antes: click no backdrop fechava E gravava STORAGE_KEY — modal nunca mais voltava.
+  // Agora: close(persist=true) só quando user explicitamente "Entendi" ou "Experimentar".
+  // Backdrop usa close(false) — fecha mas reabre na próxima visita.
+  const close = (persist: boolean = true) => {
+    if (persist) {
+      try { localStorage.setItem(STORAGE_KEY, '1') } catch {}
+    }
     setOpen(false)
   }
 
   const tryExample = () => {
-    close()
+    close(true)
     onTryExample?.(EXEMPLO)
   }
 
@@ -68,7 +74,7 @@ export default function WelcomeModal({ onTryExample }: Props) {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
-          onClick={close}
+          onClick={() => close(false)}
         >
           <motion.div
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
@@ -120,7 +126,7 @@ export default function WelcomeModal({ onTryExample }: Props) {
                 Experimentar com esse exemplo
               </button>
               <button
-                onClick={close}
+                onClick={() => close(true)}
                 className="flex-1 sm:flex-none bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-200 font-mono text-xs uppercase tracking-widest px-4 py-2.5 rounded-xl transition-colors"
               >
                 Vou explorar
