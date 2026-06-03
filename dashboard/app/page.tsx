@@ -439,7 +439,7 @@ export default function Home() {
             // PROD-13 — sem pixel office: tela limpa, focada no chat.
             // Cliente leigo não se distrai com escritório.
             <div className="h-full flex flex-col items-center justify-center px-8 text-center max-w-xl mx-auto">
-              <div className="w-16 h-16 rounded-2xl bg-stone-900 dark:bg-stone-100 flex items-center justify-center mb-6">
+              <div className={`w-16 h-16 rounded-2xl bg-stone-900 dark:bg-stone-100 flex items-center justify-center mb-6 ${isRunning ? 'animate-pulse' : ''}`}>
                 <span className="text-white dark:text-stone-900 text-xl font-display font-bold">L</span>
               </div>
               <h1 className="text-2xl font-display font-bold text-stone-900 dark:text-stone-100 mb-3">
@@ -450,6 +450,41 @@ export default function Home() {
                   ? 'O time está trabalhando — acompanha no painel à direita.'
                   : 'Descreva o que você precisa no chat. O Concierge entrevista e mobiliza o time certo pra você.'}
               </p>
+
+              {/* v1.47 A4a-008 — feedback de "vida" durante pipeline.
+                  Antes: tela central estática durante 15-30s → Pedro pensava "travou" → F5 → perdia sessão paga.
+                  Agora: bolas verde-pulsantes pra cada agente ativo + agentes concluídos em check verde. */}
+              {isRunning && (
+                <div className="mt-6 flex flex-col items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    {(['otto', 'heitor', 'salles', 'carlos', 'pedro_abrahao', 'sonia', 'aya'] as AgentId[]).map(aid => {
+                      const status = agentStatus[aid]
+                      if (status === 'idle') return null
+                      const isDone = status === 'done'
+                      const isError = status === 'error'
+                      const isActive = status === 'thinking' || status === 'speaking'
+                      return (
+                        <div key={aid}
+                          className={`px-2.5 py-1 rounded-full text-[10px] font-mono uppercase tracking-widest flex items-center gap-1.5
+                            ${isDone ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200' : ''}
+                            ${isError ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-200' : ''}
+                            ${isActive ? 'bg-stone-100 text-stone-700 dark:bg-stone-800 dark:text-stone-200' : ''}`}
+                          title={`${aid} — ${status}`}
+                        >
+                          {isActive && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
+                          {isDone && <span>✓</span>}
+                          {isError && <span>✗</span>}
+                          {aid}
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <p className="text-[11px] font-mono text-stone-400 dark:text-stone-500">
+                    Cada bola é um agente ativo • respostas chegam à direita
+                  </p>
+                </div>
+              )}
+
               {!isRunning && hasCompletedFirstSession && (
                 <button
                   onClick={() => setImersivo(true)}
