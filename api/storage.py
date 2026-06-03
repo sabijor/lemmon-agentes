@@ -74,6 +74,7 @@ def _salvar_sessao(
     duracoes: dict[str, float] | None = None,
     sandbox: bool = False,
     nome_projeto: str | None = None,  # v1.46.1 #12 — nome bonito (Haiku)
+    respostas_estruturadas: dict | None = None,  # v1.48 A-11
 ) -> Path:
     """Salva sessão completa da dashboard no histórico."""
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -90,6 +91,9 @@ def _salvar_sessao(
         "nome_projeto": nome_projeto,  # v1.46.1 #12 — usado na capa do PDF
         "agentes_usados": agentes_usados,
         "respostas": respostas,
+        # v1.48 A-11 — Salles alternativas etc preservadas em estrutura paralela.
+        # Cliente pode escolher variante; antes só sobrava blob combinado.
+        "respostas_estruturadas": respostas_estruturadas or {},
         "custos_usd": custos,
         "custo_total_usd": sum(custos.values()),
         "duracoes_segundos": duracoes or {},

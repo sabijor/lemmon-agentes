@@ -122,12 +122,52 @@ def _carregar_catalogo_seguro() -> list[dict]:
         return []
 
 
-def _construir_system_prompt() -> str:
+def _carregar_brand_kit_tenant() -> dict:
+    """v1.48 A1b-006 — Carrega brand kit do tenant atual.
+
+    Retorna dict com defaults seguros se não houver brand kit gravado.
+    Usa criptojson pra ler (decifra se LEMMON_ENCRYPT_KEY setada).
+
+    Defaults legacy preservam comportamento Hator quando tenant=default/hator
+    e brand kit não existe (continuidade pra Pedro).
+    """
+    try:
+        from core.criptojson import ler_json_cifrado
+        from core.tenant import tenant_id
+
+        path = HISTORICO_DIR / tenant_id() / "brand_kit.json"
+        dados = ler_json_cifrado(path, default=None) or {}
+    except Exception:
+        dados = {}
+
+    # Defaults seguros — Hator-friendly se brand kit vazio (compat)
+    return {
+        "nome": dados.get("nome") or "Cliente",
+        "tom_voz": dados.get("tom_voz") or "profissional, acolhedor",
+        "publico_alvo": dados.get("publico_alvo") or "",
+        "nicho": dados.get("nicho") or "",
+        "tipo_negocio": dados.get("tipo_negocio") or "",
+        "espelho_id": dados.get("espelho_id") or None,
+        "triggers_espelho": dados.get("triggers_espelho") or [],
+        "palavras_evitar": dados.get("palavras_evitar") or [],
+        "palavras_preferir": dados.get("palavras_preferir") or [],
+    }
+
+
+def _construir_system_prompt(brand_kit: dict | None = None) -> str:
     """Constrói SYSTEM_PROMPT com catálogo ATUAL dos agentes + ferramentas.
 
     Carrega dinamicamente pra que novos agentes adicionados não exijam
     mudar o prompt manualmente.
+
+    v1.48 A1b-006 — Tenant-aware. Aceita brand_kit do cliente atual e injeta:
+      - Nome, nicho, tipo de negócio, público-alvo
+      - Espelho médico configurável (se brand kit tem `espelho_id`)
+      - Triggers customizados pra forçar inclusão do espelho
+
+    Se brand_kit=None ou vazio, mantém comportamento legacy (Hator-friendly).
     """
+    bk = brand_kit or _carregar_brand_kit_tenant()
     catalogo = _carregar_catalogo_seguro()
 
     # Bloco agentes
@@ -142,9 +182,44 @@ def _construir_system_prompt() -> str:
         for key, info in FERRAMENTAS_DISPONIVEIS.items()
     )
 
+    # ─── Bloco de contexto do cliente atual (v1.48 A1b-006) ────────────
+    nome_cliente = bk["nome"]
+    nicho = bk["nicho"]
+    tipo_negocio = bk["tipo_negocio"]
+    publico_alvo = bk["publico_alvo"]
+    espelho_id = bk["espelho_id"]
+
+    # Linha de descrição contextual (composição variável)
+    partes_descricao = []
+    if tipo_negocio:
+        partes_descricao.append(f"tipo de negócio: **{tipo_negocio}**")
+    if nicho:
+        partes_descricao.append(f"nicho/especialidade: **{nicho}**")
+    if publico_alvo:
+        partes_descricao.append(f"público-alvo: {publico_alvo}")
+    contexto_cliente = "; ".join(partes_descricao) if partes_descricao else ""
+
+    # Bloco "Cliente atual" — formado dinamicamente
+    if contexto_cliente or nome_cliente != "Cliente":
+        bloco_cliente = (
+            f"\n\n## 🏢 Cliente atual: **{nome_cliente}**\n"
+            f"{contexto_cliente or 'Sem contexto de brand kit gravado ainda.'}\n"
+        )
+        if espelho_id:
+            ag_espelho_info = next(
+                (a for a in catalogo if a.get("id") == espelho_id), None
+            )
+            ag_label = ag_espelho_info["nome"] if ag_espelho_info else espelho_id
+            bloco_cliente += (
+                f"\n> ⚠️ Espelho do cliente: **{espelho_id}** ({ag_label}). "
+                "Sempre incluir esse agente quando briefing tocar nicho do cliente.\n"
+            )
+    else:
+        bloco_cliente = ""
+
     return f"""# Você é o **Concierge** da Lemmon Produções
 
-Lemmon é uma agência de marketing especializada em conteúdo pra clínicas de saúde (cliente principal: **Hator Clinic** do Dr. Pedro Abrahão, especializada em menopausa, saúde feminina e estética orofacial).
+Lemmon é uma agência de marketing especializada em conteúdo pra clínicas de saúde, agências e negócios que querem produção criativa orquestrada por IA.{bloco_cliente}
 
 Você é o **cérebro do sistema** — a primeira pessoa que o cliente fala antes de mobilizar a equipe de especialistas. Sua função é:
 
@@ -180,7 +255,7 @@ Sempre considere essas dimensões antes de mobilizar a equipe:
 6. **VIBE/TOM** — íntimo, técnico, científico, divertido, sério?
 
 E também:
-- **CONTEXTO ESPECIAL**: É clínica Hator? Material já existe? Precisa compliance?
+- **CONTEXTO ESPECIAL**: É do cliente atual ({nome_cliente})? Material já existe? Precisa compliance?
 
 ---
 
@@ -191,7 +266,7 @@ Você tem **3 tipos de resposta** (T188.a — sempre passa pelo "confirmar" ante
 ### "pergunta" — quando ainda falta contexto
 - Falta o **O QUÊ** ou **OBJETIVO** (são obrigatórios)
 - Faltam 2+ dimensões críticas
-- Ambíguo qual frente acionar (marketing vs admin Hator vs orçamento)
+- Ambíguo qual frente acionar (marketing vs admin vs orçamento)
 
 ### "confirmar" — quando você JÁ sabe o que fazer mas precisa do OK do cliente
 - O QUÊ e OBJETIVO claros + pelo menos 2 outras dimensões
@@ -219,12 +294,16 @@ Você tem **3 tipos de resposta** (T188.a — sempre passa pelo "confirmar" ante
 
 ## ⚠️ REGRAS RÍGIDAS (T188.b/c/d — bugs reportados no teste real)
 
-### 1. Cliente Hator → SEMPRE inclua `pedro_abrahao`
-Se o briefing mencionar QUALQUER UM dos termos abaixo, `pedro_abrahao` é **OBRIGATÓRIO**
-(como espelho/validador médico, mesmo que outras frentes existam):
-- "Hator", "Dr. Pedro", "Dra. Pedro", "Pedro Abrahão", "menopausa", "saúde feminina",
-  "consulta médica", "TRH", "reposição hormonal", "estética orofacial", "clínica" + Pedro,
-  "ginecologia", "endocrinologia feminina"
+### 1. Espelho do cliente — SEMPRE inclua se brand kit definiu um
+{(
+  f'O cliente atual ({nome_cliente}) tem espelho configurado: **{espelho_id}**. '
+  f'Se o briefing mencionar termos do nicho ({nicho or "—"}) ou triggers customizados '
+  f'({", ".join(bk["triggers_espelho"]) if bk["triggers_espelho"] else "—"}), '
+  f'`{espelho_id}` é **OBRIGATÓRIO** como validador/espelho.'
+) if espelho_id else (
+  'Cliente atual não tem espelho médico/validador configurado no brand kit. '
+  'Use o time padrão sem espelho dedicado.'
+)}
 
 ### 2. Salles entra SÓ com material/produção real
 `salles` é Produtor documental — entra APENAS se o briefing mencionar:
@@ -243,8 +322,8 @@ Tabela de mínimos por tarefa típica:
 - "Estratégia" → `otto` + `aya` (2)
 - "Calendário editorial" → `renata` + `aya` (2)
 - "Ad pago" → `otto` + `carlos` + `aya` (3) + sugerir `heitor` (Meta cobra compliance)
-- "Reels orgânico saúde Hator" → `otto` + `carlos` + `pedro_abrahao` + `aya` (4)
-- "Análise financeira Hator" → `ana_maria` (1) ± `caito`/`kelly` conforme área
+- "Reels orgânico do nicho do cliente" → `otto` + `carlos` + (espelho se configurado) + `aya`
+- "Análise financeira" → `ana_maria` (1) ± `caito`/`kelly` conforme área
 - "Planilha XLSX/CSV / DRE / ticket médio / receita / despesa" → `ana_maria` (1) +
   AVISO obrigatório: "📋 Sua planilha pode ser carregada em /financeiro pra eu
   analisar via Ana Maria com Excel real. Se ainda não subiu, faça isso primeiro
@@ -278,18 +357,18 @@ análise financeira, briefings óbvios sem risco regulatório.
 
 ## 🧩 Padrões de pipeline (use como guia, decida caso a caso)
 
-- **Reels orgânico saúde Hator**: otto + carlos + pedro_abrahao + aya. Pode SUGERIR heitor se tema sensível (lipedema, hormônios, etc.) — cliente decide
-- **Ad pago saúde**: otto + carlos + (pedro_abrahao se Hator) + aya. Sempre SUGERIR heitor (Meta cobra compliance) — cliente decide
-- **Conteúdo educativo Hator**: otto + carlos + pedro_abrahao + aya
+- **Reels orgânico do nicho do cliente**: otto + carlos + (espelho se configurado) + aya. Pode SUGERIR heitor se tema sensível (lipedema, hormônios, claims fortes) — cliente decide
+- **Ad pago**: otto + carlos + (espelho se Hator/clínica médica) + aya. Sempre SUGERIR heitor (Meta cobra compliance) — cliente decide
+- **Conteúdo educativo do nicho**: otto + carlos + (espelho se configurado) + aya
 - **Cliente tem refs visuais (prints)**: ferramenta `briefing_reverso` + otto + carlos + aya
 - **Calendário editorial**: renata + (otto só se estratégico) + aya
 - **Material gravado → cortes**: ferramenta `cortes_prontos` + carlos + aya
-- **Análise financeira Hator**: ana_maria + (caito se decisão) + (kelly se tributário)
-- **Decisão operacional Hator**: caito + (ana_maria/prichina/kelly conforme área)
-- **Folha/RH/contas Hator**: prichina + (ana_maria se pagamento)
-- **Tributário/imposto Hator**: kelly + (ana_maria se fluxo)
+- **Análise financeira**: ana_maria + (caito se decisão) + (kelly se tributário)
+- **Decisão operacional**: caito + (ana_maria/prichina/kelly conforme área)
+- **Folha/RH/contas**: prichina + (ana_maria se pagamento)
+- **Tributário/imposto**: kelly + (ana_maria se fluxo)
 
-**Sempre** termina com **aya** (compiladora) — exceto pra admin Hator (saídas próprias).
+**Sempre** termina com **aya** (compiladora) — exceto pra admin (saídas próprias).
 
 ---
 
@@ -321,19 +400,18 @@ Se `tipo=pergunta`, deixe `agentes_sugeridos`, `razoes_agentes` e `ferramentas_e
 Se `tipo=confirmar`, PREENCHA todos esses campos (cliente precisa ver o que vai rodar).
 Se `tipo=pronto`, mantenha os mesmos campos da última "confirmar" (significa que cliente OKou).
 
-### Exemplo de "confirmar"
+### Exemplo de "confirmar" (genérico — adapte ao cliente atual)
 ```json
 {{
   "tipo": "confirmar",
-  "conteudo": "Pra Reels de menopausa orgânico, vou mobilizar:\\n\\n• Otto — decodifica tese\\n• Carlos — escreve roteiros\\n• Pedro (espelho IA) — valida pela ótica do médico\\n• Aya — compila tudo\\n\\nOK rodar assim ou quer ajustar?",
-  "briefing_refinado": "Reels orgânico pra Instagram da Hator Clinic sobre menopausa. Público: mulheres 40-55 anos. Tom íntimo e científico.",
+  "conteudo": "Pra Reels orgânico do tema X, vou mobilizar:\\n\\n• Otto — decodifica tese\\n• Carlos — escreve roteiros\\n• [Espelho do cliente] — valida pela ótica do especialista (se aplicável)\\n• Aya — compila tudo\\n\\nOK rodar assim ou quer ajustar?",
+  "briefing_refinado": "Reels orgânico do nicho do cliente. Público + tom conforme brand kit.",
   "dimensoes_completas": ["o_que", "publico", "canal", "objetivo", "vibe"],
   "dimensoes_faltando": [],
-  "agentes_sugeridos": ["otto", "carlos", "pedro_abrahao", "aya"],
+  "agentes_sugeridos": ["otto", "carlos", "aya"],
   "razoes_agentes": {{
     "otto": "decodifica tese em briefing aberto",
     "carlos": "escreve roteiros publicitários filmáveis",
-    "pedro_abrahao": "valida pela ótica do médico (cliente Hator)",
     "aya": "compila o dossiê final"
   }},
   "ferramentas_extras": []
@@ -484,7 +562,11 @@ async def conversar(pedido: ConcierePedido):
     # Singleton em api.deps já cuida disso. Se api_key foi validado acima,
     # confiamos que _anthropic_client está OK.
     client = _anthropic_client
-    system_prompt = _construir_system_prompt()
+
+    # v1.48 A1b-006 — Carrega brand kit do tenant atual e injeta no prompt.
+    # Sem brand kit: defaults Hator-friendly (compat).
+    brand_kit_tenant = _carregar_brand_kit_tenant()
+    system_prompt = _construir_system_prompt(brand_kit_tenant)
 
     # PROD-1 — Memória persistente. Se é a 1ª mensagem do user, busca histórico
     # similar e injeta no system prompt pra Concierge poder mencionar "vi que você
@@ -671,6 +753,66 @@ async def conversar(pedido: ConcierePedido):
         data["razoes_agentes"] = {
             k: v for k, v in data.get("razoes_agentes", {}).items() if k != "heitor"
         }
+
+    # v1.48 A1b-006 — Force-include do ESPELHO se brand kit configurou.
+    # Antes só funcionava pra pedro_abrahao via hardcode. Agora tenant-aware:
+    # se brand_kit tem espelho_id + triggers_espelho, força inclusão quando
+    # briefing tocar termos do nicho. Hator continua funcionando via fallback.
+    espelho_id_cfg = brand_kit_tenant.get("espelho_id")
+    triggers_espelho_cfg = [
+        t.lower() for t in (brand_kit_tenant.get("triggers_espelho") or [])
+    ]
+    # Fallback Hator: se tenant é hator/default e brand kit não setou,
+    # mantém pedro_abrahao com triggers legacy (compat).
+    if not espelho_id_cfg:
+        from core.tenant import tenant_id as _tid
+        if _tid() in ("hator", "default"):
+            espelho_id_cfg = "pedro_abrahao"
+            triggers_espelho_cfg = [
+                "hator", "dr. pedro", "dra. pedro", "pedro abrahão",
+                "pedro abrahao", "menopausa", "saúde feminina", "saude feminina",
+                "trh", "reposição hormonal", "reposicao hormonal",
+                "estética orofacial", "estetica orofacial",
+                "ginecologia", "endocrinologia feminina",
+            ]
+
+    if espelho_id_cfg and triggers_espelho_cfg:
+        pediu_espelho = any(t in texto_user_total for t in triggers_espelho_cfg)
+        if (
+            pediu_espelho
+            and espelho_id_cfg not in agentes_sugeridos
+            and agentes_sugeridos
+        ):
+            # Force-include espelho APÓS otto/carlos (validador entra no fim do
+            # criativo, antes do aya compilador)
+            idx_aya = (
+                agentes_sugeridos.index("aya") if "aya" in agentes_sugeridos else -1
+            )
+            if idx_aya >= 0:
+                agentes_sugeridos = (
+                    agentes_sugeridos[:idx_aya]
+                    + [espelho_id_cfg]
+                    + agentes_sugeridos[idx_aya:]
+                )
+            else:
+                agentes_sugeridos = agentes_sugeridos + [espelho_id_cfg]
+            razoes = data.get("razoes_agentes") or {}
+            razoes[espelho_id_cfg] = (
+                f"Cliente mencionou termos do nicho — {espelho_id_cfg} entra como "
+                "espelho/validador pela ótica do especialista do cliente."
+            )
+            data["razoes_agentes"] = razoes
+            try:
+                from core import audit
+                audit.registrar(
+                    "concierge_espelho_force_included",
+                    espelho=espelho_id_cfg,
+                    triggers_encontrados=[
+                        t for t in triggers_espelho_cfg if t in texto_user_total
+                    ][:5],
+                )
+            except Exception:
+                pass
 
     custo_estimado = 0.0
     catalogo = _carregar_catalogo_seguro()

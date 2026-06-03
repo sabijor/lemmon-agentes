@@ -38,6 +38,17 @@ class BrandKit(BaseModel):
     palavras_evitar: list[str] = Field(default_factory=list)
     palavras_preferir: list[str] = Field(default_factory=list)
 
+    # v1.48 A1b-006 — Concierge tenant-aware
+    # Permite Concierge funcionar pra 2+ clientes sem hardcode.
+    # nicho: descrição curta do segmento (ex: "saúde feminina, menopausa, estética orofacial")
+    # tipo_negocio: "clínica médica" | "agência" | "loja" | "startup" | etc — orienta tom
+    # espelho_id: ID do agente espelho/validador específico do cliente (ex: "pedro_abrahao")
+    # triggers_espelho: termos que disparam inclusão obrigatória do espelho
+    nicho: str = ""
+    tipo_negocio: str = ""
+    espelho_id: Optional[str] = None
+    triggers_espelho: list[str] = Field(default_factory=list)
+
 
 def _brand_kit_path() -> Path:
     p = HISTORICO_DIR / tenant_id()

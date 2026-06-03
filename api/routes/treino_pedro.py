@@ -32,6 +32,18 @@ router = APIRouter()
 
 PROMPTS_DIR = Path(__file__).parent.parent.parent / "prompts"
 
+# v1.48 A3a-006 — seções OBRIGATÓRIAS que o prompt resultado deve preservar.
+# Se Haiku perde alguma (ex: omite "RECUSA responder" e o espelho vira complacente),
+# rejeitamos o treino e mantemos a versão anterior.
+SECOES_OBRIGATORIAS = (
+    "QUEM É VOCÊ",
+    "SUA VOZ",
+    "SEU POSICIONAMENTO",
+    "REGRAS DE RESPOSTA",
+    "O QUE VOCÊ NUNCA FAZ",
+    "REGRA DE OURO",
+)
+
 
 def _prompt_atual_path() -> Path:
     """Acha a versão mais alta de pedro_abrahao_system_v*.md."""
@@ -49,6 +61,54 @@ def _proxima_versao() -> int:
     return max(nums) + 1 if nums else 2
 
 
+def _validar_prompt_resultado(novo: str, atual: str) -> tuple[bool, str]:
+    """v1.48 A3a-006 — Garante que prompt resultado preserva seções obrigatórias.
+
+    Retorna (ok, motivo).
+
+    Critérios:
+    1. Tamanho >= 80% do atual (já tinha)
+    2. TODAS as seções de SECOES_OBRIGATORIAS continuam presentes
+    3. Header H1 inicial preservado (cabeçalho de identidade)
+    4. Não tem texto de meta-prompt vazando (ex: "Sua tarefa:", "Use ESTRITAMENTE")
+    """
+    if not novo:
+        return False, "Resposta vazia"
+
+    if len(novo) < len(atual) * 0.8:
+        return False, (
+            f"Resposta muito curta: {len(novo)} chars vs {len(atual)} no atual "
+            "(< 80%) — Haiku provavelmente truncou ou ignorou conteúdo"
+        )
+
+    # Header H1 (identidade) preservado
+    primeira_linha_atual = atual.strip().split("\n", 1)[0]
+    if primeira_linha_atual.startswith("# ") and primeira_linha_atual not in novo:
+        return False, (
+            f"Header H1 de identidade ausente no resultado: '{primeira_linha_atual}' "
+            "— espelho perdeu cabeçalho 'Você é o Dr. Pedro Abrahão'"
+        )
+
+    # Seções obrigatórias presentes
+    for secao in SECOES_OBRIGATORIAS:
+        if secao not in novo:
+            return False, (
+                f"Seção obrigatória '{secao}' ausente no resultado. "
+                "Treino rejeitado — manteria versão anterior pra não perder regra crítica."
+            )
+
+    # Detecta vazamento do system prompt do editor (Haiku copiou as instruções dele)
+    vazamentos = ("Sua tarefa:", "Use ESTRITAMENTE", "Markdown puro.", "Saída: O prompt completo")
+    for v in vazamentos:
+        if v in novo:
+            return False, (
+                f"Vazamento de meta-prompt detectado ('{v}') — Haiku confundiu "
+                "instruções dele com conteúdo do prompt. Resultado descartado."
+            )
+
+    return True, "OK"
+
+
 @router.post("/pedro/treinar")
 async def treinar_pedro_espelho(authorization: str | None = Header(default=None)):
     """Consolida correções de calibragem + gera nova versão do prompt.
@@ -56,14 +116,24 @@ async def treinar_pedro_espelho(authorization: str | None = Header(default=None)
     Requer Authorization: Bearer <LEMMON_AUTH_TOKEN>.
     Em dev: LEMMON_ALLOW_TRAIN_DEV=1 dispensa o token.
     """
-    permitir_dev = os.getenv("LEMMON_ALLOW_TRAIN_DEV") == "1"
+    # v1.48 A3a-006 — bypass dev SÓ funciona quando LEMMON_ENV=dev.
+    # Antes: LEMMON_ALLOW_TRAIN_DEV=1 dispensava token em qualquer ambiente
+    # (perigoso se acidentalmente setado em prod). Agora exige env=dev também.
+    env_atual = os.getenv("LEMMON_ENV", "").lower()
+    permitir_dev = (
+        os.getenv("LEMMON_ALLOW_TRAIN_DEV") == "1"
+        and env_atual in ("dev", "development", "local")
+    )
     esperado = os.getenv("LEMMON_AUTH_TOKEN", "")
 
     if not permitir_dev:
         if not esperado:
             raise HTTPException(
                 status_code=403,
-                detail="Treino exige LEMMON_AUTH_TOKEN configurada ou LEMMON_ALLOW_TRAIN_DEV=1.",
+                detail=(
+                    "Treino exige LEMMON_AUTH_TOKEN configurada. "
+                    "Em dev, defina também LEMMON_ENV=dev + LEMMON_ALLOW_TRAIN_DEV=1."
+                ),
             )
         if not authorization or not authorization.startswith("Bearer "):
             raise HTTPException(
@@ -143,8 +213,27 @@ Saída: O prompt completo (preservado) + a nova seção. Markdown puro.
             detail=formatar_erro_anthropic(e),
         ) from e
 
-    if not novo_prompt or len(novo_prompt) < len(prompt_atual) * 0.8:
-        raise HTTPException(status_code=502, detail="Resposta do Haiku muito curta (possível erro).")
+    # v1.48 A3a-006 — validação rigorosa antes de gravar.
+    # Antes só checava tamanho; agora também valida seções obrigatórias.
+    ok_valid, motivo_valid = _validar_prompt_resultado(novo_prompt, prompt_atual)
+    if not ok_valid:
+        # Audit pra rastrear treinos rejeitados (ajuda detectar Haiku piorando)
+        try:
+            audit.registrar(
+                "pedro_espelho_train_rejected",
+                motivo=motivo_valid,
+                tam_resposta=len(novo_prompt) if novo_prompt else 0,
+                tam_atual=len(prompt_atual),
+            )
+        except Exception:
+            pass
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "Treino rejeitado: prompt resultado não preserva regras críticas. "
+                f"Detalhe: {motivo_valid}"
+            ),
+        )
 
     # 5. Grava nova versão
     nova_versao = _proxima_versao()

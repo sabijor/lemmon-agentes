@@ -16,8 +16,36 @@ from api.ws_chat import chat
 from api.ws_mesa import mesa_redonda
 from api.ws_reuniao import reuniao
 from core.historico_index import sanity_check
+from core.logging_estruturado import (
+    novo_request_id,
+    set_request_id,
+    set_tenant_id,
+    setup_logging,
+)
 
+# v1.48 A6a-006 — Setup de logging estruturado (idempotente).
+# LEMMON_LOG_JSON=1 emite JSON; sem env, texto humano.
+setup_logging()
 _log = logging.getLogger(__name__)
+
+
+# v1.48 A6a-006 — Middleware que cria request_id + propaga via contextvar.
+# Cada request HTTP ganha 1 ID; logs dentro dela carregam o ID automaticamente.
+# Header `X-Request-ID` na resposta permite cliente correlacionar.
+class RequestIdMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        # Aceita ID vindo do cliente (loadbalancer pode setar), senão gera
+        rid = request.headers.get("x-request-id") or novo_request_id()
+        set_request_id(rid)
+        # Tenta setar tenant cedo (best-effort — env LEMMON_TENANT_ID)
+        try:
+            from core.tenant import tenant_id as _tid
+            set_tenant_id(_tid())
+        except Exception:
+            pass
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = rid
+        return response
 
 
 # T190.D5 — Rate limit simples em memória.
@@ -122,6 +150,10 @@ app.add_middleware(
 # T190.D5 — rate limit em memória. Configurável via env LEMMON_RATE_LIMIT_PER_MIN.
 _rate_limit_per_min = int(os.getenv("LEMMON_RATE_LIMIT_PER_MIN", "60"))
 app.add_middleware(RateLimitMiddleware, max_per_min=_rate_limit_per_min)
+
+# v1.48 A6a-006 — Request ID propagado pra logs estruturados.
+# Cliente recebe X-Request-ID na resposta; logs internos têm rid correlacionado.
+app.add_middleware(RequestIdMiddleware)
 
 app.include_router(agentes.router)
 app.include_router(historico.router)

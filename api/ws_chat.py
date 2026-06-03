@@ -243,6 +243,10 @@ async def chat(ws: WebSocket):
 
             # Herda respostas anteriores para que a sessão salva fique completa
             respostas: dict[str, str] = dict(resume_context.get("respostas", {}))
+            # v1.48 A-11 — respostas estruturadas (não-string), ex: variantes do Salles
+            respostas_estruturadas: dict[str, dict] = dict(
+                resume_context.get("respostas_estruturadas", {})
+            )
             custos: dict[str, float] = dict(resume_context.get("custos_usd", {}))
             duracoes: dict[str, float] = {}
             pipeline_cancelled = False
@@ -684,7 +688,19 @@ async def chat(ws: WebSocket):
                 return True
 
             async def _run_salles_alternativas() -> bool:
-                """T24: roda Salles 3x com variações e combina para Sônia. Retorna False se cancelado."""
+                """T24 + v1.48 A-11: roda Salles 3x com variações.
+
+                ANTES: combinava em 1 texto e jogava em `respostas["salles"]`.
+                Quem precisasse das variantes individuais (Aya, frontend, audit)
+                tinha que regex-parsear "## Variante N". Frágil e sem cost breakdown
+                por variante. Sônia também via blob único e podia pegar
+                acidentalmente fragmentos misturados.
+
+                AGORA: preserva variantes estruturadas em `respostas_estruturadas["salles"]`
+                como lista de {label, hint, texto, custo, variant_id}. O texto combinado
+                continua em `respostas["salles"]` pra compat com Sônia/Aya. Mas dossiê
+                final tem acesso às 3 separadas.
+                """
                 nonlocal roteiro_salles, pipeline_cancelled
                 variacoes = [
                     ("padrão", ""),
@@ -692,6 +708,7 @@ async def chat(ws: WebSocket):
                     ("emocional e pessoal", " [VARIAÇÃO: estilo emocional e testemunhal, tom íntimo, foco em conexão humana]"),
                 ]
                 formatos_perm = cfg_salles.get("formatos_permitidos", [])
+                variantes_estruturadas: list[dict] = []
                 todos_textos: list[str] = []
                 for idx, (label, hint) in enumerate(variacoes):
                     variant_id = f"salles_v{idx+1}"
@@ -708,10 +725,20 @@ async def chat(ws: WebSocket):
                                 formatos_permitidos=formatos_perm,
                             ),
                         )
-                        texto_s = f"**Variante {idx+1} — {label}**\n\n" + res_s.get("output_humano", "")
+                        texto_bruto = res_s.get("output_humano", "")
+                        texto_s = f"**Variante {idx+1} — {label}**\n\n" + texto_bruto
                         custo_s = res_s.get("custo_total_usd", 0)
-                        todos_textos.append(res_s.get("output_humano", ""))
+                        todos_textos.append(texto_bruto)
                         custos[f"salles_v{idx+1}"] = custo_s
+                        # v1.48 A-11 — preserva cada variante separada (não sobrescreve)
+                        variantes_estruturadas.append({
+                            "variant_id": variant_id,
+                            "label": label,
+                            "hint": hint,
+                            "texto": texto_bruto,
+                            "custo_usd": custo_s,
+                            "output_tecnico": res_s.get("output_tecnico", {}),
+                        })
                         await _stream(ws, variant_id, texto_s)
                         if manual_mode and idx == len(variacoes) - 1:
                             await ws.send_json({"type": "agent_done", "agent": variant_id, "cost": custo_s, "awaiting_approval": True})
@@ -728,6 +755,12 @@ async def chat(ws: WebSocket):
                     [f"## Variante {i+1}\n\n{t}" for i, t in enumerate(todos_textos)]
                 )
                 respostas["salles"] = roteiro_salles
+                # v1.48 A-11 — também publica variantes estruturadas pra dossiê final
+                respostas_estruturadas["salles"] = {
+                    "variantes": variantes_estruturadas,
+                    "texto_combinado": roteiro_salles,
+                    "total_variantes": len(variantes_estruturadas),
+                }
                 return True
 
             for name in names:
@@ -781,7 +814,13 @@ async def chat(ws: WebSocket):
                 "agentes_usados": all_agents,
             }
             # T27/T106: sandbox salva com origem='sandbox', excluído das listagens default
-            session_path = _salvar_sessao(briefing, all_agents, respostas, custos, contexto_tecnico, duracoes=duracoes, sandbox=sandbox, nome_projeto=nome_projeto_final)
+            # v1.48 A-11: passa respostas_estruturadas pra persistir variantes Salles
+            session_path = _salvar_sessao(
+                briefing, all_agents, respostas, custos, contexto_tecnico,
+                duracoes=duracoes, sandbox=sandbox,
+                nome_projeto=nome_projeto_final,
+                respostas_estruturadas=respostas_estruturadas,
+            )
             session_id = session_path.stem
 
             # Sugerir tags automaticamente via Aya (T15) — nunca em sandbox
