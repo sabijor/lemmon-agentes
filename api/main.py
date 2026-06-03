@@ -7,16 +7,84 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from api.deps import _anthropic_client
-from api.routes import agentes, auxiliares, brand_kit, calibragem, concierge, exemplares, exportar, historico, lgpd, saude, sessoes, share, transcrever, treino_pedro, usuarios
+from api.routes import agentes, auxiliares, brand_kit, calibragem, concierge, exemplares, exportar, financeiro, historico, lgpd, saude, sessoes, share, transcrever, treino_pedro, usuarios
 from api.ws_chat import chat
 from api.ws_mesa import mesa_redonda
 from api.ws_reuniao import reuniao
 from core.historico_index import sanity_check
+from core.logging_estruturado import (
+    novo_request_id,
+    set_request_id,
+    set_tenant_id,
+    setup_logging,
+)
 
+# v1.48 A6a-006 — Setup de logging estruturado (idempotente).
+# LEMMON_LOG_JSON=1 emite JSON; sem env, texto humano.
+setup_logging()
 _log = logging.getLogger(__name__)
+
+
+# v1.48 A6a-006 — Middleware que cria request_id + propaga via contextvar.
+# Cada request HTTP ganha 1 ID; logs dentro dela carregam o ID automaticamente.
+# Header `X-Request-ID` na resposta permite cliente correlacionar.
+class RequestIdMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        # Aceita ID vindo do cliente (loadbalancer pode setar), senão gera
+        rid = request.headers.get("x-request-id") or novo_request_id()
+        set_request_id(rid)
+        # Tenta setar tenant cedo (best-effort — env LEMMON_TENANT_ID)
+        try:
+            from core.tenant import tenant_id as _tid
+            set_tenant_id(_tid())
+        except Exception:
+            pass
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = rid
+        return response
+
+
+# v1.49 QA-B14 — Rejeita payloads grandes via Content-Length.
+# Antes: backend aceitava JSON de 10MB+ sem limit → DoS por memória.
+# Endpoints de upload (transcrever, financeiro) têm cap próprio maior,
+# então só aplicamos esse middleware nos endpoints JSON normais.
+# Limite 1MB cobre briefings normais (texto até ~500k chars) com folga.
+# Imagens vão como image_base64 no Concierge — 6.7MB base64 (~5MB binário)
+# permitido pelo Pydantic, então elas pulam esse middleware.
+_PATHS_BODY_LIMITE_GRANDE = (
+    "/transcrever",
+    "/financeiro/upload",
+    "/concierge/conversar",  # pode ter image_base64 ~6.7MB
+)
+_BODY_LIMITE_DEFAULT = 1 * 1024 * 1024  # 1MB
+_BODY_LIMITE_GRANDE = 30 * 1024 * 1024  # 30MB pra upload/imagem
+
+
+class BodySizeLimitMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        cl = request.headers.get("content-length")
+        if cl and cl.isdigit():
+            tamanho = int(cl)
+            limite = (
+                _BODY_LIMITE_GRANDE
+                if any(request.url.path.startswith(p) for p in _PATHS_BODY_LIMITE_GRANDE)
+                else _BODY_LIMITE_DEFAULT
+            )
+            if tamanho > limite:
+                return JSONResponse(
+                    status_code=413,
+                    content={
+                        "detail": (
+                            f"Payload muito grande: {tamanho // 1024}KB. "
+                            f"Limite pra este endpoint: {limite // 1024}KB."
+                        )
+                    },
+                )
+        return await call_next(request)
 
 
 # T190.D5 — Rate limit simples em memória.
@@ -40,9 +108,16 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         while hits and now - hits[0] > 60:
             hits.popleft()
         if len(hits) >= self.max_per_min:
-            raise HTTPException(
+            # T191.RL-fix — BaseHTTPMiddleware não captura HTTPException;
+            # precisa retornar Response direto pra cliente receber 429.
+            return JSONResponse(
                 status_code=429,
-                detail=f"Limite de chamadas atingido ({self.max_per_min}/min). Aguarde alguns segundos.",
+                content={
+                    "detail": (
+                        f"Limite de chamadas atingido ({self.max_per_min}/min). "
+                        "Aguarde alguns segundos."
+                    )
+                },
             )
         hits.append(now)
         return await call_next(request)
@@ -67,7 +142,97 @@ async def health():
 
     Não toca em I/O nem chama LLM — só confirma que o app está rodando.
     """
-    return {"status": "ok", "service": "lemmon-agentes", "version": "1.44"}
+    return {"status": "ok", "service": "lemmon-agentes", "version": "1.48"}
+
+
+@app.get("/health/full")
+async def health_full():
+    """v1.49 A6a-004/005 — health probe completo: disco, env, tenant, cripto.
+
+    Roda em ~10ms (sem chamada externa). Útil pra:
+    - Cron/monitor checando se algo crítico tá degradado
+    - Onboarding: pingar 1x antes do Pedro abrir dashboard
+    - Pós-update: confirmar que migrations não quebraram nada
+
+    Retorna 200 sempre (não 503), pra facilitar parser. Campo `status` por
+    componente: "ok" | "warn" | "error".
+    """
+    import shutil
+    from pathlib import Path
+    relatorio: dict = {"status": "ok", "checks": {}, "version": "1.48"}
+
+    # 1. Disco — alerta se < 500MB livre (não dá pra fazer backup decente)
+    try:
+        total, used, free = shutil.disk_usage(Path(__file__).parent.parent)
+        free_mb = free // (1024 * 1024)
+        if free_mb < 100:
+            disco_status = "error"
+            relatorio["status"] = "error"
+        elif free_mb < 500:
+            disco_status = "warn"
+            if relatorio["status"] == "ok":
+                relatorio["status"] = "warn"
+        else:
+            disco_status = "ok"
+        relatorio["checks"]["disk"] = {
+            "status": disco_status,
+            "free_mb": free_mb,
+            "total_mb": total // (1024 * 1024),
+        }
+    except Exception as e:
+        relatorio["checks"]["disk"] = {"status": "error", "msg": str(e)}
+        relatorio["status"] = "error"
+
+    # 2. ANTHROPIC_API_KEY presente?
+    if os.getenv("ANTHROPIC_API_KEY"):
+        relatorio["checks"]["anthropic_key"] = {"status": "ok"}
+    else:
+        relatorio["checks"]["anthropic_key"] = {
+            "status": "error",
+            "msg": ".env sem ANTHROPIC_API_KEY — agentes vão retornar 401",
+        }
+        relatorio["status"] = "error"
+
+    # 3. Tenant detectado?
+    try:
+        from core.tenant import tenant_id
+        t = tenant_id()
+        relatorio["checks"]["tenant"] = {"status": "ok", "tenant": t}
+        if t == "default":
+            relatorio["checks"]["tenant"]["warn"] = (
+                "tenant='default' — defina LEMMON_TENANT_ID pra multi-cliente"
+            )
+    except Exception as e:
+        relatorio["checks"]["tenant"] = {"status": "error", "msg": str(e)}
+
+    # 4. Cripto-at-rest disponível?
+    try:
+        from core.tenant import cripto_disponivel
+        if cripto_disponivel():
+            relatorio["checks"]["cripto"] = {"status": "ok"}
+        else:
+            relatorio["checks"]["cripto"] = {
+                "status": "warn",
+                "msg": "LEMMON_ENCRYPT_KEY ausente — dados sensíveis em plaintext",
+            }
+    except Exception as e:
+        relatorio["checks"]["cripto"] = {"status": "error", "msg": str(e)}
+
+    # 5. Audit log gravável?
+    try:
+        from core import audit
+        path = audit._audit_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        # Smoke test: tenta abrir em append, fecha. Se filesystem read-only,
+        # detecta antes do request real escrever evento crítico.
+        with open(path, "a", encoding="utf-8") as _f:
+            pass
+        relatorio["checks"]["audit"] = {"status": "ok", "path": str(path)}
+    except Exception as e:
+        relatorio["checks"]["audit"] = {"status": "error", "msg": str(e)}
+        relatorio["status"] = "error"
+
+    return relatorio
 
 
 @app.get("/health/anthropic")
@@ -115,6 +280,13 @@ app.add_middleware(
 _rate_limit_per_min = int(os.getenv("LEMMON_RATE_LIMIT_PER_MIN", "60"))
 app.add_middleware(RateLimitMiddleware, max_per_min=_rate_limit_per_min)
 
+# v1.48 A6a-006 — Request ID propagado pra logs estruturados.
+# Cliente recebe X-Request-ID na resposta; logs internos têm rid correlacionado.
+app.add_middleware(RequestIdMiddleware)
+
+# v1.49 QA-B14 — rejeita payloads grandes (1MB default, 30MB pra upload/imagem)
+app.add_middleware(BodySizeLimitMiddleware)
+
 app.include_router(agentes.router)
 app.include_router(historico.router)
 app.include_router(exportar.router)
@@ -129,6 +301,7 @@ app.include_router(concierge.router)  # T186 — orquestrador conversacional
 app.include_router(lgpd.router)  # G-01/02/03 — LGPD compliance
 app.include_router(brand_kit.router)  # PROD-7 — Brand Kit por cliente
 app.include_router(usuarios.router)  # PROD-8 — Multi-user
+app.include_router(financeiro.router)  # PROD-FIN v1.47 — planilha financeira XLSX/CSV pra Ana Maria
 app.include_router(treino_pedro.router)  # PROD-2 — Calibragem que treina
 
 app.websocket("/ws/chat")(chat)

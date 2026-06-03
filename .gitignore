@@ -50,3 +50,6 @@ AUDITORIA_*.md
 .tmp/
 *.tmp
 *.lock
+
+# Relatórios detalhados auditoria/ — snippets de código + arquivo:linha sensíveis
+auditoria/

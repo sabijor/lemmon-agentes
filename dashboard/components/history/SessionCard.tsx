@@ -62,8 +62,8 @@ export function SessionList({ sessions, loading, selectedId, onSelect }: {
         const tags = (s.tags ?? []).slice(0, 3)
         return (
           <button key={s.session_id} onClick={() => onSelect(s.session_id)}
-            className={`w-full text-left px-4 py-3 border-b border-stone-100 transition-colors
-              ${active ? 'bg-stone-900' : 'hover:bg-stone-50'}`}
+            className={`w-full text-left px-4 py-3 border-b border-stone-100 dark:border-stone-800 transition-colors
+              ${active ? 'bg-stone-900 dark:bg-stone-100' : 'hover:bg-stone-50 dark:hover:bg-stone-800'}`}
           >
             {/* Origin icon + favorito */}
             <div className="flex items-center gap-1 mb-1">
@@ -77,16 +77,16 @@ export function SessionList({ sessions, loading, selectedId, onSelect }: {
             </div>
 
             <p className={`text-[10px] font-mono font-bold leading-snug line-clamp-2 mb-1.5
-              ${active ? 'text-white' : 'text-stone-700'}`}>
+              ${active ? 'text-white dark:text-stone-900' : 'text-stone-700 dark:text-stone-200'}`}>
               {s.briefing || '(sem briefing)'}
             </p>
 
             <div className="flex items-center justify-between gap-2 mb-1.5">
-              <span className="text-[8px] font-mono text-stone-400">
+              <span className={`text-[8px] font-mono ${active ? 'text-white/60 dark:text-stone-700' : 'text-stone-400 dark:text-stone-500'}`}>
                 {s.timestamp ? fmt(s.timestamp) : '—'}
               </span>
               {s.custo_total_usd > 0 && (
-                <span className="text-[8px] font-mono text-stone-400 flex-shrink-0">
+                <span className={`text-[8px] font-mono flex-shrink-0 ${active ? 'text-white/60 dark:text-stone-700' : 'text-stone-400 dark:text-stone-500'}`}>
                   ${s.custo_total_usd.toFixed(4)}
                 </span>
               )}
@@ -113,8 +113,8 @@ export function SessionList({ sessions, loading, selectedId, onSelect }: {
                   <span key={tag}
                     className={`text-[7px] font-mono px-1.5 py-0.5 rounded-full border ${
                       active
-                        ? 'border-white/20 text-white/60'
-                        : 'border-stone-200 text-stone-500 bg-stone-50'
+                        ? 'border-white/20 text-white/60 dark:border-stone-700/40 dark:text-stone-700/70'
+                        : 'border-stone-200 text-stone-500 bg-stone-50 dark:border-stone-700 dark:text-stone-400 dark:bg-stone-800'
                     }`}>
                     {tag}
                   </span>

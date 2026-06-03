@@ -25,7 +25,9 @@ async def medianas_agente(agente: str):
         if now < expires_at:
             return {"mediana_segundos": mediana_val, "amostras": amostras}
 
-    session_dir = HISTORICO_DIR / "dashboard"
+    # v1.46.1 #11 — particionado por tenant
+    from core.historico_index import dashboard_dir as _dash
+    session_dir = _dash()
     if not session_dir.exists():
         _cache[agente] = (None, 0, now + _CACHE_TTL)
         return {"mediana_segundos": None, "amostras": 0}

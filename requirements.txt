@@ -7,3 +7,4 @@ python-multipart>=0.0.9
 openai>=1.0.0
 bleach>=6.0.0  # SEC-C — sanitize HTML output do dossiê (anti-XSS)
 cryptography>=42.0.0  # V-05 — Fernet cripto-at-rest opcional (LGPD G-01)
+openpyxl>=3.1.0  # PROD-FIN-3 v1.47 — ler XLSX de clínicas

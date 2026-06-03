@@ -13,6 +13,7 @@ Uso:
     )
 """
 import hashlib
+import re
 from pathlib import Path
 from typing import Optional, cast
 
@@ -20,6 +21,43 @@ from core.agente_base import AgenteBase
 from core.config import PROMPTS_DIR
 from core.limites_espelho import aviso_pos_execucao, aviso_pre_execucao
 from core.tipos import AgenteResultado
+
+
+# v1.48 A1a-006 — Tag estruturada de confiança no fim da resposta do espelho.
+# Antes: prompt pedia "🟢 alta / 🟡 média / 🔴 baixa" — frágil (emoji pode sumir/trocar).
+# Agora: pedimos tag explícita [CONFIANCA: alta|media|baixa] e parseamos.
+# Emoji continua aparecendo pra leitura humana (compatibilidade visual),
+# mas valor canônico vem do campo estruturado.
+_CONFIANCA_TAG_RE = re.compile(
+    r"\[CONFIAN[CÇ]A:\s*(alta|m[ée]dia|baixa)\s*\]",
+    re.IGNORECASE,
+)
+_EMOJI_CONFIANCA = {"alta": "🟢", "media": "🟡", "baixa": "🔴"}
+
+
+def parsear_nivel_confianca(texto: str) -> str | None:
+    """Extrai nível de confiança ('alta'|'media'|'baixa') do texto.
+
+    Tenta tag estruturada primeiro, fallback pra emoji legacy.
+    Retorna None se não detectar.
+    """
+    if not texto:
+        return None
+    m = _CONFIANCA_TAG_RE.search(texto)
+    if m:
+        v = m.group(1).lower()
+        if v in ("media", "média"):
+            return "media"
+        return v
+    # Fallback: emoji legacy nos últimos 200 chars (pode estar no rodapé)
+    tail = texto[-200:]
+    if "🟢" in tail:
+        return "alta"
+    if "🟡" in tail:
+        return "media"
+    if "🔴" in tail:
+        return "baixa"
+    return None
 
 
 class EspelhoCliente(AgenteBase):
@@ -132,16 +170,23 @@ class EspelhoCliente(AgenteBase):
         self.logger.info(aviso_pos_execucao(self._nome_display, custo_total,
                                              self._previsao_range, self._aviso_vermelho))
 
+        # v1.48 A1a-006 — extrai nível de confiança estruturado pra campo do JSON.
+        # Antes só dava pra ver via emoji no texto (frágil). Agora vem como campo
+        # canônico — frontend pode pintar com cor sem regex, audit pode agregar.
+        nivel_confianca = parsear_nivel_confianca(resposta)
+
         resultado = {
             "output_tecnico": {
                 "modo_aplicado": modo,
                 "pergunta_preview": pergunta[:300],
                 "resposta_completa": resposta,
+                "nivel_confianca": nivel_confianca,
             },
             "output_humano": resposta,
             "modo_execucao": modo,
             "tags": tags or [],
             "fontes_consultadas": [],
+            "nivel_confianca": nivel_confianca,  # v1.48 A1a-006 — campo estruturado
             "custo_total_usd": round(custo_total, 6),
             "custo_total_brl_estimado": round(custo_total * 5.20, 4),
             "breakdown_custo": {"consulta_usd": round(custo_total, 6)},
@@ -176,8 +221,10 @@ class EspelhoCliente(AgenteBase):
             partes.append(f"CONTEXTO ADICIONAL:\n---\n{contexto}\n---\n\n")
         partes.append(
             "LEMBRE-SE:\n"
-            "- Declare nível de confiança no final (🟢 alta / 🟡 média / 🔴 baixa)\n"
-            "- Recuse zonas fora do seu escopo profissional\n"
             "- Use sua voz real\n"
+            "- Recuse zonas fora do seu escopo profissional\n"
+            "- TERMINE SEMPRE com a tag estruturada do seu nível de confiança:\n"
+            "  `[CONFIANCA: alta]` ou `[CONFIANCA: media]` ou `[CONFIANCA: baixa]`\n"
+            "  (Pode acompanhar de emoji 🟢/🟡/🔴 pra leitura humana, mas a TAG é OBRIGATÓRIA.)\n"
         )
         return "".join(partes)

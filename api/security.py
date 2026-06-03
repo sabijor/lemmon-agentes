@@ -12,12 +12,20 @@ SEC-B — Origin check pra WebSocket.
 from __future__ import annotations
 
 import os
+import secrets  # v1.46.2 A3a-004 — constant-time token compare
 from typing import Iterable
 
 from fastapi import HTTPException, Request, WebSocket, status
 
 
-_TOKEN = os.getenv("LEMMON_AUTH_TOKEN", "").strip()
+# v1.46.2 A3a-011 — lazy reading do env (era cacheado no import — testes não
+# conseguiam ativar auth em runtime e prod precisava reiniciar pra mudar).
+def _token() -> str:
+    return os.getenv("LEMMON_AUTH_TOKEN", "").strip()
+
+
+# Mantido como alias pra compatibilidade backward (auth_enabled etc)
+_TOKEN = _token()
 
 
 def _allowed_origins() -> list[str]:
@@ -36,11 +44,15 @@ def _allowed_origins() -> list[str]:
 def auth_required(request: Request) -> None:
     """SEC-A — dependency que valida Bearer token quando LEMMON_AUTH_TOKEN setada.
 
+    v1.46.2 A3a-004 — usa secrets.compare_digest (constant-time) em vez de `==`.
+    Antes era timing-attack-vulnerable.
+
     Uso:
       @router.get("/endpoint", dependencies=[Depends(auth_required)])
       async def endpoint(...): ...
     """
-    if not _TOKEN:
+    esperado = _token()
+    if not esperado:
         return  # modo dev / single-user — pula auth
     # Health-check sempre liberado
     if request.url.path in ("/health", "/health/anthropic"):
@@ -53,7 +65,7 @@ def auth_required(request: Request) -> None:
             headers={"WWW-Authenticate": "Bearer"},
         )
     token = header[len("Bearer "):].strip()
-    if token != _TOKEN:
+    if not secrets.compare_digest(token, esperado):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token inválido.",

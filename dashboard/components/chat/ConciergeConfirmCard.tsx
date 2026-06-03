@@ -84,6 +84,19 @@ export function ConciergeConfirmCard({
             <p className="text-[10px] font-mono uppercase tracking-widest text-stone-500 dark:text-stone-400">
               Equipe proposta
             </p>
+            {/* v1.47 A4a-005 — alerta quando Concierge sugeriu agentes que o frontend
+                não conhece (mismatch de catálogo). Antes filtrava silenciosamente — user
+                aprovava 5 agentes, sistema rodava 3, sem aviso. Agora mostra warning. */}
+            {(() => {
+              const desconhecidos = agentes.filter(id => !AGENT_MAP[id])
+              if (desconhecidos.length === 0) return null
+              return (
+                <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-700 px-3 py-2 text-[11px] text-amber-900 dark:text-amber-200">
+                  ⚠️ Concierge sugeriu agente{desconhecidos.length === 1 ? '' : 's'} que não está no catálogo do dashboard:{' '}
+                  <strong className="font-mono">{desconhecidos.join(', ')}</strong>. Será ignorado no pipeline.
+                </div>
+              )
+            })()}
             <div className="space-y-2">
               {agentes.map((id, idx) => {
                 const agent = AGENT_MAP[id]

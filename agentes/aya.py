@@ -106,9 +106,79 @@ FERRAMENTA_DOSSIE_AYA = {
                     }
                 },
                 "required": ["presente", "resumo"]
+            },
+            # v1.46.1 #19 — adicionados Carlos + Pedro + Renata + 4 admin.
+            # Antes só Otto/Heitor/Salles/Sonia eram representáveis, então output
+            # de outros agentes era descartado pela Aya.
+            "card_carlos": {
+                "type": "object",
+                "description": "Resumo do Carlos (roteirista publicitário). Se ausente, presente=false.",
+                "properties": {
+                    "presente": {"type": "boolean"},
+                    "resumo": {"type": "string", "description": "Até 400 chars. Estrutura: 'Formato: X. CTA: Y. N peças.'"}
+                },
+                "required": ["presente", "resumo"]
+            },
+            "card_pedro_abrahao": {
+                "type": "object",
+                "description": "Resumo do Pedro Abrahão (espelho médico). Se ausente, presente=false.",
+                "properties": {
+                    "presente": {"type": "boolean"},
+                    "resumo": {"type": "string", "description": "Até 400 chars. Estrutura: 'Veredito: aprovado/ajustar/recusar. Pontos: X, Y.'"}
+                },
+                "required": ["presente", "resumo"]
+            },
+            "card_renata": {
+                "type": "object",
+                "description": "Resumo da Renata (distribuição). Se ausente, presente=false.",
+                "properties": {
+                    "presente": {"type": "boolean"},
+                    "resumo": {"type": "string", "description": "Até 400 chars. Estrutura: 'Duração: N dias. Plataformas: X, Y. Cadência: ...'"}
+                },
+                "required": ["presente", "resumo"]
+            },
+            "card_ana_maria": {
+                "type": "object",
+                "description": "Resumo da Ana Maria (CFO Hator). Se ausente, presente=false.",
+                "properties": {
+                    "presente": {"type": "boolean"},
+                    "resumo": {"type": "string", "description": "Até 400 chars."}
+                },
+                "required": ["presente", "resumo"]
+            },
+            "card_prichina": {
+                "type": "object",
+                "description": "Resumo da Prichina (admin/RH Hator). Se ausente, presente=false.",
+                "properties": {
+                    "presente": {"type": "boolean"},
+                    "resumo": {"type": "string", "description": "Até 400 chars."}
+                },
+                "required": ["presente", "resumo"]
+            },
+            "card_caito": {
+                "type": "object",
+                "description": "Resumo do Caíto (COO Hator). Se ausente, presente=false.",
+                "properties": {
+                    "presente": {"type": "boolean"},
+                    "resumo": {"type": "string", "description": "Até 400 chars."}
+                },
+                "required": ["presente", "resumo"]
+            },
+            "card_kelly": {
+                "type": "object",
+                "description": "Resumo da Kelly (tributária/contábil Hator). Se ausente, presente=false.",
+                "properties": {
+                    "presente": {"type": "boolean"},
+                    "resumo": {"type": "string", "description": "Até 400 chars."}
+                },
+                "required": ["presente", "resumo"]
             }
         },
-        "required": ["card_otto", "card_heitor", "card_salles", "card_sonia"]
+        "required": [
+            "card_otto", "card_heitor", "card_salles", "card_sonia",
+            "card_carlos", "card_pedro_abrahao", "card_renata",
+            "card_ana_maria", "card_prichina", "card_caito", "card_kelly",
+        ]
     }
 }
 
@@ -131,7 +201,8 @@ class Aya(AgenteBase):
         "operador só queria tirar uma dúvida solta",
     ]
     categoria = "compilacao"
-    custo_medio_usd = 0.08
+    # v1.49 QA-B11 — recalibrado 0.08 → 0.05 (real $0.030 na sessão Reels menopausa)
+    custo_medio_usd = 0.05
     system_prompt_reuniao = (
         "Você é Aya, assistente virtual da Lemmon Produções. "
         "Em reuniões conversacionais você responde de forma natural, direta e prestativa. "
@@ -177,7 +248,7 @@ class Aya(AgenteBase):
         self.logger.info(aviso_pre_execucao_aya(num_presentes))
 
         self.logger.info(
-            f"Aya iniciando | agentes detectados: {num_presentes}/4 | "
+            f"Aya iniciando | agentes detectados: {num_presentes}/{len(AYA_AGENTES_PADRAO)} | "
             f"projeto: {nome_projeto or '(sem nome)'}"
         )
 
@@ -371,9 +442,27 @@ Use `compilar_resumos_lemmon`.
         """Montagem Python pura do markdown final.
 
         REGRA DE OURO: agentes ausentes NÃO aparecem.
+
+        v1.46.1 #19 — antes Aya só montava Otto/Heitor/Salles/Sonia.
+        Carlos/Pedro/Renata/admin Hator iam pro lixo. Agora itera dinâmico.
         """
         ts = datetime.now().strftime("%d/%m/%Y às %H:%M")
         projeto_str = nome_projeto or "(sem nome)"
+
+        # v1.46.1 #19 — label e seção pra cada agente (ordem de aparição no dossiê)
+        agentes_meta = {
+            "otto":          ("Otto", "Estratégia"),
+            "heitor":        ("Heitor", "Compliance"),
+            "salles":        ("Salles", "Roteiro Documental"),
+            "carlos":        ("Carlos", "Roteiro Publicitário"),
+            "sonia":         ("Sonia", "Performance"),
+            "pedro_abrahao": ("Dr. Pedro Abrahão", "Validação Médica"),
+            "renata":        ("Renata", "Distribuição"),
+            "ana_maria":     ("Ana Maria", "Financeiro Hator"),
+            "prichina":      ("Prichina", "Admin/RH Hator"),
+            "caito":         ("Caíto", "COO Hator"),
+            "kelly":         ("Kelly", "Tributário Hator"),
+        }
 
         partes = []
 
@@ -387,70 +476,33 @@ Use `compilar_resumos_lemmon`.
         partes.append("- [Resumo dos agentes](#resumo-dos-agentes)\n")
 
         secao_num = 1
-        if outputs.get("otto"):
-            partes.append(f"- [{secao_num}. Otto — Estratégia](#{secao_num}-otto-estratégia)\n")
-            secao_num += 1
-        if outputs.get("heitor"):
-            partes.append(f"- [{secao_num}. Heitor — Compliance](#{secao_num}-heitor-compliance)\n")
-            secao_num += 1
-        if outputs.get("salles"):
-            partes.append(f"- [{secao_num}. Salles — Roteiro](#{secao_num}-salles-roteiro)\n")
-            secao_num += 1
-        if outputs.get("sonia"):
-            partes.append(f"- [{secao_num}. Sonia — Performance](#{secao_num}-sonia-performance)\n")
+        for ag_id, (nome, titulo) in agentes_meta.items():
+            if outputs.get(ag_id):
+                slug = f"{secao_num}-{nome.lower().replace(' ', '-').replace('.', '').replace('ã', 'a').replace('í', 'i')}-{titulo.lower().replace(' ', '-')}"
+                partes.append(f"- [{secao_num}. {nome} — {titulo}](#{slug})\n")
+                secao_num += 1
 
         partes.append("\n---\n\n")
 
         # PÁGINA 1 — RESUMO DOS AGENTES (só presentes)
         partes.append("## Resumo dos agentes\n\n")
-
-        co = cards.get("card_otto", {})
-        if co.get("presente") and outputs.get("otto"):
-            partes.append("### Otto — Estratégia\n\n")
-            partes.append(f"{co.get('resumo', '')}\n\n")
-
-        ch = cards.get("card_heitor", {})
-        if ch.get("presente") and outputs.get("heitor"):
-            partes.append("### Heitor — Compliance\n\n")
-            partes.append(f"{ch.get('resumo', '')}\n\n")
-
-        cs = cards.get("card_salles", {})
-        if cs.get("presente") and outputs.get("salles"):
-            partes.append("### Salles — Roteiro\n\n")
-            partes.append(f"{cs.get('resumo', '')}\n\n")
-
-        cson = cards.get("card_sonia", {})
-        if cson.get("presente") and outputs.get("sonia"):
-            partes.append("### Sonia — Performance\n\n")
-            partes.append(f"{cson.get('resumo', '')}\n\n")
+        for ag_id, (nome, titulo) in agentes_meta.items():
+            if outputs.get(ag_id):
+                card = cards.get(f"card_{ag_id}", {})
+                if card.get("presente"):
+                    partes.append(f"### {nome} — {titulo}\n\n")
+                    partes.append(f"{card.get('resumo', '')}\n\n")
 
         partes.append("---\n\n")
 
-        # PÁGINAS COMPLETAS (só agentes presentes, na ordem Otto → Heitor → Salles → Sonia)
+        # PÁGINAS COMPLETAS — output_humano de cada agente presente
         secao_num = 1
-
-        if outputs.get("otto"):
-            partes.append(f"## {secao_num}. Otto — Estratégia\n\n")
-            partes.append(str(outputs["otto"].get("output_humano", "(sem output humano)")) + "\n\n")
-            partes.append("---\n\n")
-            secao_num += 1
-
-        if outputs.get("heitor"):
-            partes.append(f"## {secao_num}. Heitor — Compliance\n\n")
-            partes.append(str(outputs["heitor"].get("output_humano", "(sem output humano)")) + "\n\n")
-            partes.append("---\n\n")
-            secao_num += 1
-
-        if outputs.get("salles"):
-            partes.append(f"## {secao_num}. Salles — Roteiro\n\n")
-            partes.append(str(outputs["salles"].get("output_humano", "(sem output humano)")) + "\n\n")
-            partes.append("---\n\n")
-            secao_num += 1
-
-        if outputs.get("sonia"):
-            partes.append(f"## {secao_num}. Sonia — Performance\n\n")
-            partes.append(str(outputs["sonia"].get("output_humano", "(sem output humano)")) + "\n\n")
-            partes.append("---\n\n")
+        for ag_id, (nome, titulo) in agentes_meta.items():
+            if outputs.get(ag_id):
+                partes.append(f"## {secao_num}. {nome} — {titulo}\n\n")
+                partes.append(str(outputs[ag_id].get("output_humano", "(sem output humano)")) + "\n\n")
+                partes.append("---\n\n")
+                secao_num += 1
 
         # RODAPÉ MÍNIMO
         partes.append(f"\n*Compilado por Aya | Lemmon Produções | {ts}*\n")

@@ -37,12 +37,21 @@ def buscar_historico_similar(
     limite: int = 3,
     score_minimo: float = 0.05,
 ) -> list[dict]:
-    """Busca N sessões mais similares ao briefing usando overlap de tokens."""
+    """Busca N sessões mais similares ao briefing usando overlap de tokens.
+
+    v1.48 A1b-008 — agora particiona POR TENANT. Antes lia
+    `historico_dir/dashboard/` sem filtro de tenant — quando 2 clientes
+    coexistissem, Concierge atendendo cliente B injetava no prompt sessões
+    de cliente A ("vi que você fez X em [data]"). Violação LGPD + vazamento
+    comercial. Fix: ler de `historico_dir/<tenant>/dashboard/`.
+    """
     query_tokens = _tokenize(briefing)
     if not query_tokens:
         return []
 
-    session_dir = historico_dir / "dashboard"
+    # v1.48 A1b-008 — lazy import pra evitar dep circular core.config → core.tenant
+    from core.tenant import tenant_id
+    session_dir = historico_dir / tenant_id() / "dashboard"
     if not session_dir.exists():
         return []
 

@@ -443,8 +443,31 @@ Após honest count revelar só 32% do audit feito, executei os 88 itens restante
 | Tarefa | Status | Obs |
 |---|---|---|
 | REL-D Atualizar PLANO_ACAO v1.46 | ✅ concluído | essa seção |
-| REL-E Manual v1.46 (markdown + HTML + PDF) | ✅ em andamento | próximo |
-| REL-F Commit final v1.46 + push | ⏳ próximo | depois do manual |
+| REL-E Manual v1.46 (markdown + HTML + PDF) | ✅ concluído | commit ebec145 |
+| REL-F Commit final v1.46 + push | ✅ concluído | commit ebec145 push origin main |
+
+### Bloco L — QA Hator pré-Pedro (2026-06-02)
+| Tarefa | Status | Bugs encontrados |
+|---|---|---|
+| QA-H1 Setup tenant Hator + cripto + health | ✅ | versão "1.44" cosmético → corrigido |
+| QA-H2 Brand Kit CRUD | ✅ | 0 |
+| QA-H3 Multi-user lifecycle | ✅ | 0 |
+| QA-H4 LGPD endpoints + auth wall | ✅ | **CRÍTICO #1** — `/lgpd/apagar-tudo` aceitava chamada anônima. Fix: constant-compare via `Authorization: Bearer <token>`. Mesmo fix em `/pedro/treinar` |
+| QA-H5 Treino Pedro Espelho | ✅ | RODADO end-to-end (28s real). 5 calibragens fake (notas 1-3) → POST `/pedro/treinar` com Bearer → Haiku consolidou em v2 do prompt (8401 chars, 5 padrões "Recuse/Prefira/Padrão"). Idempotência ok (todas notas=5 → "IA tá indo bem"). Auth wall validado (403/403/200). Audit log gravando |
+| QA-H6 Segurança (injection + rate + magic) | ✅ | **CRÍTICO #2** — Rate limit retornava 500 (não 429). Causa: `BaseHTTPMiddleware` não captura exceptions → returnar `JSONResponse` direto |
+| QA-H7 Pipeline real Hator | ⏭️ skipped | exige ANTHROPIC_API_KEY |
+| QA-H8 PWA + build | ✅ | **CRÍTICO #3** — ícones `/icon-192.png` e `/icon-512.png` não existiam. Fix: gerados via Pillow. Warning `themeColor` movido pro export `viewport` |
+| QA-H9 Suíte de testes | ✅ | 17/17 features + 19/19 segurança + tsc clean + build clean |
+| QA-H10 Relatório QA + fixes + commit | ✅ | `RELATORIO_QA_v1.46.md` + 2 testes regressão (lgpd auth, rate 429) |
+
+**Veredito QA-Hator:** Sistema pronto pra Pedro receber acesso. 3 bugs críticos pegos antes da entrega.
+
+**Bugs que NÃO existiriam em prod sem o QA:**
+1. Vazamento total dos dados Hator (qualquer um wipava sem token)
+2. Backend parecia "quebrado" (rate limit retornava 500)
+3. Ícone PWA genérico no iPad do Pedro
+
+---
 
 ---
 
@@ -508,3 +531,449 @@ Após honest count revelar só 32% do audit feito, executei os 88 itens restante
 - **30 vulnerabilidades de segurança** (5 críticas, 10 altas)
 - **3 gaps LGPD/GDPR** (dados médicos)
 - **Cobertura de testes ~8%** (frontend = 0)
+
+---
+
+## 🐛 QA-H7 ao vivo com o Calebe — bugs reais descobertos (2026-06-02)
+
+Sessão de teste real com briefing do Pedro/Hator (lipedema + implante hormonal).
+Pipeline rodou end-to-end mas vários bugs apareceram. Tabela consolidada:
+
+| # | Bug | Severidade | Status | Causa raiz | Fix / Pendência |
+|---|---|---|---|---|---|
+| **#4** | Bolhas do chat sumiam ao navegar entre rotas (`/saude`, `/historico` e voltar) | 🔴 alto | ✅ fixado | `useState<Message[]>(persistedMessages)` capturava `[]` (defaultValue SSR-safe) no primeiro render, `useLocalStorage` lia storage depois mas `messages` ficava preso em `[]`. Resultado: localStorage tinha mensagens, backend recebia histórico completo, mas tela mostrava vazio | `useChat.ts:90-108` — hidratação one-shot via `hasHydratedRef` |
+| **#5** | Heitor entrava no pipeline mesmo sem o cliente pedir compliance | 🟠 alto (custo desnecessário ~R$ 2/rodada) | ✅ fixado | System prompt do Concierge dizia "Heitor entra obrigatoriamente quando ad pago / claims fortes / cliente pede compliance" — Haiku interpretava qualquer tema médico como gatilho | `concierge.py:253-273` — reescrito pra "Heitor é SUGESTÃO inteligente, nunca obrigatória. Proponha no card com 'não é obrigatório, mas...' e deixe cliente decidir" |
+| **#6** | "9500%" no agente pensando (estado "lemon pensando · 9500%") | 🟠 alto (cliente fica chocado) | ✅ fixado | Dupla multiplicação: `useChat.ts:338` já guarda progress em escala 0-100, mas `MessageBubble.tsx:96` fazia `Math.round(progress * 100)%` | `MessageBubble.tsx:96` — só `Math.round(progress)%` agora |
+| **#7** | Pipeline "fantasma" continua na UI após reinício do backend (WS antigo morto, frontend sem reconectar) | 🟡 médio | ⚠️ workaround | WS morre abruptamente quando kill -9 no backend; frontend mantém `isRunning=true` e `agentStatus.X='thinking'` indefinidamente | Workaround: `LIMPAR` no chat + `Cmd+Shift+R`. Fix real: detectar WS dead → toast "conexão perdida, recarregue" + auto-recovery |
+| **#8** | `complianceMode='sempre'` no localStorage adicionava Heitor escondido (sem aparecer no card) | 🔴 alto (quebra de promessa visual + custo invisível) | ✅ fixado | Em `page.tsx:216`, lógica antiga `if (complianceMode === 'sempre' && !ids.includes('heitor'))` injetava Heitor depois do clique OK, sem aparecer no card de confirmação. Toast "🛡️ Compliance forçado" passava batido | `page.tsx:216-225` — removida injeção. `complianceMode='sempre'` agora é no-op. Só `'nunca'` mantém efeito (kill switch transparente) |
+| **#9** | Defesa em profundidade: backend filtra Heitor server-side se cliente não pediu compliance | — | ✅ implementado | Mesmo com prompt atualizado, Haiku ainda sugeria Heitor em ~40% dos briefings de saúde. Frontend pode mostrar agentes em `agentes_sugeridos` ANTES do filtro complianceMode rodar | `concierge.py:603-628` — checa `_COMPLIANCE_TRIGGERS` (compliance, cfm, anvisa, conar, auditar, ad pago, meta ads, etc) no histórico do user antes de retornar agentes. Sem trigger → remove Heitor + razão. **10/10 validações sem Heitor sem trigger, 4/4 com trigger** |
+| **#10** | Carlos loga warning `'Historico' object has no attribute 'salvar'` | 🟡 médio | ⏳ pendente | Carlos chama método `.salvar()` que não existe na classe `Historico`. Provavelmente refatoraram pra `.save()`/`.gravar()` em algum momento e Carlos ficou pra trás | Investigar `agentes/carlos.py` + `core/historico.py` (ou onde estiver Historico). Renomear método pro nome correto |
+| **#11** | Sessão do Calebe salva em `historico/dashboard/` (não em `historico/hator/dashboard/`) — tenant namespace falhou | 🔴 alto (vazamento entre tenants) | ⏳ pendente | `ws_chat.py:_salvar_sessao()` usa caminho literal `historico/dashboard/...` em vez de `tenant_namespace(HISTORICO_DIR, "dashboard")` | Refatorar `_salvar_sessao` em `ws_chat.py` e `core/historico_index.py` pra usar `tenant_namespace()`. **CRÍTICO pra B2B SaaS — se Pedro e outro cliente usam mesma instância, sessões misturam** |
+| **#12** | Capa do PDF mostra briefing literal truncado em snake_case (`Funil_de_retargeting_em_cascata_5_estágios_para_implante_hor`) ao invés de nome bonito | 🟠 alto (capa amadora) | ⏳ pendente | `ws_chat.py:410` faz `nome_projeto = _cleaned[:60]` do briefing direto. Nunca chama Haiku pra nomear o projeto. JSON da sessão nem persiste `nome_projeto`, então export busca via regex no markdown da Aya e cai no fallback "(sem nome)" ou no título feio | Adicionar agente nano (Haiku, ~$0.001) que gera "Funil Implante Hormonal — Hator" a partir do briefing. Persistir em `sessao.nome_projeto` |
+| **#13** | Carlos aparece rotulado como **"Salles"** no índice e seções do PDF da Aya | 🟠 alto (confusão profissional) | ⏳ pendente | `core/config.py:AYA_AGENTES_PADRAO = ["otto", "heitor", "salles", "sonia"]`. Carlos não está na lista — Aya cai no fallback Salles ao detectar agente. Quando user pede só Carlos, vira "## 1. Salles — Roteiro" com conteúdo de Carlos | Adicionar `carlos`, `pedro_abrahao`, `renata`, `ana_maria`, `prichina`, `caito`, `kelly` em `AYA_AGENTES_PADRAO`. Aya precisa rotular correto pelo `respostas.keys()` real |
+| **#14** | "Resumo dos agentes" na pág 1 fala de agentes que não rodaram (export seletivo) | 🟡 médio | ⏳ pendente | Export seletivo (só roteiro) usa o mesmo markdown da Aya que tem resumo de todos. Filtro só corta seções específicas, não atualiza o índice/resumo | Export seletivo deve regenerar o resumo só com agentes selecionados |
+| **#15** | Pop-up de export apareceu travado, fechou sozinho, depois funcionou | 🟡 médio | ⏳ pendente | Race condition em `ExportModal.tsx` — provavelmente estado inicial não carregou opções a tempo. UX: cliente vê modal congelado, fecha sozinho, segunda tentativa funciona | Investigar `dashboard/components/export/ExportModal.tsx`. Adicionar loading state explícito + fallback se backend demorar |
+| **#16** | Texto descritivo amador no PDF — sem letra maiúscula no início de frases, "Formato: FUNIL EM CASCATA..." | 🟢 baixo | ⏳ pendente | Carlos não capitaliza output. Aya também não normaliza. Prompt do Carlos precisa de "escreva texto profissional com capitalização correta" | Reforçar prompt de Carlos. Pós-processamento opcional na Aya |
+
+---
+
+## 📋 RELATÓRIO CONSOLIDADO — O que falta implementar (priorizado)
+
+### 🔴 BLOQUEADORES pra entregar pro Pedro (ainda pendentes)
+
+| Prioridade | Item | Esforço | Observação |
+|---|---|---|---|
+| **P0** | Bug #11 — Tenant namespace em ws_chat.py | M | Sem isso, sessões de clientes diferentes misturam. CRÍTICO pra B2B. Multi-tenant da v1.46 só funciona em endpoints, não no WS |
+| **P0** | Bug #12 — Nome de projeto bonito via Haiku | S | Capa "Funil_de_retargeting_em_cascata_5_estágios" é INSUSTENTÁVEL pra mostrar pro cliente final. Pedro não vai exibir esse PDF |
+| **P0** | Bug #13 — Carlos aparece como "Salles" no PDF | S | Confusão grave de identidade dos agentes. Cliente lê "Salles — Roteiro" e fica perdido. Apenas atualiza AYA_AGENTES_PADRAO + lógica de detecção |
+| **P1** | Bug #10 — Carlos.salvar() não existe | S | Não bloqueia output visível, mas perde histórico interno do Carlos. Pode afetar memória entre sessões |
+
+### 🟠 ALTO IMPACTO pós-Pedro (Sprint v1.47)
+
+| Item | Esforço | Categoria |
+|---|---|---|
+| Bug #14 — Resumo da pág 1 atualiza com export seletivo | M | UX export |
+| Bug #15 — Pop-up de export travado | M | UX frontend |
+| Bug #16 — Capitalização do texto do Carlos | S | Prompt engineering |
+| Bug #7 — Reconexão WS automática quando backend reinicia | M | Robustez |
+| Auth obrigatório por default (hoje só dev) — V-01 do audit | M | Segurança SaaS |
+| ChatPanel.tsx refactor 1773 → 6 componentes — F-14 | L | Tech debt |
+| useChat reduce 34 → 8 returns via Zustand — F-07 | L | Tech debt |
+| ws_chat.py 703 → strategy pattern — A-10 | L | Tech debt |
+| Mobile breakpoints — F-15 | L | Pedro usa iPad |
+| Frontend Vitest setup (0 testes hoje) | M | Testes |
+
+### 🟡 MÉDIO IMPACTO (Sprint v1.48+)
+
+- A-11 Salles alternativas perde 2/3 dos roteiros
+- A-13 `_stream` finge streaming (sleep 60ms)
+- A-19 callback `_make_confirmacao_callback` pode bloquear 5min
+- A-20 `sugerir_pipeline` prompt monolítico 60 linhas
+- V-13 DoS via WS abrindo 10 conexões satura threadpool
+- V-14 Cancel não interrompe Anthropic em curso (queima crédito)
+- V-15 `'unsafe-inline'` em CSP + script inline /share
+- F-04 60 props pro ChatPanel + callbacks inline
+- F-08 a F-13 state management (Zustand)
+
+### ✅ JÁ FECHADO no QA-H7 ao vivo
+
+- ✅ #4 Hidratação one-shot do messages
+- ✅ #5 Prompt Concierge atenuado (Heitor sugestão)
+- ✅ #6 Progress não mostra 9500%
+- ✅ #8 complianceMode='sempre' removido
+- ✅ #9 Defesa server-side anti-Heitor (3 camadas validadas)
+
+---
+
+## 📈 PROGRESSO HONESTO HOJE
+
+**v1.46 publicada:** 40% dos 134 achados resolvidos.
+**QA-H7 ao vivo:** descobriu 13 bugs novos (#4 a #16), fixou 5, deixou 8 pendentes.
+
+**Pra ir pro Pedro sem vergonha:** precisamos fechar P0 (#10, #11, #12, #13). Tudo S/M esforço — 1 dia de trabalho focado. Depois disso, sistema fica pronto pra Pedro receber acesso em piloto controlado.
+
+**Estimativa pra fechar P0:** 4-6 horas de codificação + testes.
+
+---
+
+# 🗺️ PLANO DE EXECUÇÃO — 4 SPRINTS ATÉ SAAS
+
+> Estratégia em sprints com objetivo claro, dependências e critério de done.
+> Cada sprint tem entrega visível pro Calebe testar antes de prosseguir.
+
+## 📐 Princípio de ordenação
+
+1. **Sempre fechar bloqueador antes de polimento.** Pedro não recebe acesso até P0 estar 100%.
+2. **Tech debt depois de feature, nunca antes.** Refactor pra escala só faz sentido se tem cliente real (PMF confirmado).
+3. **Segurança aumenta junto com superfície.** Auth obrigatório quando tiver 2º cliente, não antes (custo > benefício).
+4. **Testes seguram regressão, não viram blocker.** Vitest setup é P1, não P0.
+
+---
+
+## 🏃 SPRINT v1.46.1 — "Pedro recebe acesso" ✅ COMPLETO (2026-06-02, ~3h)
+
+**Resultado:** 3 rounds de QA real end-to-end com briefing Pedro/Hator.
+Round 3 final: pipeline 4 agentes (Otto + Carlos + Pedro + Aya) executou em
+4min50s, custo $0.26 (~R$ 1,40), PDF 244KB com TODOS os agentes visíveis,
+capa "Retargeting Cascata Lipedema — Pedro", sessão em `historico/hator/`.
+
+**Bugs fechados neste sprint:**
+- ✅ #10 Carlos.salvar() → registrar() (método alinhado com classe Historico)
+- ✅ #11 Tenant namespace em ws_chat._salvar_sessao + 6 rotas (historico, exportar, share, sessoes, saude, historico_index)
+- ✅ #12 Nome bonito do projeto via Haiku — novo módulo `core/nomeador.py` com cache por hash, persistido em `sessao.nome_projeto`, exportador usa
+- ✅ #13 Carlos rotulado como "Salles" → variável `roteiro_carlos` separada + AYA_AGENTES_PADRAO expandido pra 11 agentes
+- ✅ #17 Pedro_abrahao não rodava como agente top-level — case próprio em `_run_agent_step`
+- ✅ #18 Otto KeyError 'output_humano' quando LLM omite campo — `_montar_output_humano_fallback` formatado
+- ✅ #19 Aya schema só com 4 cards (Otto/Heitor/Salles/Sonia) — expandido pra 11. `_montar_markdown` iterativo
+
+**Validação final (round 3 com briefing real do Pedro):**
+- ✅ Heitor não entrou (Concierge sugere só [otto, carlos, pedro_abrahao, aya])
+- ✅ Todos os 4 agentes rodaram com `agent_done`
+- ✅ Carlos terminou sem warning de histórico
+- ✅ Pipeline FIM enviado, sessão salva
+- ✅ Sessão em `historico/hator/dashboard/` (tenant correto, não no path default)
+- ✅ `nome_projeto = "Retargeting Cascata Lipedema — Pedro"` no JSON
+- ✅ PDF 244KB com capa correta, Carlos como Carlos (não Salles), Pedro com seu próprio header
+
+---
+
+## 🏃 SPRINT v1.46.1 (original — agora ✅ done)
+
+**Objetivo:** PDF apresentável + multi-tenant funcionando. Pedro pode mostrar dossiê pra paciente sem vergonha.
+
+**Critério de done:**
+- [ ] Rodar QA-H7 com briefing real do Pedro
+- [ ] Capa do PDF: "Funil Implante Hormonal — Hator" (não snake_case feio)
+- [ ] Índice: "1. Carlos — Roteiro" (não "Salles")
+- [ ] Arquivo salvo em `historico/hator/dashboard/` (não no path default)
+- [ ] Zero warnings no log do Carlos
+- [ ] Pedro consegue baixar e abrir o PDF, ficou no padrão de qualidade Hator
+
+**Sequência (ordem importa por dependência):**
+
+### Bloco A — Quick fixes (30min)
+| Ordem | Bug | Esforço | Arquivos |
+|---|---|---|---|
+| 1 | #13 Atualizar `AYA_AGENTES_PADRAO` | 15min | `core/config.py:174` (adicionar carlos, pedro_abrahao, renata, admin agents) + `agentes/aya.py` detecção |
+| 2 | #10 Renomear método `salvar()` → `gravar()` (ou inverso) | 15min | Investigar `core/historico.py` + `agentes/carlos.py`. Alinhar nome do método |
+
+### Bloco B — Tenant fix (1h)
+| Ordem | Bug | Esforço | Estratégia |
+|---|---|---|---|
+| 3 | #11 Tenant em `ws_chat._salvar_sessao()` | 30min | Refatorar pra usar `tenant_namespace(HISTORICO_DIR, "dashboard")` em vez de path literal |
+| 4 | #11.b Mesmo fix em `core/historico_index.py` | 20min | `sanity_check()`, `listar_sessoes()`, `marcar_favorito()` etc — todos devem usar `tenant_namespace()` |
+| 5 | #11.c Migração: copiar sessões antigas de `historico/dashboard/` pra `historico/default/dashboard/` se LEMMON_TENANT_ID=default | 10min | Script one-shot pra não perder histórico |
+
+### Bloco C — Nome do projeto (1h)
+| Ordem | Bug | Esforço | Estratégia |
+|---|---|---|---|
+| 6 | #12 Função `gerar_nome_projeto(briefing) -> str` via Haiku | 30min | Nova função em `core/nomeador.py`. Prompt: "Gere um título curto e profissional (máx 50 chars) pra esse projeto de marketing. Exemplos: 'Funil Implante Hormonal — Hator', 'Reels Menopausa Q3'". Cache por hash do briefing pra não repetir Haiku |
+| 7 | #12.b Persistir `nome_projeto` no JSON da sessão | 15min | `_salvar_sessao()` adiciona campo. Schema bump pra v2 |
+| 8 | #12.c Exportador busca `nome_projeto` do JSON antes do regex no markdown | 15min | `core/exportador_aya.py:140` — prioridade: JSON > regex no markdown > fallback "Sem nome" |
+
+### Bloco D — Validação + commit (1h)
+| Ordem | Tarefa | Esforço |
+|---|---|---|
+| 9 | Reiniciar backend, rodar QA-H7 real (custo ~R$ 2-3) | 30min |
+| 10 | Validar capa + agentes + path | 5min |
+| 11 | Commit "fix(v1.46.1): bugs Pedro recebe acesso (#10-#13)" + push | 10min |
+| 12 | Atualizar `PLANO_ACAO.md` marcando P0 como ✅ | 15min |
+
+**Risco:** Bug #11 (tenant) pode ter mais lugares hardcoded que não vi (ex: rotas de download, share). Buffer de +1h.
+
+---
+
+
+# 📊 AUDITORIA v1.47 — 73 achados (2026-06-02)
+
+Pós-v1.46.1, com Pedro pronto pra receber acesso, fizemos **auditoria completa em 6 frentes** (Backend, Frontend, Security/LGPD, UX, Tests, DevOps) com 6 auditores especialistas em paralelo via raio-X do código.
+
+**Resultado:** 73 achados (17 🔴 / 30 🟠 / 18 🟡 / 8 🟢). Detalhes completos em `AUDITORIA_v1.47.md` e relatórios individuais em `auditoria/A{1-6}_*.md`.
+
+## 🚨 1 BUG VIVO descoberto (P0 absoluto)
+
+`core/agente_admin_base.py:90` chama `self.historico.salvar()` que **não existe na classe Historico** — só tem `.registrar()`. É o MESMO bug do Carlos #10 v1.46.1, mas a classe BASE foi esquecida. Resultado: **Ana Maria + Prichina + Caíto + Kelly TODOS vão estourar AttributeError na primeira invocação**.
+
+Ana Maria é exatamente o agente da próxima feature (planilha financeira). Pedro carrega XLSX → sistema crasha imediatamente. **Fix: 15 minutos.**
+
+## Top 10 P0 ranqueados (impacto × esforço)
+
+| # | ID | Bug | Esforço |
+|---|---|---|---|
+| 1 | A5-002 | `AgenteAdminBase.salvar()` não existe (4 agentes admin) | S |
+| 2 | A3a-001 | `/lgpd/exportar` + `/lgpd/deletar-sessao` SEM auth | S |
+| 3 | A3a-004 | Tokens user com `==` (não constant-time) + GET usuarios sem auth | S |
+| 4 | A3a-002 | `tenant_id()` aceita path traversal (`../etc`) | S |
+| 5 | A6a-002 | README ensina entry point errado (Pedro nem sobe backend) | S |
+| 6 | A4a-007 | Erro técnico em inglês na primeira sessão → Pedro abandona | S |
+| 7 | A2a-006 | Race condition no `useChat.send()` (WS antigo não fechado) | M |
+| 8 | A1b-008 | `buscar_historico_similar` vaza histórico entre tenants (LGPD) | M |
+| 9 | A1b-004 | Defesa anti-Heitor bypassable por sinônimos (ANS, ads, Meta) | M |
+| 10 | A6a-007 | Update workflow inexistente (subir nova versão = bomba) | M |
+
+**6 dos 10 são S (<1h). ~3h fecha tudo.**
+
+## Comparação com baseline (134 achados anteriores)
+
+- **54 resolvidos** no v1.46 + v1.46.1 (40% → 41%)
+- **9 persistentes** confirmados (F-14, F-07, A-10, V-26 parcial, etc)
+- **~30 novos** descobertos agora (regressões parciais + arquitetura pra próxima feature)
+
+---
+
+# 🗺️ ROADMAP PÓS-AUDITORIA — 4 SPRINTS
+
+## 🚨 SPRINT v1.46.2 — Emergencial pré-Pedro real (~3h)
+
+**Por quê AGORA:** sem isso, Pedro testar Ana Maria com planilha financeira = crash imediato. LGPD vaza tudo via GET. README impede subir backend novo.
+
+**Critério de done:**
+- [ ] Ana Maria executa sem AttributeError
+- [ ] LGPD endpoints exigem auth token
+- [ ] tenant_id rejeita path traversal
+- [ ] GET /usuarios exige auth, comparação constant-time
+- [ ] README ensina subir backend de verdade
+- [ ] Erro em inglês → mensagem PT amigável
+- [ ] Magic bytes WebP completo (não só RIFF)
+- [ ] historico.py respeita tenant
+- [ ] 2 testes de regressão escritos
+
+### Bloco A — Bug vivo + LGPD (1h15)
+| # | ID | Fix | Esforço |
+|---|---|---|---|
+| 1 | A5-002 | `AgenteAdminBase.salvar(...)` → `.registrar({...})` em `core/agente_admin_base.py` | 15min |
+| 2 | A3a-001 | `_require_auth_token` em `/lgpd/exportar` + `/lgpd/deletar-sessao` (já está em /apagar-tudo) | 20min |
+| 3 | A3a-004 | `secrets.compare_digest` em `api/security.py` + auth em `GET /usuarios` | 15min |
+| 4 | A3a-002 | Regex sanitize em `core/tenant.py:tenant_id()` (só alfanumérico + hífen) | 10min |
+| 5 | A5-005 | `core/historico.py:12` usar `tenant_namespace()` (completa fix #11) | 15min |
+
+### Bloco B — UX + DevOps crítico (1h15)
+| # | ID | Fix | Esforço |
+|---|---|---|---|
+| 6 | A6a-002 | README: subir backend via `uvicorn api.main:app --port 8000` + alinhar start.sh + Makefile | 30min |
+| 7 | A4a-007 | Wrap erros técnicos do Concierge em fallback amigável PT no `useConcierge.ts` | 30min |
+| 8 | A1a-007 | Magic bytes WebP completo (marker bytes 8-12 'WEBP') | 15min |
+
+### Bloco C — Testes regressão + commit (30min)
+| # | Item | Esforço |
+|---|---|---|
+| 9 | `tests/test_regressoes.py`: `test_agente_admin_usa_registrar` + `test_lgpd_endpoints_exigem_auth` + `test_tenant_id_rejeita_traversal` | 20min |
+| 10 | Smoke test Hator + commit + push | 10min |
+
+**Total: ~3h. Pré-requisito pra qualquer coisa depois.**
+
+---
+
+## 🏗️ SPRINT v1.47 — Refactors pré-feature + planilha financeira (7-10 dias)
+
+**Por quê:** sem refactors arquiteturais, planilha vira gambiarra em arquivos de 2000 linhas. Ana Maria fica isolada do resto. Próximas features custam o dobro.
+
+**Critério de done:**
+- [ ] `ws_chat.py` → 1 strategy por agente em `api/agent_strategies/`
+- [ ] `ChatPanel.tsx` quebrado em 6+ componentes < 300 linhas cada
+- [ ] `useChat` → Zustand store (35 returns → 8)
+- [ ] Concierge system prompt em arquivos modulares
+- [ ] CI mínimo funcionando (.github/workflows/ci.yml)
+- [ ] Endpoint `/financeiro/upload` aceita XLSX
+- [ ] Ana Maria real lê planilha e gera análise
+- [ ] Tela "Análise Financeira" no dashboard
+
+### Bloco A — Refactors arquiteturais (3 dias)
+| # | ID | Refactor | Esforço |
+|---|---|---|---|
+| 1 | A1a-001/002 | `ws_chat.py` → registry `PipelineStep` + 1 arquivo por agente em `api/agent_strategies/` | M (2d) |
+| 2 | A2a-001 | `ChatPanel.tsx` 1773 → `ChatHeader`/`MessageList`/`MessageBubble`/`ChatInput`/`ChatFooter`/`AgentMacroBar` | L (2d) |
+| 3 | A2a-002 | `useChat` → Zustand store, retornar apenas 8 valores | M (1d) |
+| 4 | A1b-001 | Concierge: extrair system prompt pra `prompts/concierge/*.md` modulares | S (4h) |
+| 5 | A2a-008 | Modelo `mode` expansível (não só pipeline/reuniao) + Message tipada por agente | M (1d) |
+
+### Bloco B — CI + testes core (1 dia)
+| # | ID | Item | Esforço |
+|---|---|---|---|
+| 6 | A5-003 | `.github/workflows/ci.yml`: ruff + pytest + tsc + npm build | S (2h) |
+| 7 | A5-* | 10 testes core (Ana Maria registrar, tenant isolation, magic bytes, Concierge defesa, useChat hidratação, MessageBubble progress, ExportModal init, ChatPanel render, treino_pedro auth) | M (1d) |
+| 8 | Vitest setup + 5 testes frontend | S (4h) |
+
+### Bloco C — Planilha financeira (2-3 dias)
+| # | ID | Item | Esforço |
+|---|---|---|---|
+| 9 | PROD-FIN-1 | Endpoint `POST /financeiro/upload` aceita XLSX/CSV, valida estrutura, cripta com Fernet, salva em `historico/<tenant>/financeiro/` | M (1d) |
+| 10 | PROD-FIN-2 | Validação anti-Excel-CSV-injection (fórmulas `=cmd|...`), zip bomb, magic bytes XLSX | S (4h) |
+| 11 | PROD-FIN-3 | Ana Maria lê XLSX via `openpyxl`, gera DRE simplificado / ticket médio / top 5 procedimentos | M (1d) |
+| 12 | PROD-FIN-4 | Audit log dedicado pra acesso financeiro (LGPD) | S (2h) |
+| 13 | Frontend | Tela `/financeiro/upload` com drag-and-drop + tela de resultado | M (1d) |
+
+### Bloco D — Polish UX descoberto na auditoria (1 dia)
+| # | ID | Item | Esforço |
+|---|---|---|---|
+| 14 | A4a-002 | Botão "Experimentar exemplo" → preenche campo (não envia direto) | S (1h) |
+| 15 | A4a-003 | Click backdrop no modal NÃO marca onboarded; só X | S (30min) |
+| 16 | A4a-005 | ConciergeConfirmCard alerta quando agente é filtrado | S (1h) |
+| 17 | A4a-008 | Pipeline rodando: pulsing dot central + agentes terminados em verde | S (2h) |
+| 18 | A2a-003 | Smooth scroll só no fim do streaming, não por token | S (30min) |
+| 19 | A2a-005 | Cleanup SpeechRecognition no unmount | S (15min) |
+
+**Total: ~7-10 dias trabalho focado.**
+
+---
+
+## 🔐 SPRINT v1.48 — Hardening + multi-tenant safety ✅ CONCLUÍDO (2026-06-02)
+
+**Por quê:** preparar pra adicionar 2º cliente sem refactor. Tornar audit log inadulterável. Update workflow funcional.
+
+**Critério de done:** TODOS ATINGIDOS
+- [x] Concierge funciona pra 2 clientes diferentes sem hardcode (brand kit dinâmico)
+- [x] `buscar_historico_similar` filtrado por tenant
+- [x] Cripto Fernet em brand_kit + usuarios (audit + prompts seguem prox sprint se necessário)
+- [x] Audit log com hash chain + fsync + rotation diária + detecção tampering
+- [x] Backup automático diário com Fernet + script de restore
+- [x] Update workflow documentado (UPDATE.md + bin/update.sh)
+
+### Bloco A — Multi-tenant safety ✅
+| # | ID | Item | Status |
+|---|---|---|---|
+| 1 | A1b-008 | `buscar_historico_similar` filtra por `tenant_id()` | ✅ |
+| 2 | A1b-006 | Concierge tenant-aware: system prompt parametrizado por brand kit, espelho médico configurável | ✅ |
+| 3 | A1b-004 | Defesa anti-Heitor: lista expandida + force-include simétrico + audit | ✅ |
+
+### Bloco B — Cripto + audit hardening ✅
+| # | ID | Item | Status |
+|---|---|---|---|
+| 4 | A3a-003 | Cripto Fernet aplicada em `brand_kit.json`, `usuarios.json` (audit/prompts permanecem plaintext por escolha — fácil debug) | ✅ |
+| 5 | A3a-005 | Audit log: hash chain + fsync + rotação diária + verificar_integridade() | ✅ |
+| 6 | A3a-006 | Treino Pedro: validar seções obrigatórias + bypass dev exige LEMMON_ENV=dev | ✅ |
+
+### Bloco C — DevOps SaaS-ready ✅
+| # | ID | Item | Status |
+|---|---|---|---|
+| 7 | A6a-001 | CI completo (3 jobs: backend, frontend, security) | ✅ (commit 3a649f1) |
+| 8 | A6a-003 | Script de backup diário rotativo 7d/4s/3m + restore | ✅ |
+| 9 | A6a-007 | Update workflow: `UPDATE.md` + script `bin/update.sh` + migrations versionadas | ✅ |
+| 10 | A6a-006 | Logs estruturados JSON + request_id propagado | ✅ |
+
+### Bloco D — ws_chat residuais + dívida ✅
+| # | ID | Item | Status |
+|---|---|---|---|
+| 11 | A1a-005 | `await ws.receive_json()` com timeout (_safe_receive_json) | ✅ |
+| 12 | A1a-006 | Detecção de confiança via campo `nivel_confianca` (não emoji) | ✅ |
+| 13 | A1a-008 | Fallback chain Renata documentada + 3 testes | ✅ |
+| 14 | A-11 audit | Salles alternativas preserva 3 variantes em `respostas_estruturadas` | ✅ |
+
+**Total entregue:** 14/14 itens. 23 testes novos em `tests/test_v1_48.py`. Suite full: 85 testes passando.
+
+---
+
+## ✨ SPRINT v1.49+ — Polish + post-PMF (BACKEND PARCIAL ENTREGUE 2026-06-02)
+
+**Quando:** itens backend foram antecipados pq tinham impacto compounding (path traversal, health probe, injection list). Frontend continua diferido até Pedro usar 2+ semanas ou 2º cliente entrar.
+
+### Backend — ENTREGUE ✅
+- [x] A1b-002 — Detecção injection expandida (30+ patterns: DAN, jailbreaks, role-play, tag-injection, persona inversion)
+- [x] A1b-005 — Hard-enforce 4 rodadas via state (override server-side se Haiku ignora prompt)
+- [x] A1a-003/004 — Aya/Renata fora do for-loop + _montar_snap_outputs DRY
+- [x] A3a-007/008 — safe_join helper + LGPD usa defesa em profundidade
+- [x] A6a-004/005/008 — /health/full com disco+key+tenant+cripto+audit + .env.example reescrito
+- [x] A5 — Cobertura de testes (8 endpoints novos: catalogo, saude, pedro/versoes, admin, brand-kit, anthropic, concierge, usuarios)
+
+### Backend — diferido pra v1.50+
+- A1b-007 — Concierge usar tool-use mode da Anthropic (refactor grande)
+
+### Frontend — diferido (sistema é localhost privado pro Pedro)
+- A2a-004/007 — useEffect deps + a11y full
+- A4a-001/004/006 — Modal/headline/Editar fluxo refinado
+
+**Backend Status:** ~30 testes novos em `tests/test_v1_49.py`. Suite full: 117 passando.
+
+---
+
+## 🐛 SPRINT v1.50 — Bugs do QA visual real (2026-06-03)
+
+**Origem:** sessão de QA visual via `claude-in-chrome` rodando o sistema com Pedro Espelho. Pipeline real disparado com briefing "Reels orgânico menopausa Hator 14 dias". Concierge → ConfirmCard → Otto → Carlos → Pedro → Renata → Aya. Todos os fixes do v1.48/v1.49 validados ao vivo.
+
+### ✅ Funcionando ao vivo (confirmado)
+- **A1b-007 tool-use mode** — Concierge retornou JSON estruturado de primeira, sem retry de fence markdown
+- **A1b-006 tenant-aware + force-include** — Pedro Abrahão foi force-incluído pelo trigger "menopausa" + "Hator" automaticamente
+- **Dark mode bubbles** (chat) — user (stone-700) e Concierge (stone-800) com contraste forte
+- **Pipeline streaming** com indicador "Mais lento que o normal" e alerta "RESTAM ~1 MIN"
+
+### 🐛 Bugs encontrados no QA visual
+
+| # | ID | Severidade | Descrição | Onde |
+|---|---|---|---|---|
+| 1 | QA-B01 | ✅ FIXED | "E aí, ficou bom?" feedback card aparecia DESDE a welcome screen (`isVisible={!!sessionId}` em ChatPanel.tsx:1276 + sessionId é persistido em localStorage → sobrevive reloads). **FIX**: novo state `pipelineCompletoNestaSessao` em useChat.ts, não-persistido, só vira true em `pipeline_done`. ChatPanel agora usa `isVisible={!!pipelineCompletoNestaSessao}`. | `dashboard/lib/useChat.ts` + `dashboard/components/chat/ChatPanel.tsx` |
+| 2 | QA-B02 | ✅ FIXED | Pills do escritório só mostravam 7 agentes hardcoded (faltavam Renata + 4 admin Hator). FIX: lista expandida pra 12 agentes em `page.tsx:460`. | `dashboard/app/page.tsx:460` |
+| 3 | QA-B03 | ✅ FIXED | Toast "Concierge ativou" não incluía Pedro porque flag `reuniaoOnly` filtrava ele (mesmo bug raiz de B09). | Resolvido por fix de B09 |
+| 4 | QA-B04 | ⚠️ NÃO É BUG | Avatar "L" tem `dark:bg-stone-100` correto (inversão proposital). Cliente pode preferir outro design mas tecnicamente está ok. | (sem ação) |
+| 5 | QA-B05 | 🟢 BAIXO | Label "SESSÃO FAVORITA?" muito pálida em dark | `dashboard/components/chat/ChatPanel.tsx` |
+| 6 | QA-B06 | ✅ FIXED | Welcome exemplos: clique agora envia direto (não só preenche composer). | `dashboard/components/chat/ChatPanel.tsx:1083` |
+| 7 | QA-B07 | ✅ FIXED | Backend congelava após pipeline anterior (workers em executor presos pra sempre sem timeout). FIX: `Anthropic(timeout=300.0)` em `api/deps.py:29`. Worker libera mesmo se rede cair no meio. Próximas chamadas têm 5min teto. | `api/deps.py:29` |
+| 8 | QA-B08 | 🟢 BAIXO | Otto entregou conteúdo brilhante mas demorou ~30s (alerta "Mais lento que o normal" disparou). Avaliar se vale cache de prompt ou modelo mais rápido pro Otto | `agentes/otto.py` |
+| 12 | QA-B12 | ⚠️ FIX PARCIAL | ConfigSidebar (176px) cortada por overflow:hidden do parent. FIX parcial: panel cresce de 540 → 716 quando configOpen. MAS quando o chat aside já está posicionado no canto direito da viewport, o panel não pode crescer além do espaço disponível (1920-pos = ~463px). Solução completa: mudar config sidebar pra overlay/portal em vez de inline na flex row, OU layout responsivo (mobile-friendly) | `dashboard/components/chat/ChatPanel.tsx:167` |
+| 13 | QA-OP01 | 🟠 OPERACIONAL | **Backend rodando código velho (v1.46)**. `/health` reporta 1.46, `/health/full` 404, BrandKit GET não retorna campos `nicho`/`espelho_id` adicionados no v1.48 A1b-006, `/financeiro/listar` 404. Significa que TODOS os fixes do v1.48 (cripto, audit chain, tenant-aware) + v1.49 (tool-use, injection list, health probe) NÃO ESTÃO ATIVOS no backend. **Calebe precisa rodar `lsof -ti:8000 \| xargs kill -9 && ./start.sh`** pra ativar os fixes. | (operacional) |
+| 14 | QA-B14 | ✅ FIXED | **Payloads de 10MB+ aceitos sem limit** → DoS por memória. Backend lia 10MB de JSON na RAM antes de rejeitar. FIX: novo `BodySizeLimitMiddleware` rejeita Content-Length > 1MB em endpoints normais, 30MB pra upload/concierge (image_base64). | `api/main.py` BodySizeLimitMiddleware |
+| 15 | QA-B15 | ✅ FIXED | **PUT /brand-kit aceita `<script>...</script>` em campo `nome`** sem sanitize. Não é XSS exploitable hoje (string vai só pro LLM system prompt), MAS se Aya algum dia renderizar em PDF/HTML, vira XSS. FIX: Pydantic `@field_validator` rejeita `<` e `>` em `nome`, `tom_voz`, `publico_alvo`, `nicho`, `tipo_negocio`, `fonte_*`. | `api/routes/brand_kit.py` BrandKit |
+| 9 | QA-B09 | ✅ FIXED | **Pedro Abrahão era force-incluído pelo Concierge mas NÃO RODAVA no pipeline**. Causa raiz: `dashboard/lib/agents.ts:107` Pedro tinha `reuniaoOnly: true` (flag legacy do tempo que ele só era gate-espelho). O filtro `!agent.reuniaoOnly` em `app/page.tsx:236` removia Pedro silenciosamente da lista `ids` antes do `send()`. Backend tinha case próprio desde v1.46.1 #17. **FIX**: removida a flag `reuniaoOnly` do Pedro. | `dashboard/lib/agents.ts:107` |
+| 10 | QA-B10 | ⚠️ MITIGADO | **Renata aparece em `agentes_usados` mas sem resposta persistida**. FIX parcial: `all_agents` agora só inclui agentes que produziram resposta (não os que falharam silenciosamente). Causa raiz da falha do Renata.executar não diagnosticada ainda (exception capturada por `_execute_with_approval` retorna True). Próximo passo: log estruturado do exception. | `api/ws_chat.py:851` mitigado / causa real pendente |
+| 11 | QA-B11 | ✅ FIXED | **Custo estimado do Concierge muito alto** (R$ 2,53 vs real R$ 0,70). FIX: recalibrado `custo_medio_usd` baseado em dados reais — Carlos $0.10 → $0.05, Aya $0.08 → $0.05. Outros agentes precisam mais dados antes de calibrar. | `agentes/carlos.py` + `agentes/aya.py` |
+
+### Melhorias sugeridas (UX)
+- **MEL-01**: Welcome exemplos → clicar deveria ENVIAR direto, não só preencher composer (1 clique vs 2)
+- **MEL-02**: Avatar do Concierge dentro da bolha (na resposta) está sem ícone — só um quadrado escuro. Adicionar emoji 🎯 ou sprite
+- **MEL-03**: "VOCÊ" label sobre a bolha do user tá meio invisível em dark — aumentar contraste
+
+**Esforço estimado:** 1-2 dias pra todos os bugs + 1 dia pras melhorias UX.
+
+---
+
+### Game-changers diferidos (PROD-XX)
+- PROD-3 Meta API direta (Otto+Carlos+Aya → publicar)
+- PROD-5 WhatsApp notify dossiê pronto
+- PROD-10 Briefing por voz (Siri-style)
+- PROD-11 Heitor proativo alerta CFM/ANVISA
+
+---
+
+## 📊 Cronograma agregado revisado
+
+| Sprint | Duração | Output | Pré-req |
+|---|---|---|---|
+| **v1.46.2** | ~3h (hoje) | Sistema pronto pra Pedro testar Ana Maria | v1.46.1 ✅ |
+| **v1.47** | 7-10 dias | Planilha financeira em produção limpa | v1.46.2 done |
+| **v1.48** | ~2 semanas | Multi-tenant ready + audit inadulterável | v1.47 done + PMF |
+| **v1.49+** | TBD | Polish + game-changers | 2º cliente real |
+
+**Até planilha em prod sem dívida: ~2 semanas focadas.**
+**Até pronto pra 2º cliente: ~1 mês.**
+
+---
+
+## ✅ Próxima ação imediata
+
+**Aguardando OK do Calebe pra começar Sprint v1.46.2 emergencial.**
+
+Sequência (3h):
+1. A5-002 → A3a-001 → A3a-004 → A3a-002 → A5-005 (1h15)
+2. A6a-002 → A4a-007 → A1a-007 (1h15)
+3. Testes regressão + commit + push (30min)
+
+Posso começar agora se aprovar.

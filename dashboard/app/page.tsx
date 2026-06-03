@@ -28,6 +28,9 @@ export default function Home() {
   const [chatMode, setChatMode] = useState<'pipeline' | 'reuniao'>('pipeline')
   const [historyOpen, setHistoryOpen] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
+  // v1.47 A4a-002 — briefing pendente pra preencher input do chat (sem enviar).
+  // WelcomeModal "Experimentar" agora usa isso em vez de handleSend direto.
+  const [prefillBriefing, setPrefillBriefing] = useState<string | undefined>(undefined)
   // T192 — Layout SVG isométrico removido em 2026-06-01 (pedido Calebe pós-teste Pedro).
   // Mantemos só PixelOfficeScene (top-down pixel art).
   // T139 Sprint 2 — Modo Auto (default ligado): IA escolhe os agentes ao enviar briefing.
@@ -48,7 +51,7 @@ export default function Home() {
   const [conciergeHistory, setConciergeHistory] = useLocalStorage<ConciergeMsg[]>('lemmon-concierge-history', [])
   // T148 — flag pra mostrar "recomendado" no Auto Mode até 1ª sessão concluir
   const [hasCompletedFirstSession, setHasCompletedFirstSession] = useLocalStorage<boolean>('lemmon-first-session-done', false)
-  const { messages, agentStatus, isRunning, sessionId, favoritado, resumedFrom, manualMode, fastTrack, sandbox, custoCap, custoCapAtingido, custoAviso, awaitingApproval, agentConfig, tagsSugeridas, agentProgress, agentProgressMeta, send, approve, abort, toggleManualMode, toggleFastTrack, toggleSandbox, setCustoCap, autorizarCusto, recusarCustoExtra, updateConfig, favoritar, exportar, reset, loadSession, setMessages } = useChat()
+  const { messages, agentStatus, isRunning, sessionId, pipelineCompletoNestaSessao, favoritado, resumedFrom, manualMode, fastTrack, sandbox, custoCap, custoCapAtingido, custoAviso, awaitingApproval, agentConfig, tagsSugeridas, agentProgress, agentProgressMeta, send, approve, abort, toggleManualMode, toggleFastTrack, toggleSandbox, setCustoCap, autorizarCusto, recusarCustoExtra, updateConfig, favoritar, exportar, reset, loadSession, setMessages } = useChat()
   const {
     messages: reunMessages, agentStatus: reunAgentStatus, isRunning: reunIsRunning,
     agentProgress: reunAgentProgress, agentProgressMeta: reunAgentProgressMeta,
@@ -150,18 +153,40 @@ export default function Home() {
       // Chama Concierge ANTES de gravar no histórico persistido (T188.p)
       const resp = await conciergeConversar(novoHistorico)
       if (!resp) {
-        // T193.b — mensagem específica baseada no tipo de erro do backend.
-        const errMsg = conciergeError || 'Erro ao consultar o Concierge.'
-        if (errMsg.includes('Sem crédito')) {
-          notify.error(`💳 ${errMsg}`)
-        } else if (errMsg.includes('Chave da API')) {
-          notify.error(`🔑 ${errMsg}`)
-        } else if (errMsg.includes('Limite de chamadas')) {
-          notify.warning(`⏳ ${errMsg}`)
-        } else if (errMsg.includes('Sem conexão')) {
-          notify.error(`🌐 ${errMsg}`)
+        // T193.b + v1.46.2 A4a-007 — wrap em PT amigável.
+        // Antes erros técnicos em inglês (ex: "Internal server error", "Failed to fetch")
+        // chegavam crus pro Pedro, que abandonava ao não entender. Agora detecta
+        // padrões conhecidos e formata. Fallback genérico também em PT.
+        const errMsgRaw = conciergeError || ''
+        const lower = errMsgRaw.toLowerCase()
+
+        // Detecção por palavra-chave conhecida do backend (que JÁ vem em PT)
+        if (errMsgRaw.includes('Sem crédito')) {
+          notify.error(`💳 ${errMsgRaw}`)
+        } else if (errMsgRaw.includes('Chave da API')) {
+          notify.error(`🔑 ${errMsgRaw}`)
+        } else if (errMsgRaw.includes('Limite de chamadas')) {
+          notify.warning(`⏳ ${errMsgRaw}`)
+        } else if (errMsgRaw.includes('Sem conexão')) {
+          notify.error(`🌐 ${errMsgRaw}`)
+        }
+        // Detecção por erros técnicos em inglês — wrap em PT
+        else if (lower.includes('failed to fetch') || lower.includes('network') || lower.includes('econn')) {
+          notify.error('🌐 Não foi possível conectar ao servidor. O backend tá no ar? Tente recarregar a página.')
+        } else if (lower.includes('timeout') || lower.includes('timed out')) {
+          notify.warning('⏱️ A resposta demorou demais. Tente de novo — se persistir, o Concierge pode estar sobrecarregado.')
+        } else if (lower.includes('json') || lower.includes('parse')) {
+          notify.error('⚠️ Resposta inválida do servidor. Recarregue a página e tente de novo.')
+        } else if (lower.includes('500') || lower.includes('internal server')) {
+          notify.error('🛠️ Erro interno no servidor. Calebe (suporte) recebeu o aviso. Tente em alguns minutos.')
+        } else if (lower.includes('404')) {
+          notify.error('🤔 Endpoint do Concierge não encontrado. Backend está rodando a versão certa?')
+        } else if (errMsgRaw) {
+          // Mensagem desconhecida: mostra mas com prefixo amigável
+          notify.error(`⚠️ Algo deu errado: ${errMsgRaw.slice(0, 120)}${errMsgRaw.length > 120 ? '…' : ''}`)
         } else {
-          notify.error(errMsg)
+          // Fallback genérico
+          notify.error('⚠️ Não consegui falar com o Concierge agora. Recarregue a página e tente de novo.')
         }
         // T188.p — NÃO atualiza histórico se API falhou. Próximo envio reaproveita
         // contexto anterior. Caso contrário ficaria 2x user seguidos no histórico.
@@ -212,14 +237,15 @@ export default function Home() {
         const agent = AGENTS.find(a => a.id === id)
         return agent && !agent.reuniaoOnly
       }) as AgentId[]
-      // T160 — compliance toggle ainda sobrepõe
-      if (complianceMode === 'sempre' && !ids.includes('heitor')) {
-        const idx = ids.indexOf('otto')
-        ids = idx >= 0 ? [...ids.slice(0, idx + 1), 'heitor', ...ids.slice(idx + 1)] : ['heitor', ...ids]
-        notify.info('🛡️ Compliance forçado: Heitor adicionado.')
-      } else if (complianceMode === 'nunca' && ids.includes('heitor')) {
+      // T-bug-Hator-#5/#8 — Concierge agora é fonte única da verdade pra equipe.
+      // ANTES: complianceMode='sempre' INJETAVA Heitor escondido (sem aparecer no card),
+      // o cliente clicava OK achando que aprovou X agentes e o pipeline rodava X+heitor.
+      // Quebra de promessa visual + custo extra. AGORA: 'sempre' é no-op, 'nunca' ainda
+      // remove Heitor (kill switch transparente: cliente vê Heitor no card e pode ter
+      // configurado 'nunca' antes — respeitamos a preferência explícita de remover).
+      if (complianceMode === 'nunca' && ids.includes('heitor')) {
         ids = ids.filter(id => id !== 'heitor')
-        notify.warning('🚫 Compliance pulado conforme sua preferência.')
+        notify.warning('🚫 Compliance removido conforme sua preferência (toggle 🛡️ Nunca).')
       }
       if (ids.length === 0) {
         notify.warning('Concierge não conseguiu escolher agentes. Tente reformular.')
@@ -265,7 +291,7 @@ export default function Home() {
   return (
     <div className="h-screen w-screen flex flex-col overflow-hidden bg-stone-50 dark:bg-stone-950">
       {/* T147 — modal de boas-vindas na 1ª visita; quando clica "experimentar", já manda o briefing exemplo */}
-      <WelcomeModal onTryExample={(b) => { handleSend(b) }} />
+      <WelcomeModal onTryExample={(b) => { setPrefillBriefing(b) }} />
       {/* Top nav */}
       <header className="flex-shrink-0 h-12 flex items-center justify-between px-6 glass border-b border-stone-200/60 dark:border-stone-800/60 z-50">
         <div className="flex items-center gap-3">
@@ -342,6 +368,11 @@ export default function Home() {
               <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
             </svg>
           </Link>
+          {/* PROD-FIN v1.47 — atalho pra Análise Financeira (Ana Maria + planilha XLSX) */}
+          <Link href="/financeiro" title="Análise Financeira (Ana Maria)"
+            className="w-8 h-8 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 flex items-center justify-center hover:bg-stone-50 dark:hover:bg-stone-800 hover:border-stone-400 dark:hover:border-stone-500 transition-all text-stone-500 dark:text-stone-400 text-xs">
+            💼
+          </Link>
           {/* T190.A3 — esconde toggles avançados até cliente completar 1ª sessão.
               Hall of Fame, Briefing Reverso, Cortes, Calibragem e SVG/PIX só aparecem
               depois do onboarding pra evitar paralisia em leigo no 1º acesso. */}
@@ -408,7 +439,7 @@ export default function Home() {
             // PROD-13 — sem pixel office: tela limpa, focada no chat.
             // Cliente leigo não se distrai com escritório.
             <div className="h-full flex flex-col items-center justify-center px-8 text-center max-w-xl mx-auto">
-              <div className="w-16 h-16 rounded-2xl bg-stone-900 dark:bg-stone-100 flex items-center justify-center mb-6">
+              <div className={`w-16 h-16 rounded-2xl bg-stone-900 dark:bg-stone-100 flex items-center justify-center mb-6 ${isRunning ? 'animate-pulse' : ''}`}>
                 <span className="text-white dark:text-stone-900 text-xl font-display font-bold">L</span>
               </div>
               <h1 className="text-2xl font-display font-bold text-stone-900 dark:text-stone-100 mb-3">
@@ -419,6 +450,47 @@ export default function Home() {
                   ? 'O time está trabalhando — acompanha no painel à direita.'
                   : 'Descreva o que você precisa no chat. O Concierge entrevista e mobiliza o time certo pra você.'}
               </p>
+
+              {/* v1.47 A4a-008 — feedback de "vida" durante pipeline.
+                  Antes: tela central estática durante 15-30s → Pedro pensava "travou" → F5 → perdia sessão paga.
+                  Agora: bolas verde-pulsantes pra cada agente ativo + agentes concluídos em check verde.
+                  v1.49 QA-B02 — antes hardcoded com 7 agentes (faltavam Renata + 4 admin Hator);
+                  Pedro + Renata sumiam do display mesmo rodando. Agora lista completa de 12. */}
+              {isRunning && (
+                <div className="mt-6 flex flex-col items-center gap-3">
+                  <div className="flex items-center gap-2 flex-wrap justify-center max-w-[700px]">
+                    {([
+                      'otto', 'heitor', 'salles', 'carlos', 'sonia', 'aya',
+                      'pedro_abrahao', 'renata',
+                      'ana_maria', 'prichina', 'caito', 'kelly',
+                    ] as AgentId[]).map(aid => {
+                      const status = agentStatus[aid]
+                      if (status === 'idle') return null
+                      const isDone = status === 'done'
+                      const isError = status === 'error'
+                      const isActive = status === 'thinking' || status === 'speaking'
+                      return (
+                        <div key={aid}
+                          className={`px-2.5 py-1 rounded-full text-[10px] font-mono uppercase tracking-widest flex items-center gap-1.5
+                            ${isDone ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200' : ''}
+                            ${isError ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-200' : ''}
+                            ${isActive ? 'bg-stone-100 text-stone-700 dark:bg-stone-800 dark:text-stone-200' : ''}`}
+                          title={`${aid} — ${status}`}
+                        >
+                          {isActive && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
+                          {isDone && <span>✓</span>}
+                          {isError && <span>✗</span>}
+                          {aid}
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <p className="text-[11px] font-mono text-stone-400 dark:text-stone-500">
+                    Cada bola é um agente ativo • respostas chegam à direita
+                  </p>
+                </div>
+              )}
+
               {!isRunning && hasCompletedFirstSession && (
                 <button
                   onClick={() => setImersivo(true)}
@@ -452,6 +524,7 @@ export default function Home() {
                 handleSend(approve ? 'ok pode rodar' : 'edita a equipe')
               }}
               sessionId={sessionId}
+              pipelineCompletoNestaSessao={pipelineCompletoNestaSessao}
               favoritado={favoritado}
               resumedFrom={resumedFrom}
               manualMode={manualMode}
@@ -464,6 +537,8 @@ export default function Home() {
               agentConfig={agentConfig}
               autoMode={autoMode}
               hideAdvancedToggles={!hasCompletedFirstSession}
+              prefillInput={prefillBriefing}
+              onPrefillConsumed={() => setPrefillBriefing(undefined)}
               onSend={handleSend}
               onReset={reset}
               onFavoritar={favoritar}

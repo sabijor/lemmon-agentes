@@ -17,14 +17,19 @@ from datetime import datetime
 from pathlib import Path
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, EmailStr
 
 from api.deps import HISTORICO_DIR
+from api.security import auth_required  # v1.46.2 A3a-004 — proteger endpoints
 from core import audit
 from core.tenant import tenant_id
 
-router = APIRouter()
+# v1.46.2 A3a-004 — todos os endpoints de /usuarios agora exigem auth.
+# Antes GET expunha lista com token prefix de cada user (ataque por brute force
+# em ambiente compartilhado). Em dev (LEMMON_AUTH_TOKEN vazia) auth_required
+# pula automaticamente, então não quebra single-user local.
+router = APIRouter(dependencies=[Depends(auth_required)])
 
 
 Role = Literal["admin", "editor", "viewer"]
@@ -51,19 +56,15 @@ def _usuarios_path() -> Path:
 
 
 def _carregar() -> list[dict]:
-    path = _usuarios_path()
-    if not path.exists():
-        return []
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
-        return []
+    # v1.48 A3a-003 — usuarios.json contém TOKENS de cada user (super sensível).
+    # Antes plaintext. Agora cifrado com Fernet se LEMMON_ENCRYPT_KEY setada.
+    from core.criptojson import ler_json_cifrado
+    return ler_json_cifrado(_usuarios_path(), default=[])
 
 
 def _salvar(usuarios: list[dict]) -> None:
-    _usuarios_path().write_text(
-        json.dumps(usuarios, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    from core.criptojson import escrever_json_cifrado
+    escrever_json_cifrado(_usuarios_path(), usuarios)
 
 
 @router.get("/usuarios")

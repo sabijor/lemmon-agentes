@@ -5,6 +5,9 @@ from unittest.mock import MagicMock, Mock
 # Garante que a variável de ambiente existe antes de qualquer import de agente
 os.environ.setdefault("ANTHROPIC_API_KEY", "sk-test-fake-key-for-testing")
 
+# v1.46.2 — rate limit alto pra suite não bater 429 quando rodar em sequência
+os.environ.setdefault("LEMMON_RATE_LIMIT_PER_MIN", "5000")
+
 
 def _make_usage(input_tokens=100, output_tokens=200):
     """Cria um mock de usage da API Anthropic."""

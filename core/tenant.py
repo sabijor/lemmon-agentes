@@ -20,9 +20,24 @@ from pathlib import Path
 
 # ─── Tenant ──────────────────────────────────────────────────────────
 
+_TENANT_ID_RE = __import__("re").compile(r"^[a-z0-9][a-z0-9_-]{0,62}$")
+
+
 def tenant_id() -> str:
-    """Retorna tenant atual (env LEMMON_TENANT_ID ou 'default')."""
-    return os.getenv("LEMMON_TENANT_ID", "default").strip().lower() or "default"
+    """Retorna tenant atual (env LEMMON_TENANT_ID ou 'default').
+
+    v1.46.2 A3a-002 — sanitize contra path traversal. Antes `tenant_id="../etc"`
+    fazia tenant_namespace(HISTORICO_DIR, ...) escapar pra fora de historico/.
+    Agora regex força [a-z0-9_-]{1,63} iniciando com alfanumérico. Inválido →
+    'default'. Cobre LGPD safety (não vaza pra path de outro tenant).
+    """
+    raw = os.getenv("LEMMON_TENANT_ID", "default").strip().lower() or "default"
+    if not _TENANT_ID_RE.match(raw):
+        # Tenant inválido vira default — não escapa. Audit não fica disponível
+        # nesta camada (importaria circular), mas tenant_namespace nunca vai
+        # criar pasta fora do historico/.
+        return "default"
+    return raw
 
 
 def tenant_namespace(base: Path, subfolder: str = "dashboard") -> Path:
@@ -35,6 +50,61 @@ def tenant_namespace(base: Path, subfolder: str = "dashboard") -> Path:
     p = base / t / subfolder
     p.mkdir(parents=True, exist_ok=True)
     return p
+
+
+# v1.49 A3a-007/008 — Helper safe_join pra blindagem em profundidade.
+# Defesa em profundidade: nunca confiar só em regex de entrada — sempre confirmar
+# que o path resolvido NÃO escapa do base via relative_to.
+#
+# Edge cases tratados:
+# - Drives diferentes no Windows (relative_to ValueError)
+# - Symlinks que apontem fora do base (resolve() segue links)
+# - Caracteres null e separators escondidos via unicode tricky
+# - .. dentro do segmento (NFKC + path resolve cancela)
+
+_TRAVERSAL_INDICATORS = ("..", "/", "\\", "\0", "\x00", "%2e%2e", "%2f", "%5c")
+
+
+def safe_join(base: Path, *segments: str) -> Path | None:
+    """Junta `segments` em `base`, garantindo que resultado não escapa.
+
+    Retorna None se qualquer segment contém traversal/separator, OU se o path
+    resultado (resolvido com symlinks) cai fora do base.
+
+    Uso:
+        p = safe_join(HISTORICO_DIR, tenant, "dashboard", session_id + ".json")
+        if p is None:
+            raise HTTPException(400, "path inválido")
+    """
+    if not segments:
+        return None
+    base_abs = base.resolve()
+
+    for seg in segments:
+        if not isinstance(seg, str) or not seg:
+            return None
+        # Rejeita indicadores conhecidos de traversal/path
+        seg_norm = seg.strip()
+        for indicator in _TRAVERSAL_INDICATORS:
+            if indicator in seg_norm.lower():
+                return None
+        # Rejeita unicode control chars (zero-width, RTL override, etc.)
+        for c in seg_norm:
+            if 0x0000 <= ord(c) <= 0x001F or 0x007F <= ord(c) <= 0x009F:
+                return None
+            if c in ("​", "‌", "‍", "‮", "﻿"):
+                return None
+
+    candidate = base
+    for seg in segments:
+        candidate = candidate / seg
+    try:
+        resolved = candidate.resolve()
+        # relative_to levanta ValueError se resolved NÃO está dentro de base_abs
+        resolved.relative_to(base_abs)
+    except (ValueError, OSError):
+        return None
+    return resolved
 
 
 # ─── Cripto-at-rest (LGPD G-01) ──────────────────────────────────────

@@ -130,23 +130,31 @@ def markdown_para_html(markdown: str) -> str:
 # EXTRAÇÃO E LIMPEZA DO MARKDOWN
 # =============================================================================
 
-def extrair_dados_e_limpar_markdown(markdown_original: str) -> tuple:
+def extrair_dados_e_limpar_markdown(markdown_original: str, nome_projeto_session: str | None = None) -> tuple:
     """
     Extrai nome do projeto e data do cabeçalho do markdown gerado pela Aya,
     e remove esse cabeçalho pra não duplicar na capa.
 
+    Args:
+        markdown_original: texto do dossiê.
+        nome_projeto_session: v1.46.1 #12 — se a sessão JSON tem nome_projeto
+            (gerado pelo Haiku), usa esse PRIMEIRO. Cai no regex como fallback.
+
     Retorna: (nome_projeto, data_str, markdown_limpo)
     """
-    nome_projeto = "Sem nome"
+    # v1.46.1 #12 — prioridade 1: nome bonito do JSON (Haiku gerou bem)
+    nome_projeto = nome_projeto_session or "Sem nome"
     data_str = datetime.now().strftime("%d/%m/%Y às %H:%M")
 
-    match_titulo = re.search(
-        r"^#\s*Dossiê\s*[—\-]\s*(.+?)$",
-        markdown_original,
-        re.MULTILINE,
-    )
-    if match_titulo:
-        nome_projeto = match_titulo.group(1).strip()
+    # Prioridade 2: regex no markdown (compat backward)
+    if nome_projeto == "Sem nome":
+        match_titulo = re.search(
+            r"^#\s*Dossiê\s*[—\-]\s*(.+?)$",
+            markdown_original,
+            re.MULTILINE,
+        )
+        if match_titulo:
+            nome_projeto = match_titulo.group(1).strip()
 
     match_data = re.search(r"\*Compilado em\s*(.+?)\*", markdown_original)
     if match_data:
@@ -227,12 +235,16 @@ def enriquecer_html_aura(html: str) -> str:
 # GERAÇÃO HTML COMPLETO
 # =============================================================================
 
-def gerar_html_completo(markdown_original: str, agentes_consultados: list) -> str:
+def gerar_html_completo(markdown_original: str, agentes_consultados: list, nome_projeto_session: str | None = None) -> str:
     """
     Recebe markdown completo da Aya, gera HTML estilizado com design system AURA.
+
+    v1.46.1 #12 — `nome_projeto_session` vem do JSON da sessão (gerado pelo Haiku
+    pelo Bug #12). Tem prioridade sobre o regex no markdown.
     """
     nome_projeto, data_str, markdown_limpo = extrair_dados_e_limpar_markdown(
-        markdown_original
+        markdown_original,
+        nome_projeto_session=nome_projeto_session,
     )
 
     capa_html = gerar_html_capa(nome_projeto, data_str, agentes_consultados)
@@ -352,6 +364,7 @@ def exportar_dossie(
     gerar_html: bool = True,
     gerar_pdf: bool = True,
     pdf_engine: str = "weasyprint",
+    nome_projeto_session: str | None = None,  # v1.46.1 #12 — vem do JSON da sessão
 ) -> dict:
     """
     Exporta dossiê em HTML + PDF a partir do markdown gerado pela Aya.
@@ -383,7 +396,7 @@ def exportar_dossie(
         return resultado
 
     try:
-        html_completo = gerar_html_completo(markdown_original, agentes_consultados)
+        html_completo = gerar_html_completo(markdown_original, agentes_consultados, nome_projeto_session=nome_projeto_session)
     except Exception as e:
         erro_msg = f"Falha ao gerar HTML: {e}"
         logger.error(erro_msg)

@@ -42,6 +42,10 @@ interface Props {
   inMeeting: Set<AgentId>
   isRunning: boolean
   sessionId: string | null
+  /** v1.49 QA-B01 — true só quando pipeline_done foi recebido nesta instance
+   * (não persiste). Usado pra esconder FeedbackPosPipeline na welcome screen
+   * quando sessionId vem de localStorage de execução anterior. */
+  pipelineCompletoNestaSessao?: boolean
   favoritado: boolean
   manualMode: boolean
   fastTrack: boolean
@@ -99,12 +103,16 @@ interface Props {
   conciergeLoading?: boolean
   /** Refinamento — Card "confirmar": callback do OK/Editar. */
   onConfirmConcierge?: (approve: boolean) => void
+  /** v1.47 A4a-002 — texto pra preencher o input (sem enviar). Útil pro "Experimentar exemplo".
+   *  Quando muda, ChatPanel popula o input. Limpa após popular (one-shot). */
+  prefillInput?: string
+  onPrefillConsumed?: () => void
 }
 
 // ─── Main panel ──────────────────────────────────────────────────────
 export default function ChatPanel({
   mode, onToggleMode,
-  messages, agentStatus, inMeeting, isRunning, sessionId, favoritado, resumedFrom,
+  messages, agentStatus, inMeeting, isRunning, sessionId, pipelineCompletoNestaSessao, favoritado, resumedFrom,
   manualMode, fastTrack, sandbox, custoCap, custoCapAtingido, custoAviso, awaitingApproval, agentConfig, dragControls,
   agentProgress, agentProgressMeta,
   reunAgentProgress, reunAgentProgressMeta,
@@ -117,6 +125,7 @@ export default function ChatPanel({
   onExportar, onClose, onSetInMeeting,
   tagsSugeridas = [], autoMode = false, hideAdvancedToggles = false,
   conciergeLoading = false, onConfirmConcierge,
+  prefillInput, onPrefillConsumed,
 }: Props) {
   // Mode-aware aliases
   const activeMessages    = mode === 'reuniao' ? reunMessages    : messages
@@ -155,6 +164,9 @@ export default function ChatPanel({
   useEffect(() => { if (!loopStatus) setLoopCustoDismissed(false) }, [loopStatus])
   useEffect(() => { if (mode === 'reuniao') setConfigOpen(false) }, [mode])
   useEffect(() => {
+    // v1.49 QA-B12 — config virou OVERLAY portal (renderizado fora da flex row),
+    // não compete mais pelo espaço do chat. Mantém panel >= 540 só por consistência
+    // visual quando configOpen (header não fica espremido), mas sem somar 176.
     if (configOpen) setPanelSize(prev => prev.w < 540 ? { ...prev, w: 540 } : prev)
   }, [configOpen])
   useEffect(() => {
@@ -355,9 +367,43 @@ export default function ChatPanel({
     setIsRecording(true)
   }
 
+  // v1.47 A2a-003 — smooth scroll só DEPOIS de mensagem terminar (não por token).
+  // Antes scrollava em cada token streamado com behavior:smooth, causando jank.
+  // Agora: scroll instantâneo durante streaming, smooth no final.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const allDone = activeMessages.length === 0 || activeMessages.every(m => m.done)
+    bottomRef.current?.scrollIntoView({
+      behavior: allDone ? 'smooth' : 'auto',
+    })
   }, [activeMessages])
+
+  // v1.47 A2a-005 — cleanup do SpeechRecognition no unmount. Antes deixava
+  // listener ativo segurando referência ao componente desmontado.
+  useEffect(() => {
+    return () => {
+      try {
+        recognitionRef.current?.stop()
+      } catch {
+        // ignore — pode já estar parado
+      }
+      recognitionRef.current = null
+      // T190.B4 — também cancela qualquer speak() do TTS pendente
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        try { window.speechSynthesis.cancel() } catch { /* ignore */ }
+      }
+    }
+  }, [])
+
+  // v1.47 A4a-002 — quando WelcomeModal "Experimentar" é clicado, preenche o input
+  // (não envia automaticamente). User revisa e decide clicar Enviar.
+  // Antes: dispara handleSend(EXEMPLO) direto → primeiro clique no produto é envio
+  // sem revisão. Pedro queria entender antes.
+  useEffect(() => {
+    if (prefillInput) {
+      setInput(prefillInput)
+      onPrefillConsumed?.()
+    }
+  }, [prefillInput, onPrefillConsumed])
 
   const handleAudioSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -698,19 +744,34 @@ export default function ChatPanel({
           </svg>
         </div>
       </>}
-      {/* Config sidebar — pipeline only, collapsible */}
+      {/* v1.49 QA-B12 — ConfigSidebar OVERLAY (era inline flex row antes).
+          Renderiza absolute sobre o chat com largura fixa 200px + backdrop click-to-close.
+          Não compete mais por espaço do panel — não tem limite de viewport-position. */}
       <AnimatePresence initial={false}>
         {!minimized && mode === 'pipeline' && configOpen && (
-          <motion.div
-            key="config"
-            initial={{ width: 0, opacity: 0 }}
-            animate={{ width: 176, opacity: 1 }}
-            exit={{ width: 0, opacity: 0 }}
-            transition={{ type: 'spring', stiffness: 260, damping: 28 }}
-            className="overflow-hidden flex-shrink-0"
-          >
-            <ConfigSidebar agentConfig={agentConfig} onUpdateConfig={onUpdateConfig} isRunning={isRunning} custoCap={custoCap} onSetCustoCap={onSetCustoCap} />
-          </motion.div>
+          <>
+            {/* Backdrop sutil — clica fecha. z-30 pra ficar abaixo do overlay (40). */}
+            <motion.div
+              key="config-backdrop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="absolute inset-0 bg-black/10 dark:bg-black/30 z-30"
+              onClick={() => setConfigOpen(false)}
+              aria-hidden
+            />
+            <motion.div
+              key="config-overlay"
+              initial={{ x: -16, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: -16, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 260, damping: 28 }}
+              className="absolute left-0 top-0 h-full w-[200px] z-40 shadow-xl border-r-2 border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-900"
+            >
+              <ConfigSidebar agentConfig={agentConfig} onUpdateConfig={onUpdateConfig} isRunning={isRunning} custoCap={custoCap} onSetCustoCap={onSetCustoCap} />
+            </motion.div>
+          </>
         )}
       </AnimatePresence>
 
@@ -1037,6 +1098,9 @@ export default function ChatPanel({
                     <p className="text-[10px] font-mono uppercase tracking-widest text-stone-400 dark:text-stone-500">
                       Tente um exemplo:
                     </p>
+                    {/* v1.49 QA-B06 — antes onClick só preenchia composer (`setInput`) e
+                        user precisava clicar de novo no botão de enviar. Agora clica =
+                        envia direto. Se cliente quiser editar, pode cancelar e digitar. */}
                     {[
                       'Quero atrair pacientes pra consulta de menopausa pelo Instagram.',
                       'Preciso de um calendário editorial de Reels pro próximo mês.',
@@ -1045,7 +1109,12 @@ export default function ChatPanel({
                       <button
                         key={i}
                         type="button"
-                        onClick={() => setInput(ex)}
+                        onClick={() => {
+                          // QA-B06 — só faz sentido em modo Pipeline (Concierge);
+                          // o welcome com exemplos só é renderizado nesse modo.
+                          onSend(ex)
+                          setInput('')
+                        }}
                         className="text-left text-[12px] text-stone-700 dark:text-stone-200 bg-stone-100 dark:bg-stone-800/60 hover:bg-stone-200 dark:hover:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-lg px-3 py-2 transition-colors leading-snug"
                       >
                         {ex}
@@ -1234,7 +1303,10 @@ export default function ChatPanel({
               className="mx-4 mb-1 flex flex-col gap-3 px-4 py-3 rounded-xl border border-stone-200/60 dark:border-stone-700/60 bg-stone-50/80 dark:bg-stone-900/60 flex-shrink-0"
             >
               {/* PROD-4 — feedback pós-pipeline (reacao loop) */}
-              <FeedbackPosPipeline sessionId={sessionId} isVisible={!!sessionId} />
+              {/* v1.49 QA-B01 — antes: `isVisible={!!sessionId}` aparecia desde a welcome screen
+                  porque sessionId é persistido em localStorage entre reloads. Agora usa flag
+                  específica que só vira true quando pipeline_done chega NESTA instance. */}
+              <FeedbackPosPipeline sessionId={sessionId} isVisible={!!pipelineCompletoNestaSessao} />
 
               {/* Tags sugeridas — T180 dark */}
               {tagsAceitas.length > 0 && (
@@ -1252,9 +1324,9 @@ export default function ChatPanel({
                 </div>
               )}
 
-              {/* Favoritar — T180 dark */}
+              {/* Favoritar — T180 + v1.49 QA-B05 dark: label sai de stone-500 → stone-300 pra contraste */}
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-mono text-stone-400 dark:text-stone-500 uppercase tracking-widest">Sessão favorita?</span>
+                <span className="text-[10px] font-mono text-stone-500 dark:text-stone-300 uppercase tracking-widest">Sessão favorita?</span>
                 <button
                   onClick={() => onFavoritar()}
                   title={favoritado ? 'Remover dos favoritos' : 'Favoritar esta sessão'}
@@ -1706,12 +1778,12 @@ export default function ChatPanel({
               {referencias && referencias.length > 0 && (
                 <div className="space-y-1">
                   {referencias.map(r => (
-                    <div key={r.session_id} className="px-2 py-1.5 rounded-lg bg-stone-50 border border-stone-200">
+                    <div key={r.session_id} className="px-2 py-1.5 rounded-lg bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700">
                       <div className="flex items-center justify-between gap-2">
-                        <p className="text-[9px] font-mono text-stone-600 line-clamp-1 flex-1">{r.briefing}</p>
+                        <p className="text-[9px] font-mono text-stone-600 dark:text-stone-300 line-clamp-1 flex-1">{r.briefing}</p>
                         <div className="flex items-center gap-1.5 flex-shrink-0">
-                          {r.avaliacao && <span className="text-[8px] text-amber-500">{'★'.repeat(r.avaliacao)}</span>}
-                          <span className="text-[8px] font-mono text-stone-400">{Math.round(r.score * 100)}%</span>
+                          {r.avaliacao && <span className="text-[8px] text-amber-500 dark:text-amber-400">{'★'.repeat(r.avaliacao)}</span>}
+                          <span className="text-[8px] font-mono text-stone-400 dark:text-stone-500">{Math.round(r.score * 100)}%</span>
                         </div>
                       </div>
                     </div>
@@ -1719,13 +1791,13 @@ export default function ChatPanel({
                 </div>
               )}
               {referencias && referencias.length === 0 && (
-                <p className="text-[8px] font-mono text-stone-400">Nenhuma referência encontrada.</p>
+                <p className="text-[8px] font-mono text-stone-400 dark:text-stone-500">Nenhuma referência encontrada.</p>
               )}
               {sugestao && (
-                <div className="px-3 py-2.5 rounded-xl bg-violet-50 border border-violet-200">
+                <div className="px-3 py-2.5 rounded-xl bg-violet-50 dark:bg-violet-950/30 border border-violet-200 dark:border-violet-800/60">
                   <div className="flex items-center justify-between mb-2">
-                    <p className="text-[8px] font-mono text-violet-600 uppercase tracking-widest font-bold">sugestão de agentes</p>
-                    <button onClick={() => setSugestao(null)} className="text-violet-400 hover:text-violet-700 text-[10px] leading-none transition-colors">×</button>
+                    <p className="text-[8px] font-mono text-violet-600 dark:text-violet-300 uppercase tracking-widest font-bold">sugestão de agentes</p>
+                    <button onClick={() => setSugestao(null)} className="text-violet-400 hover:text-violet-700 dark:text-violet-500 dark:hover:text-violet-200 text-[10px] leading-none transition-colors">×</button>
                   </div>
                   <div className="flex flex-wrap gap-1.5 mb-2">
                     {sugestao.agentes.map(a => {

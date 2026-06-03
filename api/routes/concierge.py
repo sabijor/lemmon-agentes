@@ -106,6 +106,98 @@ FERRAMENTAS_DISPONIVEIS = {
 }
 
 
+# v1.49 A1b-007 — Tool-use mode da Anthropic pra estruturar resposta.
+# Antes: model retornava texto que tentávamos parsear como JSON (com fallback
+# pra retry + alerta de fence markdown). Parsing falhava ~5% das vezes (Haiku
+# adicionava texto fora do JSON, esquecia fechar chave, etc.) → cliente via
+# pergunta neutra de fallback em vez do real.
+# Agora: definimos schema da resposta como tool, modelo retorna tool_use block
+# já validado. Sem parsing, sem retry de fence. Forma canônica da Anthropic
+# pra structured output.
+FERRAMENTA_CONCIERGE_RESPOSTA = {
+    "name": "responder_concierge",
+    "description": (
+        "Estrutura a resposta do Concierge ao cliente. Use SEMPRE essa tool — "
+        "nunca responda em texto livre. Os 3 tipos (pergunta/confirmar/pronto) "
+        "seguem as regras do system prompt."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "tipo": {
+                "type": "string",
+                "enum": ["pergunta", "confirmar", "pronto"],
+                "description": (
+                    "pergunta = ainda falta contexto crítico. "
+                    "confirmar = sei o que fazer, peço OK do cliente. "
+                    "pronto = cliente já OKou na rodada anterior."
+                ),
+            },
+            "conteudo": {
+                "type": "string",
+                "description": (
+                    "Texto pro cliente. Português brasileiro coloquial e direto. "
+                    "Em confirmar: lista agentes escolhidos + razão de 1 linha + 'OK rodar?'. "
+                    "Em pergunta: 1 frase de contexto + 1 pergunta concreta."
+                ),
+            },
+            "briefing_refinado": {
+                "type": ["string", "null"],
+                "description": (
+                    "Se tipo=confirmar OU pronto: consolida o pedido em 2-4 frases. "
+                    "Se tipo=pergunta: null."
+                ),
+            },
+            "dimensoes_completas": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": (
+                    "Lista de dimensões já entendidas. Chaves válidas: "
+                    "o_que, publico, canal, objetivo, urgencia, vibe."
+                ),
+            },
+            "dimensoes_faltando": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Lista de dimensões que ainda faltam (mesmas chaves).",
+            },
+            "agentes_sugeridos": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": (
+                    "IDs dos agentes do catálogo. Lowercase snake_case: "
+                    "otto, heitor, salles, carlos, sonia, aya, renata, "
+                    "pedro_abrahao, ana_maria, prichina, caito, kelly. "
+                    "Vazio se tipo=pergunta."
+                ),
+            },
+            "razoes_agentes": {
+                "type": "object",
+                "additionalProperties": {"type": "string"},
+                "description": (
+                    "Mapa agente_id → razão de 1 linha. Mesmas keys de "
+                    "agentes_sugeridos. Vazio se tipo=pergunta."
+                ),
+            },
+            "ferramentas_extras": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": (
+                    "Keys das ferramentas extras: briefing_reverso, cortes_prontos, "
+                    "calibragem_pedro, transcrever, share, exportar. Vazio se "
+                    "nenhuma se aplica."
+                ),
+            },
+        },
+        "required": [
+            "tipo", "conteudo", "briefing_refinado",
+            "dimensoes_completas", "dimensoes_faltando",
+            "agentes_sugeridos", "razoes_agentes", "ferramentas_extras",
+        ],
+    },
+}
+
+
 # A-16 — cache de catálogo (era construído 2x por request Concierge)
 _CATALOGO_CACHE: list[dict] | None = None
 
@@ -122,12 +214,52 @@ def _carregar_catalogo_seguro() -> list[dict]:
         return []
 
 
-def _construir_system_prompt() -> str:
+def _carregar_brand_kit_tenant() -> dict:
+    """v1.48 A1b-006 — Carrega brand kit do tenant atual.
+
+    Retorna dict com defaults seguros se não houver brand kit gravado.
+    Usa criptojson pra ler (decifra se LEMMON_ENCRYPT_KEY setada).
+
+    Defaults legacy preservam comportamento Hator quando tenant=default/hator
+    e brand kit não existe (continuidade pra Pedro).
+    """
+    try:
+        from core.criptojson import ler_json_cifrado
+        from core.tenant import tenant_id
+
+        path = HISTORICO_DIR / tenant_id() / "brand_kit.json"
+        dados = ler_json_cifrado(path, default=None) or {}
+    except Exception:
+        dados = {}
+
+    # Defaults seguros — Hator-friendly se brand kit vazio (compat)
+    return {
+        "nome": dados.get("nome") or "Cliente",
+        "tom_voz": dados.get("tom_voz") or "profissional, acolhedor",
+        "publico_alvo": dados.get("publico_alvo") or "",
+        "nicho": dados.get("nicho") or "",
+        "tipo_negocio": dados.get("tipo_negocio") or "",
+        "espelho_id": dados.get("espelho_id") or None,
+        "triggers_espelho": dados.get("triggers_espelho") or [],
+        "palavras_evitar": dados.get("palavras_evitar") or [],
+        "palavras_preferir": dados.get("palavras_preferir") or [],
+    }
+
+
+def _construir_system_prompt(brand_kit: dict | None = None) -> str:
     """Constrói SYSTEM_PROMPT com catálogo ATUAL dos agentes + ferramentas.
 
     Carrega dinamicamente pra que novos agentes adicionados não exijam
     mudar o prompt manualmente.
+
+    v1.48 A1b-006 — Tenant-aware. Aceita brand_kit do cliente atual e injeta:
+      - Nome, nicho, tipo de negócio, público-alvo
+      - Espelho médico configurável (se brand kit tem `espelho_id`)
+      - Triggers customizados pra forçar inclusão do espelho
+
+    Se brand_kit=None ou vazio, mantém comportamento legacy (Hator-friendly).
     """
+    bk = brand_kit or _carregar_brand_kit_tenant()
     catalogo = _carregar_catalogo_seguro()
 
     # Bloco agentes
@@ -142,9 +274,44 @@ def _construir_system_prompt() -> str:
         for key, info in FERRAMENTAS_DISPONIVEIS.items()
     )
 
+    # ─── Bloco de contexto do cliente atual (v1.48 A1b-006) ────────────
+    nome_cliente = bk["nome"]
+    nicho = bk["nicho"]
+    tipo_negocio = bk["tipo_negocio"]
+    publico_alvo = bk["publico_alvo"]
+    espelho_id = bk["espelho_id"]
+
+    # Linha de descrição contextual (composição variável)
+    partes_descricao = []
+    if tipo_negocio:
+        partes_descricao.append(f"tipo de negócio: **{tipo_negocio}**")
+    if nicho:
+        partes_descricao.append(f"nicho/especialidade: **{nicho}**")
+    if publico_alvo:
+        partes_descricao.append(f"público-alvo: {publico_alvo}")
+    contexto_cliente = "; ".join(partes_descricao) if partes_descricao else ""
+
+    # Bloco "Cliente atual" — formado dinamicamente
+    if contexto_cliente or nome_cliente != "Cliente":
+        bloco_cliente = (
+            f"\n\n## 🏢 Cliente atual: **{nome_cliente}**\n"
+            f"{contexto_cliente or 'Sem contexto de brand kit gravado ainda.'}\n"
+        )
+        if espelho_id:
+            ag_espelho_info = next(
+                (a for a in catalogo if a.get("id") == espelho_id), None
+            )
+            ag_label = ag_espelho_info["nome"] if ag_espelho_info else espelho_id
+            bloco_cliente += (
+                f"\n> ⚠️ Espelho do cliente: **{espelho_id}** ({ag_label}). "
+                "Sempre incluir esse agente quando briefing tocar nicho do cliente.\n"
+            )
+    else:
+        bloco_cliente = ""
+
     return f"""# Você é o **Concierge** da Lemmon Produções
 
-Lemmon é uma agência de marketing especializada em conteúdo pra clínicas de saúde (cliente principal: **Hator Clinic** do Dr. Pedro Abrahão, especializada em menopausa, saúde feminina e estética orofacial).
+Lemmon é uma agência de marketing especializada em conteúdo pra clínicas de saúde, agências e negócios que querem produção criativa orquestrada por IA.{bloco_cliente}
 
 Você é o **cérebro do sistema** — a primeira pessoa que o cliente fala antes de mobilizar a equipe de especialistas. Sua função é:
 
@@ -180,7 +347,7 @@ Sempre considere essas dimensões antes de mobilizar a equipe:
 6. **VIBE/TOM** — íntimo, técnico, científico, divertido, sério?
 
 E também:
-- **CONTEXTO ESPECIAL**: É clínica Hator? Material já existe? Precisa compliance?
+- **CONTEXTO ESPECIAL**: É do cliente atual ({nome_cliente})? Material já existe? Precisa compliance?
 
 ---
 
@@ -191,7 +358,7 @@ Você tem **3 tipos de resposta** (T188.a — sempre passa pelo "confirmar" ante
 ### "pergunta" — quando ainda falta contexto
 - Falta o **O QUÊ** ou **OBJETIVO** (são obrigatórios)
 - Faltam 2+ dimensões críticas
-- Ambíguo qual frente acionar (marketing vs admin Hator vs orçamento)
+- Ambíguo qual frente acionar (marketing vs admin vs orçamento)
 
 ### "confirmar" — quando você JÁ sabe o que fazer mas precisa do OK do cliente
 - O QUÊ e OBJETIVO claros + pelo menos 2 outras dimensões
@@ -219,12 +386,16 @@ Você tem **3 tipos de resposta** (T188.a — sempre passa pelo "confirmar" ante
 
 ## ⚠️ REGRAS RÍGIDAS (T188.b/c/d — bugs reportados no teste real)
 
-### 1. Cliente Hator → SEMPRE inclua `pedro_abrahao`
-Se o briefing mencionar QUALQUER UM dos termos abaixo, `pedro_abrahao` é **OBRIGATÓRIO**
-(como espelho/validador médico, mesmo que outras frentes existam):
-- "Hator", "Dr. Pedro", "Dra. Pedro", "Pedro Abrahão", "menopausa", "saúde feminina",
-  "consulta médica", "TRH", "reposição hormonal", "estética orofacial", "clínica" + Pedro,
-  "ginecologia", "endocrinologia feminina"
+### 1. Espelho do cliente — SEMPRE inclua se brand kit definiu um
+{(
+  f'O cliente atual ({nome_cliente}) tem espelho configurado: **{espelho_id}**. '
+  f'Se o briefing mencionar termos do nicho ({nicho or "—"}) ou triggers customizados '
+  f'({", ".join(bk["triggers_espelho"]) if bk["triggers_espelho"] else "—"}), '
+  f'`{espelho_id}` é **OBRIGATÓRIO** como validador/espelho.'
+) if espelho_id else (
+  'Cliente atual não tem espelho médico/validador configurado no brand kit. '
+  'Use o time padrão sem espelho dedicado.'
+)}
 
 ### 2. Salles entra SÓ com material/produção real
 `salles` é Produtor documental — entra APENAS se o briefing mencionar:
@@ -242,87 +413,79 @@ Tabela de mínimos por tarefa típica:
 - "Roteiros" sozinho → `carlos` + `aya` (2)
 - "Estratégia" → `otto` + `aya` (2)
 - "Calendário editorial" → `renata` + `aya` (2)
-- "Ad pago" → `otto` + `heitor` + `carlos` + `aya` (4) — Heitor obrigatório
-- "Reels orgânico saúde Hator" → `otto` + `carlos` + `pedro_abrahao` + `aya` (4)
-- "Análise financeira Hator" → `ana_maria` (1) ± `caito`/`kelly` conforme área
+- "Ad pago" → `otto` + `carlos` + `aya` (3) + sugerir `heitor` (Meta cobra compliance)
+- "Reels orgânico do nicho do cliente" → `otto` + `carlos` + (espelho se configurado) + `aya`
+- "Análise financeira" → `ana_maria` (1) ± `caito`/`kelly` conforme área
+- "Planilha XLSX/CSV / DRE / ticket médio / receita / despesa" → `ana_maria` (1) +
+  AVISO obrigatório: "📋 Sua planilha pode ser carregada em /financeiro pra eu
+  analisar via Ana Maria com Excel real. Se ainda não subiu, faça isso primeiro
+  e volta aqui." (v1.47 PROD-FIN)
 - "Cortes de vídeo gravado" → ferramenta `cortes_prontos` + `carlos` + `aya` (2)
 
 **NÃO inclua agente "pra ter certeza"**. Se não há razão específica no briefing,
 não convoca. Cliente paga por cada um.
 
-### 4. Heitor entra quando há risco
-`heitor` (compliance) entra obrigatoriamente quando:
-- É ad pago (Meta cobra compliance)
-- Mencionar produto/serviço de saúde com claims ("emagrecimento", "cura", "tratamento")
-- Cliente diz "auditar", "revisar termos", "checar"
+### 4. Heitor é SUGESTÃO inteligente, nunca obrigatória
+`heitor` (compliance) é RECOMENDADO quando vê risco real, mas **NUNCA force**.
+Sempre proponha no card de confirmação com a razão clara, e deixe o cliente decidir.
 
-Pode ficar de fora em: posts orgânicos genéricos sem claim, calendário, copy interno.
+Casos onde recomendar Heitor (sugerir, não forçar):
+- Ad pago (Meta cobra compliance — risco de derrubar campanha)
+- Claims fortes de saúde ("cura", "emagrecimento garantido", "elimina")
+- Cliente menciona "compliance", "CFM", "ANVISA", "auditar", "revisar termos"
+- Tema sensível: tratamento médico, procedimento estético, medicamento
+
+**Quando sugerir Heitor**, na razão dele escreva algo como:
+"Não é obrigatório, mas o tema [lipedema/menopausa/etc] tem regras CFM
+específicas — recomendo Heitor pra checar antes de publicar.
+Se quiser pular, é só me dizer."
+
+Cliente sempre pode tirar Heitor da equipe via card → "Editar".
+
+NÃO sugira Heitor em: posts orgânicos sem claim, calendário editorial, copy interno,
+análise financeira, briefings óbvios sem risco regulatório.
 
 ---
 
 ## 🧩 Padrões de pipeline (use como guia, decida caso a caso)
 
-- **Reels orgânico saúde Hator**: otto + carlos + pedro_abrahao + aya (heitor só se ad)
-- **Ad pago saúde**: otto + heitor (obrigatório) + carlos + (pedro_abrahao se Hator) + aya
-- **Conteúdo educativo Hator**: otto + carlos + pedro_abrahao + aya
+- **Reels orgânico do nicho do cliente**: otto + carlos + (espelho se configurado) + aya. Pode SUGERIR heitor se tema sensível (lipedema, hormônios, claims fortes) — cliente decide
+- **Ad pago**: otto + carlos + (espelho se Hator/clínica médica) + aya. Sempre SUGERIR heitor (Meta cobra compliance) — cliente decide
+- **Conteúdo educativo do nicho**: otto + carlos + (espelho se configurado) + aya
 - **Cliente tem refs visuais (prints)**: ferramenta `briefing_reverso` + otto + carlos + aya
 - **Calendário editorial**: renata + (otto só se estratégico) + aya
 - **Material gravado → cortes**: ferramenta `cortes_prontos` + carlos + aya
-- **Análise financeira Hator**: ana_maria + (caito se decisão) + (kelly se tributário)
-- **Decisão operacional Hator**: caito + (ana_maria/prichina/kelly conforme área)
-- **Folha/RH/contas Hator**: prichina + (ana_maria se pagamento)
-- **Tributário/imposto Hator**: kelly + (ana_maria se fluxo)
+- **Análise financeira**: ana_maria + (caito se decisão) + (kelly se tributário)
+- **Decisão operacional**: caito + (ana_maria/prichina/kelly conforme área)
+- **Folha/RH/contas**: prichina + (ana_maria se pagamento)
+- **Tributário/imposto**: kelly + (ana_maria se fluxo)
 
-**Sempre** termina com **aya** (compiladora) — exceto pra admin Hator (saídas próprias).
+**Sempre** termina com **aya** (compiladora) — exceto pra admin (saídas próprias).
 
 ---
 
 ## 📤 Formato OBRIGATÓRIO da resposta
 
-Retorne SEMPRE um JSON válido, e SÓ o JSON (sem texto fora, sem markdown fences):
+Você SEMPRE responde usando a ferramenta `responder_concierge` (tool-use forçado
+no nível da API — não escreva texto livre, sempre chame a tool).
 
-```json
-{{
-  "tipo": "pergunta" | "confirmar" | "pronto",
-  "conteudo": "<texto pro cliente — pergunta gentil / proposta com OK / transição amigável>",
-  "briefing_refinado": "<se confirmar OU pronto: consolidação em 2-4 frases. se pergunta: null>",
-  "dimensoes_completas": ["o_que", "publico", "canal", ...],
-  "dimensoes_faltando": ["objetivo", "vibe", ...],
-  "agentes_sugeridos": ["otto", "carlos", ...],
-  "razoes_agentes": {{
-    "otto": "decodificar tese pra um briefing aberto de saúde",
-    "carlos": "..."
-  }},
-  "ferramentas_extras": ["briefing_reverso", ...]
-}}
-```
+Regras importantes ao preencher:
 
-Use SEMPRE chaves exatas pra dimensões: `o_que`, `publico`, `canal`, `objetivo`, `urgencia`, `vibe`.
-Use IDs exatos pra agentes (lowercase, snake_case): `otto`, `heitor`, `salles`, `carlos`, `sonia`, `aya`, `renata`, `pedro_abrahao`, `ana_maria`, `prichina`, `caito`, `kelly`.
-Use keys exatos pra ferramentas: `briefing_reverso`, `cortes_prontos`, `calibragem_pedro`, `transcrever`, `share`, `exportar`.
+- **`tipo`**: "pergunta" | "confirmar" | "pronto" (exatamente uma dessas strings).
+- **`conteudo`**: texto pro cliente em português brasileiro coloquial.
+- **`briefing_refinado`**: 2-4 frases se confirmar/pronto, `null` se pergunta.
+- **`dimensoes_completas`**/`dimensoes_faltando`: use SEMPRE as keys canônicas:
+  `o_que`, `publico`, `canal`, `objetivo`, `urgencia`, `vibe`.
+- **`agentes_sugeridos`**: IDs lowercase snake_case (otto, heitor, salles, carlos,
+  sonia, aya, renata, pedro_abrahao, ana_maria, prichina, caito, kelly).
+- **`razoes_agentes`**: mapa agente_id → razão de 1 linha.
+- **`ferramentas_extras`**: keys: briefing_reverso, cortes_prontos,
+  calibragem_pedro, transcrever, share, exportar.
 
-Se `tipo=pergunta`, deixe `agentes_sugeridos`, `razoes_agentes` e `ferramentas_extras` vazios.
-Se `tipo=confirmar`, PREENCHA todos esses campos (cliente precisa ver o que vai rodar).
-Se `tipo=pronto`, mantenha os mesmos campos da última "confirmar" (significa que cliente OKou).
-
-### Exemplo de "confirmar"
-```json
-{{
-  "tipo": "confirmar",
-  "conteudo": "Pra Reels de menopausa orgânico, vou mobilizar:\\n\\n• Otto — decodifica tese\\n• Carlos — escreve roteiros\\n• Pedro (espelho IA) — valida pela ótica do médico\\n• Aya — compila tudo\\n\\nOK rodar assim ou quer ajustar?",
-  "briefing_refinado": "Reels orgânico pra Instagram da Hator Clinic sobre menopausa. Público: mulheres 40-55 anos. Tom íntimo e científico.",
-  "dimensoes_completas": ["o_que", "publico", "canal", "objetivo", "vibe"],
-  "dimensoes_faltando": [],
-  "agentes_sugeridos": ["otto", "carlos", "pedro_abrahao", "aya"],
-  "razoes_agentes": {{
-    "otto": "decodifica tese em briefing aberto",
-    "carlos": "escreve roteiros publicitários filmáveis",
-    "pedro_abrahao": "valida pela ótica do médico (cliente Hator)",
-    "aya": "compila o dossiê final"
-  }},
-  "ferramentas_extras": []
-}}
-```
+Convenções por tipo:
+- `pergunta`: deixe `agentes_sugeridos`, `razoes_agentes` e `ferramentas_extras` vazios.
+- `confirmar`: PREENCHA todos os campos (cliente precisa ver o que vai rodar).
+- `pronto`: mantenha os mesmos campos da última `confirmar`.
 """
 
 
@@ -348,10 +511,13 @@ def _parse_resposta_concierge(text: str) -> dict | None:
         return None
 
 
-# T188.o — padrões comuns de prompt injection que tentamos detectar.
+# T188.o + v1.49 A1b-002 — padrões comuns de prompt injection.
 # Não bloqueia a request (false positives), mas LOGAMOS pra auditoria + adicionamos
 # um guard rail extra no system prompt avisando o modelo.
+# v1.49 A1b-002 — lista expandida com jailbreaks modernos (DAN, role-play attacks,
+# evasão por tradução, tag-injection HTML/XML, exfiltração via "translate to X").
 _PROMPT_INJECTION_PATTERNS = (
+    # Clássicos
     "ignore previous",
     "ignore above",
     "ignore instructions",
@@ -381,6 +547,58 @@ _PROMPT_INJECTION_PATTERNS = (
     "mostre suas instruções",
     "repeat your prompt",
     "repita seu prompt",
+    # v1.49 A1b-002 — jailbreaks famosos (DAN, do anything, etc.)
+    "dan mode",
+    "do anything now",
+    "developer mode",
+    "modo desenvolvedor",
+    "jailbreak",
+    "jailbroken",
+    "without restrictions",
+    "sem restrições",
+    "sem restricoes",
+    "no rules apply",
+    "no limitations",
+    "sem limitações",
+    # Role-play attacks
+    "roleplay as",
+    "role play as",
+    "interprete o papel",
+    "interprete um papel",
+    "from now on you",
+    "a partir de agora você",
+    "a partir de agora voce",
+    # Exfiltração via output formatting / tradução
+    "translate the following",
+    "traduza o seguinte",
+    "in your next response include",
+    "na sua próxima resposta inclua",
+    "output your instructions",
+    "imprima suas instruções",
+    "print your prompt",
+    "print system",
+    "imprima system",
+    # Tag injection adicional (todos minúsculos — match é case-insensitive)
+    "<|im_start|>",
+    "<|im_end|>",
+    "<|system|>",
+    "[inst]",
+    "[/inst]",
+    # Hipnose por verbose
+    "step by step ignore",
+    "step-by-step ignore",
+    "before answering ignore",
+    "antes de responder ignore",
+    # Confidence override
+    "you must comply",
+    "você deve obedecer",
+    "voce deve obedecer",
+    # Persona inversion
+    "evil version of you",
+    "versão maligna",
+    "versao maligna",
+    "opposite of your",
+    "oposto do seu",
 )
 
 
@@ -468,7 +686,11 @@ async def conversar(pedido: ConcierePedido):
     # Singleton em api.deps já cuida disso. Se api_key foi validado acima,
     # confiamos que _anthropic_client está OK.
     client = _anthropic_client
-    system_prompt = _construir_system_prompt()
+
+    # v1.48 A1b-006 — Carrega brand kit do tenant atual e injeta no prompt.
+    # Sem brand kit: defaults Hator-friendly (compat).
+    brand_kit_tenant = _carregar_brand_kit_tenant()
+    system_prompt = _construir_system_prompt(brand_kit_tenant)
 
     # PROD-1 — Memória persistente. Se é a 1ª mensagem do user, busca histórico
     # similar e injeta no system prompt pra Concierge poder mencionar "vi que você
@@ -524,62 +746,63 @@ async def conversar(pedido: ConcierePedido):
             "com conteúdo 'Não entendi seu pedido. Pode descrever que conteúdo você precisa?'"
         )
 
-    # T188.l + T193.a — tenta até 2x: se 1ª resposta vier sem JSON válido,
-    # injeta lembrete e tenta de novo. Evita derrubar sessão por glitch do modelo.
+    # v1.49 A1b-007 — tool-use mode. Antes: regex/fence parsing do texto.
+    # Agora: 1 chamada com tool_choice forçado → response.content tem 1 bloco
+    # tool_use com input já validado pelo schema (sem retry de fence markdown).
+    #
+    # Fallback de parsing legacy mantido por defesa (modelo nunca retorna
+    # texto livre nesse modo, mas se acontecer pegamos via _parse_resposta).
     data: dict | None = None
-    text = ""
-    ultima_excecao: Exception | None = None
+    try:
+        response = client.messages.create(
+            model=_modelo_concierge(),
+            max_tokens=2048,
+            system=system_prompt,
+            messages=messages,
+            tools=[FERRAMENTA_CONCIERGE_RESPOSTA],
+            tool_choice={"type": "tool", "name": "responder_concierge"},
+        )
+    except (
+        anthropic.AuthenticationError,
+        anthropic.RateLimitError,
+        anthropic.APIConnectionError,
+        anthropic.APIStatusError,
+        anthropic.APIError,
+    ) as e:
+        # T193.b + T190.A10 — classifica erro e retorna status apropriado.
+        # NÃO vaza traceback nem string crua da Anthropic.
+        kind = classificar_erro_anthropic(e)
+        msg_amigavel = formatar_erro_anthropic(e)
+        status_map = {
+            "sem_credito": 402,
+            "rate_limit": 429,
+            "auth": 401,
+            "conexao": 503,
+            "outro": 502,
+        }
+        raise HTTPException(
+            status_code=status_map.get(kind, 502),
+            detail=msg_amigavel,
+        ) from e
 
-    for tentativa in range(2):
-        try:
-            response = client.messages.create(
-                model=_modelo_concierge(),
-                max_tokens=2048,
-                system=(
-                    system_prompt
-                    if tentativa == 0
-                    else system_prompt + "\n\n## ⚠ Última saída inválida\n"
-                    "Sua última resposta NÃO foi JSON válido. Retorne SÓ o objeto JSON "
-                    "exigido, sem texto antes/depois, sem fences markdown."
-                ),
-                messages=messages,
-            )
-        except (
-            anthropic.AuthenticationError,
-            anthropic.RateLimitError,
-            anthropic.APIConnectionError,
-            anthropic.APIStatusError,
-            anthropic.APIError,
-        ) as e:
-            # T193.b + T190.A10 — classifica erro e retorna status apropriado.
-            # NÃO vaza traceback nem string crua da Anthropic.
-            kind = classificar_erro_anthropic(e)
-            msg_amigavel = formatar_erro_anthropic(e)
-            status_map = {
-                "sem_credito": 402,
-                "rate_limit": 429,
-                "auth": 401,
-                "conexao": 503,
-                "outro": 502,
-            }
-            raise HTTPException(
-                status_code=status_map.get(kind, 502),
-                detail=msg_amigavel,
-            ) from e
+    # Extrai tool_use block (forma canônica em tool_choice forçado)
+    for block in response.content:
+        if block.type == "tool_use" and block.name == "responder_concierge":
+            data = dict(block.input) if hasattr(block, "input") else None
+            break
 
+    # Fallback: se por algum motivo veio texto em vez de tool_use, tenta parse
+    if data is None:
         text = ""
         for block in response.content:
             if block.type == "text":
                 text += block.text
-
         data = _parse_resposta_concierge(text)
-        if data is not None:
-            break  # JSON OK, segue
-        # Se chegou aqui, vai tentar de novo (com prompt reforçado)
 
     if data is None:
-        # T188.l — fallback gracioso: nem 2ª tentativa parseou. Em vez de derrubar
-        # a sessão com 500, retorna pergunta neutra pra user reformular.
+        # Fallback gracioso final: retorna pergunta neutra pra user reformular.
+        # Em tool-use mode isso é praticamente impossível (Anthropic garante
+        # estrutura), mas mantemos por defesa em profundidade.
         return ConciereResposta(
             tipo="pergunta",
             conteudo=(
@@ -588,8 +811,188 @@ async def conversar(pedido: ConcierePedido):
             ),
         )
 
+    # v1.49 A1b-005 — HARD-ENFORCE 4 rodadas via STATE (não só prompt).
+    # Antes: confiava no Haiku seguir instrução do prompt. Mas testes reais
+    # mostraram que ele às vezes ignora e continua perguntando (loop infinito
+    # frustrando cliente). Agora: se o STATE diz que passou de 4 rodadas E
+    # modelo ainda voltou "pergunta", override pra "confirmar" com defaults.
+    if rodadas_user >= 4 and data.get("tipo") == "pergunta":
+        try:
+            from core import audit
+            audit.registrar(
+                "concierge_force_confirmar_rodadas",
+                rodadas=rodadas_user,
+                tipo_original=data.get("tipo"),
+            )
+        except Exception:
+            pass
+        # Detecta intent admin vs criativo pelo histórico
+        _todo_texto = " ".join(
+            (m.content or "").lower() for m in pedido.historico if m.role == "user"
+        )
+        _palavras_admin = (
+            "financeiro", "planilha", "fluxo de caixa", "dre", "imposto",
+            "contas a pagar", "contas a receber", "folha", "rh", "tributário",
+        )
+        _intent_admin = any(p in _todo_texto for p in _palavras_admin)
+        if _intent_admin:
+            data["agentes_sugeridos"] = ["ana_maria"]
+            data["razoes_agentes"] = {
+                "ana_maria": "Análise financeira / DRE / fluxo (default v1.49 após 4 rodadas)"
+            }
+        else:
+            data["agentes_sugeridos"] = ["otto", "carlos", "aya"]
+            data["razoes_agentes"] = {
+                "otto": "Decodifica briefing em tese criativa",
+                "carlos": "Escreve roteiros publicitários",
+                "aya": "Compila o dossiê final",
+            }
+        data["tipo"] = "confirmar"
+        data["conteudo"] = (
+            "Já trocamos várias mensagens — pra não te travar, vou montar "
+            "um time inicial padrão com o que tenho:\n\n"
+            + "\n".join(
+                f"• {ag} — {data['razoes_agentes'].get(ag, '')}"
+                for ag in data["agentes_sugeridos"]
+            )
+            + "\n\nOK rodar assim? Se quiser tirar ou trocar alguém, me diz."
+        )
+        # briefing_refinado simples — usa última msg do user
+        ultima_user = next(
+            (m.content for m in reversed(pedido.historico) if m.role == "user"),
+            "",
+        )
+        if ultima_user:
+            data["briefing_refinado"] = ultima_user[:280]
+
     # T188.e — calcula custo estimado somando custo_medio_usd dos sugeridos
     agentes_sugeridos = data.get("agentes_sugeridos", [])
+
+    # T-bug-Hator-#9 + v1.48 A1b-004 — DEFESA SERVER-SIDE bidirecional pra Heitor.
+    # Filtra Heitor se cliente não pediu compliance.
+    # E adiciona Heitor (force-include) se cliente PEDIU mas Haiku esqueceu.
+    # Sem isso: cliente pede "ad pago" + Haiku omite Heitor → ad cai em Meta sem
+    # compliance → cliente perde dinheiro real. Lista expandida pra cobrir sinônimos
+    # comuns (ANS, ads, Google Ads, tráfego pago, conar, anvisa).
+    _COMPLIANCE_TRIGGERS = (
+        # Termos regulatórios oficiais
+        "compliance", "cfm", "anvisa", "conar", "ans", "cremesp", "cremerj",
+        "regulament", "regulação", "regulacao",
+        # Verbos de revisão
+        "auditar", "auditoria", "revisar termos", "checar termos",
+        "validar termos", "compliance check",
+        # Plataformas pagas (Heitor entra obrigatório)
+        "ad pago", "anúncio pago", "anuncio pago", "campanha paga", "campanha de ad",
+        "meta ads", "facebook ads", "google ads", "instagram ads", "tiktok ads",
+        "tráfego pago", "trafego pago", "ads",
+        # Claims sensíveis
+        "milagre", "garanto", "100% garantido", "elimina", "cura definitiva",
+    )
+    # 1) Sempre que cliente PEDIU compliance, Heitor entra (mesmo que Haiku esqueceu)
+    texto_user_total = " ".join(
+        (m.content or "").lower()
+        for m in pedido.historico
+        if m.role == "user"
+    )
+    pediu_compliance = any(t in texto_user_total for t in _COMPLIANCE_TRIGGERS)
+
+    if pediu_compliance and "heitor" not in agentes_sugeridos and agentes_sugeridos:
+        # Force-include Heitor APÓS otto (ou no início se não tiver otto)
+        idx_otto = agentes_sugeridos.index("otto") if "otto" in agentes_sugeridos else -1
+        if idx_otto >= 0:
+            agentes_sugeridos = (
+                agentes_sugeridos[:idx_otto + 1]
+                + ["heitor"]
+                + agentes_sugeridos[idx_otto + 1:]
+            )
+        else:
+            agentes_sugeridos = ["heitor"] + agentes_sugeridos
+        # Adiciona razão padrão (Haiku não criou)
+        razoes = data.get("razoes_agentes") or {}
+        razoes["heitor"] = (
+            "Cliente mencionou termos regulatórios/ads pagos — Heitor entra pra "
+            "validar compliance (CFM, ANVISA, Meta Ads policy). Sem isso, ad pode "
+            "ser derrubado pela plataforma. Se quiser pular, é só me dizer."
+        )
+        data["razoes_agentes"] = razoes
+        # Adiciona audit pra rastrear quando Heitor é force-included
+        try:
+            from core import audit
+            audit.registrar(
+                "concierge_heitor_force_included",
+                triggers_encontrados=[t for t in _COMPLIANCE_TRIGGERS if t in texto_user_total][:5],
+            )
+        except Exception:
+            pass
+
+    # 2) Se cliente NÃO pediu mas Haiku incluiu Heitor por overcaution, remove
+    elif "heitor" in agentes_sugeridos and not pediu_compliance:
+        agentes_sugeridos = [a for a in agentes_sugeridos if a != "heitor"]
+        # Remove razão também
+        data["razoes_agentes"] = {
+            k: v for k, v in data.get("razoes_agentes", {}).items() if k != "heitor"
+        }
+
+    # v1.48 A1b-006 — Force-include do ESPELHO se brand kit configurou.
+    # Antes só funcionava pra pedro_abrahao via hardcode. Agora tenant-aware:
+    # se brand_kit tem espelho_id + triggers_espelho, força inclusão quando
+    # briefing tocar termos do nicho. Hator continua funcionando via fallback.
+    espelho_id_cfg = brand_kit_tenant.get("espelho_id")
+    triggers_espelho_cfg = [
+        t.lower() for t in (brand_kit_tenant.get("triggers_espelho") or [])
+    ]
+    # Fallback Hator: se tenant é hator/default e brand kit não setou,
+    # mantém pedro_abrahao com triggers legacy (compat).
+    if not espelho_id_cfg:
+        from core.tenant import tenant_id as _tid
+        if _tid() in ("hator", "default"):
+            espelho_id_cfg = "pedro_abrahao"
+            triggers_espelho_cfg = [
+                "hator", "dr. pedro", "dra. pedro", "pedro abrahão",
+                "pedro abrahao", "menopausa", "saúde feminina", "saude feminina",
+                "trh", "reposição hormonal", "reposicao hormonal",
+                "estética orofacial", "estetica orofacial",
+                "ginecologia", "endocrinologia feminina",
+            ]
+
+    if espelho_id_cfg and triggers_espelho_cfg:
+        pediu_espelho = any(t in texto_user_total for t in triggers_espelho_cfg)
+        if (
+            pediu_espelho
+            and espelho_id_cfg not in agentes_sugeridos
+            and agentes_sugeridos
+        ):
+            # Force-include espelho APÓS otto/carlos (validador entra no fim do
+            # criativo, antes do aya compilador)
+            idx_aya = (
+                agentes_sugeridos.index("aya") if "aya" in agentes_sugeridos else -1
+            )
+            if idx_aya >= 0:
+                agentes_sugeridos = (
+                    agentes_sugeridos[:idx_aya]
+                    + [espelho_id_cfg]
+                    + agentes_sugeridos[idx_aya:]
+                )
+            else:
+                agentes_sugeridos = agentes_sugeridos + [espelho_id_cfg]
+            razoes = data.get("razoes_agentes") or {}
+            razoes[espelho_id_cfg] = (
+                f"Cliente mencionou termos do nicho — {espelho_id_cfg} entra como "
+                "espelho/validador pela ótica do especialista do cliente."
+            )
+            data["razoes_agentes"] = razoes
+            try:
+                from core import audit
+                audit.registrar(
+                    "concierge_espelho_force_included",
+                    espelho=espelho_id_cfg,
+                    triggers_encontrados=[
+                        t for t in triggers_espelho_cfg if t in texto_user_total
+                    ][:5],
+                )
+            except Exception:
+                pass
+
     custo_estimado = 0.0
     catalogo = _carregar_catalogo_seguro()
     catalogo_idx = {a["id"]: a for a in catalogo}

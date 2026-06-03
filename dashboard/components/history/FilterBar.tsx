@@ -44,13 +44,15 @@ export function FilterBar({ filter, onChange, sessions }: {
   const origens = Array.from(new Set(sessions.map(s => s.origem).filter(Boolean)))
   const activeCount = Object.values(filter).filter(v => v !== '' && v !== false).length
 
+  // v1.49 QA — dark variants em todos os selects/buttons da barra de filtro
+  const selectCls = "px-1.5 py-0.5 rounded-md bg-stone-100 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 text-[8px] font-mono text-stone-600 dark:text-stone-200 focus:outline-none"
   return (
-    <div className="px-3 py-2 border-b border-stone-100 space-y-1.5">
+    <div className="px-3 py-2 border-b border-stone-100 dark:border-stone-800 space-y-1.5">
       <div className="flex items-center justify-between">
-        <span className="text-[8px] font-mono text-stone-400 uppercase tracking-widest">Filtros</span>
+        <span className="text-[8px] font-mono text-stone-400 dark:text-stone-500 uppercase tracking-widest">Filtros</span>
         {activeCount > 0 && (
           <button onClick={() => onChange(DEFAULT_FILTER)}
-            className="text-[8px] font-mono text-stone-400 hover:text-stone-700 transition-colors">
+            className="text-[8px] font-mono text-stone-400 hover:text-stone-700 dark:text-stone-500 dark:hover:text-stone-200 transition-colors">
             limpar ({activeCount})
           </button>
         )}
@@ -58,7 +60,7 @@ export function FilterBar({ filter, onChange, sessions }: {
       <div className="flex flex-wrap gap-1">
         {/* Período */}
         <select value={filter.periodo} onChange={e => onChange({ periodo: e.target.value as FilterState['periodo'] })}
-          className="px-1.5 py-0.5 rounded-md bg-stone-100 border border-stone-200 text-[8px] font-mono text-stone-600 focus:outline-none">
+          className={selectCls}>
           <option value="">todo período</option>
           <option value="7d">7 dias</option>
           <option value="30d">30 dias</option>
@@ -67,14 +69,14 @@ export function FilterBar({ filter, onChange, sessions }: {
         {/* Origem */}
         {origens.length > 1 && (
           <select value={filter.origem} onChange={e => onChange({ origem: e.target.value })}
-            className="px-1.5 py-0.5 rounded-md bg-stone-100 border border-stone-200 text-[8px] font-mono text-stone-600 focus:outline-none">
+            className={selectCls}>
             <option value="">toda origem</option>
             {origens.map(o => <option key={o} value={o}>{o}</option>)}
           </select>
         )}
         {/* Agente */}
         <select value={filter.agente} onChange={e => onChange({ agente: e.target.value })}
-          className="px-1.5 py-0.5 rounded-md bg-stone-100 border border-stone-200 text-[8px] font-mono text-stone-600 focus:outline-none">
+          className={selectCls}>
           <option value="">todo agente</option>
           {Object.values(AGENT_MAP).map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
         </select>
@@ -83,8 +85,8 @@ export function FilterBar({ filter, onChange, sessions }: {
           onClick={() => onChange({ apenasFavoritas: !filter.apenasFavoritas })}
           className={`px-1.5 py-0.5 rounded-md border text-[8px] font-mono transition-colors ${
             filter.apenasFavoritas
-              ? 'bg-amber-100 border-amber-300 text-amber-700'
-              : 'bg-stone-100 border-stone-200 text-stone-500 hover:border-stone-300'
+              ? 'bg-amber-100 border-amber-300 text-amber-700 dark:bg-amber-900/30 dark:border-amber-700 dark:text-amber-200'
+              : 'bg-stone-100 border-stone-200 text-stone-500 hover:border-stone-300 dark:bg-stone-800 dark:border-stone-700 dark:text-stone-300 dark:hover:border-stone-500'
           }`}
         >
           ★ favoritas
@@ -94,8 +96,8 @@ export function FilterBar({ filter, onChange, sessions }: {
           onClick={() => onChange({ incluirSandbox: !filter.incluirSandbox })}
           className={`px-1.5 py-0.5 rounded-md border text-[8px] font-mono transition-colors ${
             filter.incluirSandbox
-              ? 'bg-violet-100 border-violet-300 text-violet-700'
-              : 'bg-stone-100 border-stone-200 text-stone-500 hover:border-stone-300'
+              ? 'bg-violet-100 border-violet-300 text-violet-700 dark:bg-violet-900/30 dark:border-violet-700 dark:text-violet-200'
+              : 'bg-stone-100 border-stone-200 text-stone-500 hover:border-stone-300 dark:bg-stone-800 dark:border-stone-700 dark:text-stone-300 dark:hover:border-stone-500'
           }`}
         >
           🧪 LAB

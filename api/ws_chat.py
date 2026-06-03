@@ -13,6 +13,86 @@ WS_MAX_PAYLOAD_BYTES = 6 * 1024 * 1024
 # imagem grande; conexão idle além disso é desconectada (libera worker).
 WS_RECEIVE_TIMEOUT_S = 300
 
+# v1.48 A1a-005 — timeout pra approval/confirmation manual via WS.
+# Antes: await ws.receive_json() em manual_mode/cost_cap/gate ficava indefinido.
+# Cliente que fechasse browser sem mandar "cancel" travava worker no executor —
+# agente "esperando aprovação" pra sempre, custos não fechados, leak de threads.
+# Agora: 10 minutos de janela manual antes de cancelar automaticamente (loga).
+WS_APPROVAL_TIMEOUT_S = 600
+
+
+async def _safe_receive_json(ws, label: str, timeout: float = WS_APPROVAL_TIMEOUT_S) -> dict:
+    """v1.48 A1a-005 — wrapper de ws.receive_json com timeout + tratamento.
+
+    Em timeout: retorna {"type": "cancel", "_timeout": True, "_label": label}.
+    O caller checa _timeout e cancela pipeline gracefully (sem deadlock).
+    """
+    import asyncio as _asyncio
+    try:
+        return await _asyncio.wait_for(ws.receive_json(), timeout=timeout)
+    except _asyncio.TimeoutError:
+        return {"type": "cancel", "_timeout": True, "_label": label}
+
+
+# v1.49 A1a-003/004 — helper pra construir snap_outputs DRY.
+# Antes: 11 blocos `"agente": {output_humano, output_tecnico} if condition else None`
+# duplicados literal em ws_chat.py linha 476-521. Adicionar agente novo exigia
+# copiar-colar o bloco. Agora: tabela explícita + 1 loop.
+#
+# Convenção: 3 fontes podem alimentar o output_humano:
+#   - respostas[k] (string padrão, vinda de _execute_with_approval)
+#   - outputs especiais (analise_otto, diretrizes_heitor, roteiro_salles, roteiro_carlos)
+#
+# output_tecnico só existe pra Otto (analise) e Heitor (diretrizes).
+def _montar_snap_outputs(
+    respostas: dict[str, str],
+    analise_otto: dict | None,
+    diretrizes_heitor: dict | None,
+    roteiro_salles: str | None,
+    roteiro_carlos: str | None,
+) -> dict[str, dict | None]:
+    """Constrói o dicionário de outputs que Aya recebe pra compilar.
+
+    Retorna dict com chave=agente_id, valor=None se ausente OU
+    {"output_humano": str, "output_tecnico": dict}.
+    """
+    snap: dict[str, dict | None] = {}
+
+    # Casos especiais (têm output_tecnico próprio)
+    snap["otto"] = (
+        {"output_humano": respostas.get("otto", ""), "output_tecnico": analise_otto}
+        if analise_otto is not None
+        else None
+    )
+    snap["heitor"] = (
+        {"output_humano": respostas.get("heitor", ""), "output_tecnico": diretrizes_heitor or {}}
+        if diretrizes_heitor
+        else None
+    )
+    snap["salles"] = (
+        {"output_humano": roteiro_salles, "output_tecnico": {}}
+        if roteiro_salles
+        else None
+    )
+    snap["carlos"] = (
+        {"output_humano": roteiro_carlos, "output_tecnico": {}}
+        if roteiro_carlos
+        else None
+    )
+
+    # Agentes simples (output_humano vem direto de respostas[k], output_tecnico vazio)
+    _agentes_simples = (
+        "sonia", "pedro_abrahao", "renata",
+        "ana_maria", "prichina", "caito", "kelly",
+    )
+    for ag in _agentes_simples:
+        snap[ag] = (
+            {"output_humano": respostas.get(ag, ""), "output_tecnico": {}}
+            if ag in respostas
+            else None
+        )
+    return snap
+
 from agentes.aya import Aya
 from agentes.heitor import Heitor
 from agentes.otto import Otto
@@ -118,22 +198,30 @@ async def chat(ws: WebSocket):
             if image_base64 and image_media_type not in ALLOWED_MEDIA:
                 image_base64 = None  # tipo desconhecido = ignora
             # V-26 — valida magic bytes (anti-evasão: cliente diz "image/png" mas manda EXE)
+            # v1.46.2 A1a-007 — WebP completo: antes só checava RIFF (que também serve
+            # pra WAV/AVI/outros formatos RIFF). Agora exige marker "WEBP" nos bytes 8-11.
             if image_base64:
                 try:
                     import base64 as _b64
-                    _head = _b64.b64decode(image_base64[:32], validate=False)[:8]
-                    MAGIC = {
+                    # Precisamos de 16 bytes pra checar WEBP marker (bytes 8-11).
+                    # base64 codifica 3 bytes em 4 chars — pedimos 24 chars pra ter 18 bytes.
+                    _head = _b64.b64decode(image_base64[:24], validate=False)[:16]
+                    MAGIC_SIMPLES = {
                         b"\xff\xd8\xff": "image/jpeg",
                         b"\x89PNG\r\n\x1a\n": "image/png",
                         b"GIF87a": "image/gif",
                         b"GIF89a": "image/gif",
-                        b"RIFF": "image/webp",  # WebP começa com RIFF...WEBP
                     }
                     ok = False
-                    for m, t in MAGIC.items():
-                        if _head.startswith(m) and (t == image_media_type or (t == "image/webp" and image_media_type == "image/webp")):
+                    # Checa formatos com magic simples no início
+                    for m, t in MAGIC_SIMPLES.items():
+                        if _head.startswith(m) and t == image_media_type:
                             ok = True
                             break
+                    # WebP: RIFF nos bytes 0-3 E "WEBP" nos bytes 8-11
+                    if not ok and image_media_type == "image/webp":
+                        if len(_head) >= 12 and _head[:4] == b"RIFF" and _head[8:12] == b"WEBP":
+                            ok = True
                     if not ok:
                         image_base64 = None  # magic bytes não bate com declarado
                 except Exception:
@@ -206,16 +294,24 @@ async def chat(ws: WebSocket):
             analise_otto = resume_context.get("analise_otto") or None
             diretrizes_heitor = resume_context.get("diretrizes_heitor") or None
             roteiro_salles = resume_context.get("roteiro_salles") or None
+            # v1.46.1 #13 — Carlos atribuía em roteiro_salles antes, vazando como
+            # "Salles — Roteiro" no PDF. Agora cada agente tem sua variável.
+            roteiro_carlos = resume_context.get("roteiro_carlos") or None
             # T166-T168: outputs dos agentes administrativos da sessão atual.
             # Usado pra alimentar Caíto com visão cruzada dos outros admin.
             admin_outputs: dict[str, str] = {}
 
             # Herda respostas anteriores para que a sessão salva fique completa
             respostas: dict[str, str] = dict(resume_context.get("respostas", {}))
+            # v1.48 A-11 — respostas estruturadas (não-string), ex: variantes do Salles
+            respostas_estruturadas: dict[str, dict] = dict(
+                resume_context.get("respostas_estruturadas", {})
+            )
             custos: dict[str, float] = dict(resume_context.get("custos_usd", {}))
             duracoes: dict[str, float] = {}
             pipeline_cancelled = False
             heitor_risco_vermelho = False  # T29: roteamento condicional
+            nome_projeto_final: str | None = None  # v1.46.1 #12 — persiste no JSON da sessão
 
             # Se resume_context tem briefing e o usuário não digitou nada novo, mantém o original
             if resume_context.get("briefing") and briefing == resume_context["briefing"]:
@@ -238,7 +334,7 @@ async def chat(ws: WebSocket):
 
             async def _run_agent_step(name: str) -> tuple[str, float] | None:
                 """Executa um agente e retorna (text, cost) ou None se cancelado/pulado."""
-                nonlocal analise_otto, diretrizes_heitor, roteiro_salles
+                nonlocal analise_otto, diretrizes_heitor, roteiro_salles, roteiro_carlos, nome_projeto_final
 
                 if name == "otto":
                     ag = Otto()
@@ -321,9 +417,10 @@ async def chat(ws: WebSocket):
                             formato="auto",
                         ),
                     )
-                    # Carlos também pode alimentar Sônia (mesma posição do Salles)
-                    roteiro_salles = res.get("output_humano", "")
-                    return roteiro_salles, res.get("custo_total_usd", 0)
+                    # v1.46.1 #13 — Carlos atribui em SUA variável (não em roteiro_salles).
+                    # Sônia lê roteiro_carlos OR roteiro_salles, o que estiver disponível.
+                    roteiro_carlos = res.get("output_humano", "")
+                    return roteiro_carlos, res.get("custo_total_usd", 0)
 
                 # ─── Agentes administrativos Hator (T166-T168) ────────────────
                 elif name == "ana_maria":
@@ -374,9 +471,29 @@ async def chat(ws: WebSocket):
                     admin_outputs["caito"] = out
                     return out, res.get("custo_total_usd", 0)
 
+                elif name == "pedro_abrahao":
+                    # v1.46.1 #17 — Pedro como agente top-level (Concierge sugere ele direto).
+                    # Antes só rodava via _run_gate_espelho após Salles. Sem case próprio aqui,
+                    # caía no return None silencioso e o pipeline ignorava.
+                    ag = PedroAbrahao()
+                    # Pergunta = briefing; se Carlos/Salles já produziram roteiro, vira contexto opcional
+                    contexto_pedro = roteiro_carlos or roteiro_salles or None
+                    res = await loop.run_in_executor(
+                        LEMMON_EXECUTOR,
+                        lambda: ag.executar(
+                            pergunta=briefing,
+                            contexto_opcional=contexto_pedro,
+                            modo="consulta",
+                        ),
+                    )
+                    if res and not res.get("cancelado"):
+                        return res.get("output_humano", ""), res.get("custo_total_usd", 0)
+                    return "Consulta ao Pedro cancelada.", 0
+
                 elif name == "sonia":
                     ag = Sonia()
-                    roteiro = roteiro_salles or briefing
+                    # v1.46.1 #13 — Sônia agora aceita roteiro vindo de Carlos OU Salles
+                    roteiro = roteiro_carlos or roteiro_salles or briefing
                     com_busca = bool(cfg_sonia.get("com_busca", False))
                     usar_tendencias = bool(cfg_sonia.get("usar_tendencias", True))
                     cb = _make_confirmacao_callback(ws, loop, "sonia")
@@ -398,38 +515,34 @@ async def chat(ws: WebSocket):
 
                 elif name == "aya":
                     ag = Aya()
-                    # D-3 — sanitiza nome do projeto: remove CPF/email/telefone/PII
-                    # antes de virar nome de pasta. Antes briefing[:60] vazava dados.
+                    # v1.46.1 #12 — usa Haiku pra gerar nome bonito do projeto.
+                    # Antes: snake_case truncado feio na capa do PDF.
+                    # Sanitização PII (D-3) ainda aplicada como camada de defesa.
                     import re as _re
+                    from core.nomeador import gerar_nome_projeto
                     if briefing:
-                        _cleaned = _re.sub(r"\d{3}\.?\d{3}\.?\d{3}-?\d{2}", "[cpf]", briefing)  # CPF
+                        _cleaned = _re.sub(r"\d{3}\.?\d{3}\.?\d{3}-?\d{2}", "[cpf]", briefing)
                         _cleaned = _re.sub(r"[\w\.-]+@[\w\.-]+", "[email]", _cleaned)
                         _cleaned = _re.sub(r"\(?\d{2}\)?[\s-]?\d{4,5}-?\d{4}", "[fone]", _cleaned)
-                        _cleaned = _re.sub(r"[^\w\s-]", "", _cleaned)  # só alfanum + espaço + hifen
-                        _cleaned = _re.sub(r"\s+", "_", _cleaned).strip("_")
-                        nome_projeto = _cleaned[:60] or None
+                        # Detecta cliente do tenant
+                        from core.tenant import tenant_id as _tid
+                        _cliente = _tid().capitalize() if _tid() != "default" else None
+                        nome_projeto = gerar_nome_projeto(_cleaned, cliente=_cliente)
+                        nome_projeto_final = nome_projeto  # v1.46.1 #12 — guarda pra salvar
                     else:
                         nome_projeto = None
-                    # Sempre passa os 4 agentes; None = ausente nesta sessão
-                    # (Aya não vai buscar no disco para os ausentes)
-                    snap_outputs: dict[str, dict | None] = {
-                        "otto": {
-                            "output_humano": respostas.get("otto", ""),
-                            "output_tecnico": analise_otto,
-                        } if analise_otto is not None else None,
-                        "heitor": {
-                            "output_humano": respostas.get("heitor", ""),
-                            "output_tecnico": diretrizes_heitor or {},
-                        } if diretrizes_heitor else None,
-                        "salles": {
-                            "output_humano": roteiro_salles,
-                            "output_tecnico": {},
-                        } if roteiro_salles else None,
-                        "sonia": {
-                            "output_humano": respostas.get("sonia", ""),
-                            "output_tecnico": {},
-                        } if "sonia" in respostas else None,
-                    }
+                    # v1.46.1 #13 — adicionados carlos, pedro_abrahao, renata + 4 admin
+                    # Aya rotula cada output pelo agente CORRETO no PDF (não mais Carlos→Salles)
+                    # v1.49 A1a-003/004 — dedup: snap_outputs construído via _montar_snap
+                    # (era 11 blocos quase idênticos, troca de agente nova exigia
+                    # duplicar). Agora 1 chamada com mapeamento.
+                    snap_outputs = _montar_snap_outputs(
+                        respostas=respostas,
+                        analise_otto=analise_otto,
+                        diretrizes_heitor=diretrizes_heitor,
+                        roteiro_salles=roteiro_salles,
+                        roteiro_carlos=roteiro_carlos,
+                    )
                     res = await loop.run_in_executor(
                         LEMMON_EXECUTOR,
                         lambda: ag.executar(
@@ -448,12 +561,33 @@ async def chat(ws: WebSocket):
                         or cfg_renata.get("cliente_id")
                         or None
                     )
-                    # Dossiê da Aya nesta sessão tem prioridade; fallback: auto-detect no historico
+                    # v1.48 A1a-008 — FALLBACK CHAIN da Renata documentada:
+                    # ─────────────────────────────────────────────────────
+                    # Renata é Social Media → quer contexto rico pra montar
+                    # calendário editorial. Ordem de preferência do contexto:
+                    #
+                    # 1. dossie_aya (output da Aya neste pipeline) — IDEAL.
+                    #    Aya compila tudo: estratégia, roteiros, compliance.
+                    # 2. roteiro_salles (output direto do Salles) — bom 2º.
+                    #    Briefing já refinado pra produção.
+                    # 3. analise_sonia + diretrizes_heitor — sinais extras
+                    #    (performance + compliance), não substituem 1/2 mas
+                    #    enriquecem.
+                    # 4. briefing puro (modo solo) — FALLBACK FINAL.
+                    #    Renata sozinha, sem pipeline antes. Acontece quando
+                    #    cliente quer só calendário ("planejar 30 dias de
+                    #    posts") e ninguém roda antes dela.
+                    #
+                    # A flag `_has_pipeline_context` decide modo:
+                    # - True (Aya ou Salles presente) → modo "pipeline"
+                    # - False → modo "solo" + contexto = briefing original
+                    #
+                    # Renata SEMPRE roda mesmo sem Aya — Aya quebrar não
+                    # pode bloquear calendário do cliente.
                     _dossie_aya = respostas.get("aya") or None
                     _rot_salles = roteiro_salles or None
                     _an_sonia   = respostas.get("sonia") or None
                     _dir_heitor = diretrizes_heitor or None
-                    # Se não há contexto de pipeline, cai em modo solo com o briefing
                     _has_pipeline_context = bool(_dossie_aya or _rot_salles)
                     _modo = "pipeline" if _has_pipeline_context else "solo"
                     _ctx_solo = briefing if not _has_pipeline_context else None
@@ -483,6 +617,27 @@ async def chat(ws: WebSocket):
                         _t0 = asyncio.get_running_loop().time()
                         result = await _run_agent_step(name)
                         if result is None:
+                            # v1.49 QA-B10 — antes: silent success quando agent não foi
+                            # mapeado. Renata em alguns paths caía aqui sem trace.
+                            # Agora: log + audit + WS warning pra cliente perceber.
+                            _log.warning(
+                                "agent_skipped_silently name=%s reason=run_agent_step_returned_None",
+                                name,
+                            )
+                            try:
+                                from core import audit
+                                audit.registrar(
+                                    "agent_skipped_silently",
+                                    agent=name,
+                                    reason="run_agent_step_returned_None",
+                                )
+                            except Exception:
+                                pass
+                            await ws.send_json({
+                                "type": "agent_error",
+                                "agent": name,
+                                "error": f"{name} não foi executado (mapeamento ausente — bug)",
+                            })
                             return True
                         text, cost = result
                         duracoes[name] = round(asyncio.get_running_loop().time() - _t0, 1)
@@ -492,7 +647,7 @@ async def chat(ws: WebSocket):
 
                         if manual_mode:
                             await ws.send_json({"type": "agent_done", "agent": name, "cost": cost, "awaiting_approval": True})
-                            ctrl = await ws.receive_json()
+                            ctrl = await _safe_receive_json(ws, "manual_approval")
                             if ctrl.get("type") == "cancel":
                                 pipeline_cancelled = True
                                 return False
@@ -501,9 +656,26 @@ async def chat(ws: WebSocket):
                         return True
 
                     except Exception as e:
+                        # v1.49 QA-B10 — antes exception era só enviada pro WS e silenciada.
+                        # Agora: log estruturado com traceback + audit pra rastrear.
+                        import traceback as _tb
+                        _log.error(
+                            "agent_exception name=%s err=%s tb=%s",
+                            name, str(e), _tb.format_exc(),
+                        )
+                        try:
+                            from core import audit
+                            audit.registrar(
+                                "agent_exception",
+                                agent=name,
+                                error_type=type(e).__name__,
+                                error_msg=str(e)[:500],
+                            )
+                        except Exception:
+                            pass
                         if manual_mode:
                             await ws.send_json({"type": "agent_error", "agent": name, "error": str(e), "awaiting_retry": True})
-                            ctrl = await ws.receive_json()
+                            ctrl = await _safe_receive_json(ws, "manual_approval")
                             action = ctrl.get("type", "skip")
                             if action == "retry":
                                 continue  # reinicia o while
@@ -559,7 +731,7 @@ async def chat(ws: WebSocket):
                             f"{gate_text[:500]}\n\nContinuar para Sônia mesmo assim?"
                         )
                         await ws.send_json({"type": "confirmar", "agent": "gate_espelho", "mensagem": msg})
-                        ctrl = await ws.receive_json()
+                        ctrl = await _safe_receive_json(ws, "manual_approval")
                         if ctrl.get("type") != "confirmar_sim":
                             pipeline_cancelled = True
                             return False
@@ -590,7 +762,7 @@ async def chat(ws: WebSocket):
                         "total_atual": round(total_atual, 5),
                         "cap": custo_cap_autorizado,
                     })
-                    ctrl = await ws.receive_json()
+                    ctrl = await _safe_receive_json(ws, "manual_approval")
                     if ctrl.get("type") == "autorizar_custo":
                         custo_cap_autorizado += max(0.1, float(ctrl.get("valor", 0.5)))
                     else:
@@ -599,7 +771,19 @@ async def chat(ws: WebSocket):
                 return True
 
             async def _run_salles_alternativas() -> bool:
-                """T24: roda Salles 3x com variações e combina para Sônia. Retorna False se cancelado."""
+                """T24 + v1.48 A-11: roda Salles 3x com variações.
+
+                ANTES: combinava em 1 texto e jogava em `respostas["salles"]`.
+                Quem precisasse das variantes individuais (Aya, frontend, audit)
+                tinha que regex-parsear "## Variante N". Frágil e sem cost breakdown
+                por variante. Sônia também via blob único e podia pegar
+                acidentalmente fragmentos misturados.
+
+                AGORA: preserva variantes estruturadas em `respostas_estruturadas["salles"]`
+                como lista de {label, hint, texto, custo, variant_id}. O texto combinado
+                continua em `respostas["salles"]` pra compat com Sônia/Aya. Mas dossiê
+                final tem acesso às 3 separadas.
+                """
                 nonlocal roteiro_salles, pipeline_cancelled
                 variacoes = [
                     ("padrão", ""),
@@ -607,6 +791,7 @@ async def chat(ws: WebSocket):
                     ("emocional e pessoal", " [VARIAÇÃO: estilo emocional e testemunhal, tom íntimo, foco em conexão humana]"),
                 ]
                 formatos_perm = cfg_salles.get("formatos_permitidos", [])
+                variantes_estruturadas: list[dict] = []
                 todos_textos: list[str] = []
                 for idx, (label, hint) in enumerate(variacoes):
                     variant_id = f"salles_v{idx+1}"
@@ -623,14 +808,24 @@ async def chat(ws: WebSocket):
                                 formatos_permitidos=formatos_perm,
                             ),
                         )
-                        texto_s = f"**Variante {idx+1} — {label}**\n\n" + res_s.get("output_humano", "")
+                        texto_bruto = res_s.get("output_humano", "")
+                        texto_s = f"**Variante {idx+1} — {label}**\n\n" + texto_bruto
                         custo_s = res_s.get("custo_total_usd", 0)
-                        todos_textos.append(res_s.get("output_humano", ""))
+                        todos_textos.append(texto_bruto)
                         custos[f"salles_v{idx+1}"] = custo_s
+                        # v1.48 A-11 — preserva cada variante separada (não sobrescreve)
+                        variantes_estruturadas.append({
+                            "variant_id": variant_id,
+                            "label": label,
+                            "hint": hint,
+                            "texto": texto_bruto,
+                            "custo_usd": custo_s,
+                            "output_tecnico": res_s.get("output_tecnico", {}),
+                        })
                         await _stream(ws, variant_id, texto_s)
                         if manual_mode and idx == len(variacoes) - 1:
                             await ws.send_json({"type": "agent_done", "agent": variant_id, "cost": custo_s, "awaiting_approval": True})
-                            ctrl = await ws.receive_json()
+                            ctrl = await _safe_receive_json(ws, "manual_approval")
                             if ctrl.get("type") == "cancel":
                                 pipeline_cancelled = True
                                 return False
@@ -643,6 +838,12 @@ async def chat(ws: WebSocket):
                     [f"## Variante {i+1}\n\n{t}" for i, t in enumerate(todos_textos)]
                 )
                 respostas["salles"] = roteiro_salles
+                # v1.48 A-11 — também publica variantes estruturadas pra dossiê final
+                respostas_estruturadas["salles"] = {
+                    "variantes": variantes_estruturadas,
+                    "texto_combinado": roteiro_salles,
+                    "total_variantes": len(variantes_estruturadas),
+                }
                 return True
 
             for name in names:
@@ -685,7 +886,16 @@ async def chat(ws: WebSocket):
                 _ = ok
 
             # Salva sessão completa e envia o ID para o frontend avaliar
-            all_agents = list(dict.fromkeys(list(resume_context.get("agentes_usados", [])) + names))
+            # v1.49 QA-B10 — antes: `all_agents` somava `names` (o que foi PEDIDO),
+            # então Renata aparecia em `agentes_usados` mesmo quando falhava silenciosamente
+            # (sem `respostas["renata"]`). Frontend mostrava pill da Renata em sessão
+            # salva sem conteúdo dela, confundindo o cliente. Agora inclui só agentes
+            # que realmente produziram resposta. Pedro só tem entrada em `respostas`
+            # se rodou (case próprio em ws_chat:474). Mantém ordem original via names.
+            _agentes_executados = [a for a in names if a in respostas]
+            all_agents = list(dict.fromkeys(
+                list(resume_context.get("agentes_usados", [])) + _agentes_executados
+            ))
             contexto_tecnico = {
                 "briefing": briefing,
                 "analise_otto": analise_otto,
@@ -696,7 +906,13 @@ async def chat(ws: WebSocket):
                 "agentes_usados": all_agents,
             }
             # T27/T106: sandbox salva com origem='sandbox', excluído das listagens default
-            session_path = _salvar_sessao(briefing, all_agents, respostas, custos, contexto_tecnico, duracoes=duracoes, sandbox=sandbox)
+            # v1.48 A-11: passa respostas_estruturadas pra persistir variantes Salles
+            session_path = _salvar_sessao(
+                briefing, all_agents, respostas, custos, contexto_tecnico,
+                duracoes=duracoes, sandbox=sandbox,
+                nome_projeto=nome_projeto_final,
+                respostas_estruturadas=respostas_estruturadas,
+            )
             session_id = session_path.stem
 
             # Sugerir tags automaticamente via Aya (T15) — nunca em sandbox

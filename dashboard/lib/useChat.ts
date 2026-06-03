@@ -89,8 +89,25 @@ export function useChat() {
   // (em done=true). Antes: localStorage.setItem 500x por segundo durante streaming.
   const [persistedMessages, setPersistedMessages] = useLocalStorage<Message[]>('lemmon-last-messages', [])
   const [messages, setMessages] = useState<Message[]>(persistedMessages)
+  // T-bug-Hator-#4 — useLocalStorage retorna defaultValue ([]) no primeiro render
+  // pra ser SSR-safe; só lê do storage no useEffect. Como inicializávamos messages
+  // com persistedMessages NO PRIMEIRO RENDER, perdemos o valor real do storage.
+  // Resultado: navegar pra outra rota e voltar zerava as bolhas do chat MAS o
+  // conciergeHistory permanecia, deixando o backend respondendo com base num
+  // histórico que o user não estava vendo. Fix: rehidrata 1 vez quando o
+  // useLocalStorage termina de ler o storage.
+  const hasHydratedRef = useRef(false)
+  useEffect(() => {
+    if (!hasHydratedRef.current && persistedMessages.length > 0 && messages.length === 0) {
+      setMessages(persistedMessages)
+      hasHydratedRef.current = true
+    } else if (persistedMessages.length === 0 && !hasHydratedRef.current) {
+      // storage vazio confirmado — marca hidratado pra não interferir depois
+      hasHydratedRef.current = true
+    }
+  }, [persistedMessages, messages.length])
   // Sincroniza state ↔ localStorage só em momentos "stables":
-  // (1) ao montar (já feito acima via useState com initial value)
+  // (1) ao montar (já feito acima via useState com initial value + rehidrata se preciso)
   // (2) quando alguma msg vira done=true (final de cada agente)
   // (3) quando array fica vazio (reset)
   const lastPersistedCount = useRef(persistedMessages.length)
@@ -107,6 +124,11 @@ export function useChat() {
   })
   const [isRunning, setIsRunning] = useState(false)
   const [sessionId, setSessionId] = useLocalStorage<string | null>('lemmon-last-session-id', null)
+  // v1.49 QA-B01 — distingue "sessão atual concluída agora" de "sessionId
+  // persistido em localStorage de execução anterior". O `sessionId` sobrevive
+  // reload da página; este flag NÃO. Usado pelo FeedbackPosPipeline pra
+  // não aparecer na welcome screen quando o usuário ainda nem mandou briefing.
+  const [pipelineCompletoNestaSessao, setPipelineCompletoNestaSessao] = useState(false)
   const [favoritado, setFavoritado] = useState(false)
   const [manualMode, setManualMode] = useState(false)
   const [awaitingApproval, setAwaitingApproval] = useState<ApprovalRequest | null>(null)
@@ -249,6 +271,7 @@ export function useChat() {
 
     sessionStartTimeRef.current = Date.now()  // T140 — pra reconciliar via histórico se WS cair
     setSessionId(null)
+    setPipelineCompletoNestaSessao(false)  // v1.49 QA-B01 — reset flag pra esconder feedback card
     setFavoritado(false)
     setAwaitingApproval(null)
     setTagsSugeridas([])
@@ -457,6 +480,7 @@ export function useChat() {
       if (data.type === 'pipeline_done') {
         setIsRunning(false)
         setAwaitingApproval(null)
+        setPipelineCompletoNestaSessao(true)  // v1.49 QA-B01
         if (data.session_id) {
           setSessionId(data.session_id)
         } else {
@@ -616,6 +640,7 @@ export function useChat() {
     messages, agentStatus, isRunning, sessionId, favoritado, resumedFrom,
     manualMode, fastTrack, sandbox, custoCap, custoCapAtingido, custoAviso,
     awaitingApproval, agentConfig, tagsSugeridas, agentProgress, agentProgressMeta,
+    pipelineCompletoNestaSessao,  // v1.49 QA-B01
     send, approve, abort, toggleManualMode, toggleFastTrack, toggleSandbox,
     setCustoCap, autorizarCusto, recusarCustoExtra,
     updateConfig, favoritar, exportar, reset, loadSession,

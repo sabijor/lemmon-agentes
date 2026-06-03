@@ -86,28 +86,29 @@ export default function HistoryPanel({
       </>}
 
       {/* Header — drag handle */}
+      {/* v1.49 QA — dark variants pra header do histórico */}
       <div
         style={{ height: HEADER_H, flexShrink: 0 }}
-        className="flex items-center justify-between px-4 border-b border-stone-200/50 cursor-grab active:cursor-grabbing select-none"
+        className="flex items-center justify-between px-4 border-b border-stone-200/50 dark:border-stone-700/50 cursor-grab active:cursor-grabbing select-none"
         onPointerDown={e => dragControls.start(e)}
       >
         <div className="flex items-center gap-2">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-stone-700">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-stone-700 dark:text-stone-300">
             <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
           </svg>
-          <span className="font-display font-semibold text-sm tracking-tight">Histórico</span>
-          <span className="text-[9px] font-mono text-stone-400 bg-stone-100 px-1.5 py-0.5 rounded-full">
+          <span className="font-display font-semibold text-sm tracking-tight dark:text-stone-100">Histórico</span>
+          <span className="text-[9px] font-mono text-stone-400 dark:text-stone-500 bg-stone-100 dark:bg-stone-800 px-1.5 py-0.5 rounded-full">
             {filteredSessions.length}{filteredSessions.length !== sessions.length ? `/${sessions.length}` : ''}
           </span>
         </div>
         <div className="flex items-center gap-1.5">
           <button onClick={() => setMinimized(v => !v)}
-            className="w-7 h-7 rounded-lg border border-stone-200 bg-white flex items-center justify-center hover:bg-stone-50 transition-all font-mono text-stone-500 text-sm font-bold">
+            className="w-7 h-7 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 flex items-center justify-center hover:bg-stone-50 dark:hover:bg-stone-700 transition-all font-mono text-stone-500 dark:text-stone-300 text-sm font-bold">
             {minimized ? '+' : '−'}
           </button>
           <button onClick={onClose}
-            className="w-7 h-7 rounded-lg border border-stone-200 bg-white flex items-center justify-center hover:bg-stone-50 hover:border-stone-400 transition-all">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#78716c" strokeWidth="2.5">
+            className="w-7 h-7 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 flex items-center justify-center hover:bg-stone-50 dark:hover:bg-stone-700 hover:border-stone-400 dark:hover:border-stone-500 transition-all">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-stone-500 dark:text-stone-400">
               <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
             </svg>
           </button>

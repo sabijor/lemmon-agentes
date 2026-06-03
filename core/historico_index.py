@@ -17,11 +17,35 @@ from pathlib import Path
 from typing import Callable
 
 from core.config import HISTORICO_DIR
+from core.tenant import tenant_id  # v1.46.1 #11 — index particionado por tenant
 
 _log = logging.getLogger("lemmon.index")
 
-INDEX_PATH = HISTORICO_DIR / "_index.json"
-DASHBOARD_DIR = HISTORICO_DIR / "dashboard"
+
+# v1.46.1 #11 — INDEX_PATH e DASHBOARD_DIR viram funções pra resolver em runtime
+# (não em import time). Sem isso, mudanças em LEMMON_TENANT_ID após o import
+# não pegavam. Cada tenant tem seu próprio _index.json e dashboard/.
+def _index_path() -> Path:
+    return HISTORICO_DIR / tenant_id() / "_index.json"
+
+
+def _dashboard_dir() -> Path:
+    return HISTORICO_DIR / tenant_id() / "dashboard"
+
+
+# v1.46.1 #11 — API pública. Use em rotas/scripts em vez de `HISTORICO_DIR / "dashboard"`.
+def dashboard_dir() -> Path:
+    """Path do diretório de sessões do tenant atual (criado se não existir)."""
+    p = _dashboard_dir()
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
+
+# Mantém o nome antigo como alias pra módulos que ainda importam INDEX_PATH/DASHBOARD_DIR
+# como variáveis (são poucos — só mostra path do tenant default em import time).
+# Refatorar leitores pra usarem as funções é o caminho correto.
+INDEX_PATH = _index_path()
+DASHBOARD_DIR = _dashboard_dir()
 _VERSAO = 1
 
 
@@ -71,10 +95,11 @@ def _update_json_atomic(path: Path, mutate: Callable[[dict], None]) -> bool:
 
 def _ler_indice() -> list[dict]:
     """Carrega entradas do índice; retorna lista vazia se arquivo não existe."""
-    if not INDEX_PATH.exists():
+    idx = _index_path()  # v1.46.1 #11 — resolve em runtime
+    if not idx.exists():
         return []
     try:
-        raw = json.loads(INDEX_PATH.read_text(encoding="utf-8"))
+        raw = json.loads(idx.read_text(encoding="utf-8"))
         return raw.get("entradas", [])
     except Exception as exc:
         _log.warning("Índice corrompido, será reconstruído: %s", exc)
@@ -82,8 +107,9 @@ def _ler_indice() -> list[dict]:
 
 
 def _gravar_indice(entradas: list[dict]) -> None:
-    HISTORICO_DIR.mkdir(parents=True, exist_ok=True)
-    INDEX_PATH.write_text(
+    idx = _index_path()  # v1.46.1 #11 — resolve em runtime
+    idx.parent.mkdir(parents=True, exist_ok=True)
+    idx.write_text(
         json.dumps({"versao": _VERSAO, "entradas": entradas}, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
@@ -152,7 +178,7 @@ def marcar_favorito(session_id: str, favorito: bool) -> None:
     simultâneas em /favoritar e /tags na mesma sessão serializam sem perder
     nenhuma escrita.
     """
-    session_dir = HISTORICO_DIR / "dashboard"
+    session_dir = _dashboard_dir()  # v1.46.1 #11 — particionado por tenant
     path = session_dir / f"{session_id}.json"
     try:
         ok = _update_json_atomic(path, lambda d: d.update({"favorito": favorito}))
@@ -172,12 +198,13 @@ def reconstruir() -> int:
     _log.info("Reconstruindo índice de sessões...")
     t0 = time.monotonic()
 
-    if not DASHBOARD_DIR.exists():
+    dash = _dashboard_dir()  # v1.46.1 #11 — resolve em runtime
+    if not dash.exists():
         _gravar_indice([])
         return 0
 
     arquivos = sorted(
-        list(DASHBOARD_DIR.glob("*_sessao.json")) + list(DASHBOARD_DIR.glob("*_reuniao.json")),
+        list(dash.glob("*_sessao.json")) + list(dash.glob("*_reuniao.json")),
         key=lambda p: p.stem,
     )
     entradas = []
@@ -198,13 +225,15 @@ def sanity_check() -> None:
     Compara contagem de arquivos JSON vs entradas no índice.
     Se divergência > 5% (ou índice ausente), reconstrói automaticamente.
     """
-    if not DASHBOARD_DIR.exists():
+    dash = _dashboard_dir()  # v1.46.1 #11 — resolve em runtime
+    if not dash.exists():
         return
 
-    arquivos = list(DASHBOARD_DIR.glob("*_sessao.json")) + list(DASHBOARD_DIR.glob("*_reuniao.json"))
+    arquivos = list(dash.glob("*_sessao.json")) + list(dash.glob("*_reuniao.json"))
     n_arquivos = len(arquivos)
 
-    if not INDEX_PATH.exists():
+    idx = _index_path()
+    if not idx.exists():
         _log.warning("_index.json não encontrado — reconstruindo.")
         reconstruir()
         return

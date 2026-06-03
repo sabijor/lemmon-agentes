@@ -1,13 +1,31 @@
 """Gestão de exemplares curados (few-shot) por agente."""
 import json
+import re
 from datetime import datetime
 from pathlib import Path
 
 EXEMPLARES_DIR = Path(__file__).parent / "exemplares"
 MAX_EXEMPLARES_POR_AGENTE = 10
 
+# v1.49 QA-B13 — agente_id vem do path da rota /exemplares/{agente}.
+# Antes: `EXEMPLARES_DIR / f"{agente_id}.json"` aceitava qualquer string,
+# incluindo `../../etc/passwd` → path traversal.
+# Agora: regex força [a-z0-9_]{1,40} (mesma convenção de IDs internos).
+_AGENTE_ID_RE = re.compile(r"^[a-z0-9_]{1,40}$")
+
+
+def _validar_agente_id(agente_id: str) -> str:
+    """v1.49 QA-B13 — sanitiza agente_id antes de usar em path.
+
+    Retorna o id se válido; senão raise ValueError.
+    """
+    if not isinstance(agente_id, str) or not _AGENTE_ID_RE.match(agente_id):
+        raise ValueError(f"agente_id inválido: {agente_id!r}")
+    return agente_id
+
 
 def salvar_exemplar(agente_id: str, trecho: str, contexto: str = "", session_id: str = "") -> dict:
+    agente_id = _validar_agente_id(agente_id)
     EXEMPLARES_DIR.mkdir(exist_ok=True)
     path = EXEMPLARES_DIR / f"{agente_id}.json"
     exemplares = carregar_exemplares(agente_id)
@@ -27,6 +45,10 @@ def salvar_exemplar(agente_id: str, trecho: str, contexto: str = "", session_id:
 
 
 def carregar_exemplares(agente_id: str) -> list[dict]:
+    try:
+        agente_id = _validar_agente_id(agente_id)
+    except ValueError:
+        return []
     path = EXEMPLARES_DIR / f"{agente_id}.json"
     if not path.exists():
         return []
@@ -37,6 +59,10 @@ def carregar_exemplares(agente_id: str) -> list[dict]:
 
 
 def remover_exemplar(agente_id: str, exemplar_id: str) -> bool:
+    try:
+        agente_id = _validar_agente_id(agente_id)
+    except ValueError:
+        return False
     exemplares = carregar_exemplares(agente_id)
     antes = len(exemplares)
     exemplares = [e for e in exemplares if e.get("id") != exemplar_id]
