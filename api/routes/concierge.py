@@ -106,6 +106,98 @@ FERRAMENTAS_DISPONIVEIS = {
 }
 
 
+# v1.49 A1b-007 — Tool-use mode da Anthropic pra estruturar resposta.
+# Antes: model retornava texto que tentávamos parsear como JSON (com fallback
+# pra retry + alerta de fence markdown). Parsing falhava ~5% das vezes (Haiku
+# adicionava texto fora do JSON, esquecia fechar chave, etc.) → cliente via
+# pergunta neutra de fallback em vez do real.
+# Agora: definimos schema da resposta como tool, modelo retorna tool_use block
+# já validado. Sem parsing, sem retry de fence. Forma canônica da Anthropic
+# pra structured output.
+FERRAMENTA_CONCIERGE_RESPOSTA = {
+    "name": "responder_concierge",
+    "description": (
+        "Estrutura a resposta do Concierge ao cliente. Use SEMPRE essa tool — "
+        "nunca responda em texto livre. Os 3 tipos (pergunta/confirmar/pronto) "
+        "seguem as regras do system prompt."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "tipo": {
+                "type": "string",
+                "enum": ["pergunta", "confirmar", "pronto"],
+                "description": (
+                    "pergunta = ainda falta contexto crítico. "
+                    "confirmar = sei o que fazer, peço OK do cliente. "
+                    "pronto = cliente já OKou na rodada anterior."
+                ),
+            },
+            "conteudo": {
+                "type": "string",
+                "description": (
+                    "Texto pro cliente. Português brasileiro coloquial e direto. "
+                    "Em confirmar: lista agentes escolhidos + razão de 1 linha + 'OK rodar?'. "
+                    "Em pergunta: 1 frase de contexto + 1 pergunta concreta."
+                ),
+            },
+            "briefing_refinado": {
+                "type": ["string", "null"],
+                "description": (
+                    "Se tipo=confirmar OU pronto: consolida o pedido em 2-4 frases. "
+                    "Se tipo=pergunta: null."
+                ),
+            },
+            "dimensoes_completas": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": (
+                    "Lista de dimensões já entendidas. Chaves válidas: "
+                    "o_que, publico, canal, objetivo, urgencia, vibe."
+                ),
+            },
+            "dimensoes_faltando": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Lista de dimensões que ainda faltam (mesmas chaves).",
+            },
+            "agentes_sugeridos": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": (
+                    "IDs dos agentes do catálogo. Lowercase snake_case: "
+                    "otto, heitor, salles, carlos, sonia, aya, renata, "
+                    "pedro_abrahao, ana_maria, prichina, caito, kelly. "
+                    "Vazio se tipo=pergunta."
+                ),
+            },
+            "razoes_agentes": {
+                "type": "object",
+                "additionalProperties": {"type": "string"},
+                "description": (
+                    "Mapa agente_id → razão de 1 linha. Mesmas keys de "
+                    "agentes_sugeridos. Vazio se tipo=pergunta."
+                ),
+            },
+            "ferramentas_extras": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": (
+                    "Keys das ferramentas extras: briefing_reverso, cortes_prontos, "
+                    "calibragem_pedro, transcrever, share, exportar. Vazio se "
+                    "nenhuma se aplica."
+                ),
+            },
+        },
+        "required": [
+            "tipo", "conteudo", "briefing_refinado",
+            "dimensoes_completas", "dimensoes_faltando",
+            "agentes_sugeridos", "razoes_agentes", "ferramentas_extras",
+        ],
+    },
+}
+
+
 # A-16 — cache de catálogo (era construído 2x por request Concierge)
 _CATALOGO_CACHE: list[dict] | None = None
 
@@ -374,49 +466,26 @@ análise financeira, briefings óbvios sem risco regulatório.
 
 ## 📤 Formato OBRIGATÓRIO da resposta
 
-Retorne SEMPRE um JSON válido, e SÓ o JSON (sem texto fora, sem markdown fences):
+Você SEMPRE responde usando a ferramenta `responder_concierge` (tool-use forçado
+no nível da API — não escreva texto livre, sempre chame a tool).
 
-```json
-{{
-  "tipo": "pergunta" | "confirmar" | "pronto",
-  "conteudo": "<texto pro cliente — pergunta gentil / proposta com OK / transição amigável>",
-  "briefing_refinado": "<se confirmar OU pronto: consolidação em 2-4 frases. se pergunta: null>",
-  "dimensoes_completas": ["o_que", "publico", "canal", ...],
-  "dimensoes_faltando": ["objetivo", "vibe", ...],
-  "agentes_sugeridos": ["otto", "carlos", ...],
-  "razoes_agentes": {{
-    "otto": "decodificar tese pra um briefing aberto de saúde",
-    "carlos": "..."
-  }},
-  "ferramentas_extras": ["briefing_reverso", ...]
-}}
-```
+Regras importantes ao preencher:
 
-Use SEMPRE chaves exatas pra dimensões: `o_que`, `publico`, `canal`, `objetivo`, `urgencia`, `vibe`.
-Use IDs exatos pra agentes (lowercase, snake_case): `otto`, `heitor`, `salles`, `carlos`, `sonia`, `aya`, `renata`, `pedro_abrahao`, `ana_maria`, `prichina`, `caito`, `kelly`.
-Use keys exatos pra ferramentas: `briefing_reverso`, `cortes_prontos`, `calibragem_pedro`, `transcrever`, `share`, `exportar`.
+- **`tipo`**: "pergunta" | "confirmar" | "pronto" (exatamente uma dessas strings).
+- **`conteudo`**: texto pro cliente em português brasileiro coloquial.
+- **`briefing_refinado`**: 2-4 frases se confirmar/pronto, `null` se pergunta.
+- **`dimensoes_completas`**/`dimensoes_faltando`: use SEMPRE as keys canônicas:
+  `o_que`, `publico`, `canal`, `objetivo`, `urgencia`, `vibe`.
+- **`agentes_sugeridos`**: IDs lowercase snake_case (otto, heitor, salles, carlos,
+  sonia, aya, renata, pedro_abrahao, ana_maria, prichina, caito, kelly).
+- **`razoes_agentes`**: mapa agente_id → razão de 1 linha.
+- **`ferramentas_extras`**: keys: briefing_reverso, cortes_prontos,
+  calibragem_pedro, transcrever, share, exportar.
 
-Se `tipo=pergunta`, deixe `agentes_sugeridos`, `razoes_agentes` e `ferramentas_extras` vazios.
-Se `tipo=confirmar`, PREENCHA todos esses campos (cliente precisa ver o que vai rodar).
-Se `tipo=pronto`, mantenha os mesmos campos da última "confirmar" (significa que cliente OKou).
-
-### Exemplo de "confirmar" (genérico — adapte ao cliente atual)
-```json
-{{
-  "tipo": "confirmar",
-  "conteudo": "Pra Reels orgânico do tema X, vou mobilizar:\\n\\n• Otto — decodifica tese\\n• Carlos — escreve roteiros\\n• [Espelho do cliente] — valida pela ótica do especialista (se aplicável)\\n• Aya — compila tudo\\n\\nOK rodar assim ou quer ajustar?",
-  "briefing_refinado": "Reels orgânico do nicho do cliente. Público + tom conforme brand kit.",
-  "dimensoes_completas": ["o_que", "publico", "canal", "objetivo", "vibe"],
-  "dimensoes_faltando": [],
-  "agentes_sugeridos": ["otto", "carlos", "aya"],
-  "razoes_agentes": {{
-    "otto": "decodifica tese em briefing aberto",
-    "carlos": "escreve roteiros publicitários filmáveis",
-    "aya": "compila o dossiê final"
-  }},
-  "ferramentas_extras": []
-}}
-```
+Convenções por tipo:
+- `pergunta`: deixe `agentes_sugeridos`, `razoes_agentes` e `ferramentas_extras` vazios.
+- `confirmar`: PREENCHA todos os campos (cliente precisa ver o que vai rodar).
+- `pronto`: mantenha os mesmos campos da última `confirmar`.
 """
 
 
@@ -677,62 +746,63 @@ async def conversar(pedido: ConcierePedido):
             "com conteúdo 'Não entendi seu pedido. Pode descrever que conteúdo você precisa?'"
         )
 
-    # T188.l + T193.a — tenta até 2x: se 1ª resposta vier sem JSON válido,
-    # injeta lembrete e tenta de novo. Evita derrubar sessão por glitch do modelo.
+    # v1.49 A1b-007 — tool-use mode. Antes: regex/fence parsing do texto.
+    # Agora: 1 chamada com tool_choice forçado → response.content tem 1 bloco
+    # tool_use com input já validado pelo schema (sem retry de fence markdown).
+    #
+    # Fallback de parsing legacy mantido por defesa (modelo nunca retorna
+    # texto livre nesse modo, mas se acontecer pegamos via _parse_resposta).
     data: dict | None = None
-    text = ""
-    ultima_excecao: Exception | None = None
+    try:
+        response = client.messages.create(
+            model=_modelo_concierge(),
+            max_tokens=2048,
+            system=system_prompt,
+            messages=messages,
+            tools=[FERRAMENTA_CONCIERGE_RESPOSTA],
+            tool_choice={"type": "tool", "name": "responder_concierge"},
+        )
+    except (
+        anthropic.AuthenticationError,
+        anthropic.RateLimitError,
+        anthropic.APIConnectionError,
+        anthropic.APIStatusError,
+        anthropic.APIError,
+    ) as e:
+        # T193.b + T190.A10 — classifica erro e retorna status apropriado.
+        # NÃO vaza traceback nem string crua da Anthropic.
+        kind = classificar_erro_anthropic(e)
+        msg_amigavel = formatar_erro_anthropic(e)
+        status_map = {
+            "sem_credito": 402,
+            "rate_limit": 429,
+            "auth": 401,
+            "conexao": 503,
+            "outro": 502,
+        }
+        raise HTTPException(
+            status_code=status_map.get(kind, 502),
+            detail=msg_amigavel,
+        ) from e
 
-    for tentativa in range(2):
-        try:
-            response = client.messages.create(
-                model=_modelo_concierge(),
-                max_tokens=2048,
-                system=(
-                    system_prompt
-                    if tentativa == 0
-                    else system_prompt + "\n\n## ⚠ Última saída inválida\n"
-                    "Sua última resposta NÃO foi JSON válido. Retorne SÓ o objeto JSON "
-                    "exigido, sem texto antes/depois, sem fences markdown."
-                ),
-                messages=messages,
-            )
-        except (
-            anthropic.AuthenticationError,
-            anthropic.RateLimitError,
-            anthropic.APIConnectionError,
-            anthropic.APIStatusError,
-            anthropic.APIError,
-        ) as e:
-            # T193.b + T190.A10 — classifica erro e retorna status apropriado.
-            # NÃO vaza traceback nem string crua da Anthropic.
-            kind = classificar_erro_anthropic(e)
-            msg_amigavel = formatar_erro_anthropic(e)
-            status_map = {
-                "sem_credito": 402,
-                "rate_limit": 429,
-                "auth": 401,
-                "conexao": 503,
-                "outro": 502,
-            }
-            raise HTTPException(
-                status_code=status_map.get(kind, 502),
-                detail=msg_amigavel,
-            ) from e
+    # Extrai tool_use block (forma canônica em tool_choice forçado)
+    for block in response.content:
+        if block.type == "tool_use" and block.name == "responder_concierge":
+            data = dict(block.input) if hasattr(block, "input") else None
+            break
 
+    # Fallback: se por algum motivo veio texto em vez de tool_use, tenta parse
+    if data is None:
         text = ""
         for block in response.content:
             if block.type == "text":
                 text += block.text
-
         data = _parse_resposta_concierge(text)
-        if data is not None:
-            break  # JSON OK, segue
-        # Se chegou aqui, vai tentar de novo (com prompt reforçado)
 
     if data is None:
-        # T188.l — fallback gracioso: nem 2ª tentativa parseou. Em vez de derrubar
-        # a sessão com 500, retorna pergunta neutra pra user reformular.
+        # Fallback gracioso final: retorna pergunta neutra pra user reformular.
+        # Em tool-use mode isso é praticamente impossível (Anthropic garante
+        # estrutura), mas mantemos por defesa em profundidade.
         return ConciereResposta(
             tipo="pergunta",
             conteudo=(

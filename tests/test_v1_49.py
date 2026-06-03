@@ -193,6 +193,52 @@ def test_lgpd_rejeita_session_id_dotdot(monkeypatch, tmp_path):
     assert r.status_code in (400, 403)
 
 
+# ─── A1b-007 — Concierge usando tool-use mode ─────────────────────────
+
+def test_concierge_tem_ferramenta_responder_definida():
+    """v1.49 A1b-007 — FERRAMENTA_CONCIERGE_RESPOSTA está definida com schema."""
+    from api.routes.concierge import FERRAMENTA_CONCIERGE_RESPOSTA
+    assert FERRAMENTA_CONCIERGE_RESPOSTA["name"] == "responder_concierge"
+    props = FERRAMENTA_CONCIERGE_RESPOSTA["input_schema"]["properties"]
+    # Todos os campos da ConciereResposta existem no schema
+    for campo in ("tipo", "conteudo", "briefing_refinado",
+                  "dimensoes_completas", "dimensoes_faltando",
+                  "agentes_sugeridos", "razoes_agentes", "ferramentas_extras"):
+        assert campo in props, f"campo {campo} ausente no schema tool-use"
+    # tipo é enum restrito
+    assert props["tipo"]["enum"] == ["pergunta", "confirmar", "pronto"]
+
+
+def test_concierge_endpoint_usa_tool_choice_forcado():
+    """v1.49 A1b-007 — chamada da API força tool_choice=responder_concierge."""
+    src = open("api/routes/concierge.py", encoding="utf-8").read()
+    assert "tools=[FERRAMENTA_CONCIERGE_RESPOSTA]" in src, (
+        "v1.49 A1b-007 — falta tools=[...] na messages.create"
+    )
+    assert '"type": "tool", "name": "responder_concierge"' in src, (
+        "v1.49 A1b-007 — falta tool_choice forçado"
+    )
+    # Tool_use deve ser extraído (não regex no texto)
+    assert 'block.type == "tool_use"' in src, (
+        "v1.49 A1b-007 — falta extração do bloco tool_use"
+    )
+
+
+def test_concierge_prompt_sem_instrucao_de_json_explicita():
+    """v1.49 A1b-007 — system prompt não pede mais 'retorne JSON válido' explícito.
+
+    Antes: instruções de fence markdown + 'sem texto fora' eram necessárias.
+    Com tool-use forçado isso vira ruído (o modelo SEMPRE vai chamar a tool).
+    """
+    src = open("api/routes/concierge.py", encoding="utf-8").read()
+    # Fence markdown no prompt sumiu (era ```json ... ```)
+    assert "Retorne SEMPRE um JSON válido, e SÓ o JSON" not in src, (
+        "v1.49 A1b-007 — prompt ainda tem instrução de JSON literal, era pra ter sumido"
+    )
+    # Menciona a tool diretamente
+    assert "responder_concierge" in src
+
+
 # ─── A1b-005 — Hard-enforce 4 rodadas via state ───────────────────────
 
 def test_concierge_force_confirmar_em_4_rodadas_documentado():
