@@ -883,20 +883,26 @@ Ana Maria é exatamente o agente da próxima feature (planilha financeira). Pedr
 
 ---
 
-## ✨ SPRINT v1.49+ — Polish + post-PMF (TBD)
+## ✨ SPRINT v1.49+ — Polish + post-PMF (BACKEND PARCIAL ENTREGUE 2026-06-02)
 
-**Quando:** depois de Pedro usar 2+ semanas e confirmar valor, ou quando 2º cliente entrar.
+**Quando:** itens backend foram antecipados pq tinham impacto compounding (path traversal, health probe, injection list). Frontend continua diferido até Pedro usar 2+ semanas ou 2º cliente entrar.
 
-### Pendente do audit (não bloqueia)
-- A1b-002 — Detecção injection com lista expandida
-- A1b-005 — Hard-enforce 4 rodadas via state, não prompt
-- A1b-007 — Concierge usar tool-use mode da Anthropic
-- A1a-003/004 — Aya/Renata fora do for-loop + dedup snap_outputs
+### Backend — ENTREGUE ✅
+- [x] A1b-002 — Detecção injection expandida (30+ patterns: DAN, jailbreaks, role-play, tag-injection, persona inversion)
+- [x] A1b-005 — Hard-enforce 4 rodadas via state (override server-side se Haiku ignora prompt)
+- [x] A1a-003/004 — Aya/Renata fora do for-loop + _montar_snap_outputs DRY
+- [x] A3a-007/008 — safe_join helper + LGPD usa defesa em profundidade
+- [x] A6a-004/005/008 — /health/full com disco+key+tenant+cripto+audit + .env.example reescrito
+- [x] A5 — Cobertura de testes (8 endpoints novos: catalogo, saude, pedro/versoes, admin, brand-kit, anthropic, concierge, usuarios)
+
+### Backend — diferido pra v1.50+
+- A1b-007 — Concierge usar tool-use mode da Anthropic (refactor grande)
+
+### Frontend — diferido (sistema é localhost privado pro Pedro)
 - A2a-004/007 — useEffect deps + a11y full
 - A4a-001/004/006 — Modal/headline/Editar fluxo refinado
-- A5 (15 testes) — Cobertura de exportador, share, calendário, etc
-- A6a-004/005/008 — Health probe + .env docs + disco cheio alerta
-- A3a-007/008 — Path traversal residual + relative_to edge case
+
+**Backend Status:** ~30 testes novos em `tests/test_v1_49.py`. Suite full: 114 passando.
 
 ### Game-changers diferidos (PROD-XX)
 - PROD-3 Meta API direta (Otto+Carlos+Aya → publicar)
