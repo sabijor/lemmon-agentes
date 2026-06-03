@@ -902,7 +902,44 @@ Ana Maria é exatamente o agente da próxima feature (planilha financeira). Pedr
 - A2a-004/007 — useEffect deps + a11y full
 - A4a-001/004/006 — Modal/headline/Editar fluxo refinado
 
-**Backend Status:** ~30 testes novos em `tests/test_v1_49.py`. Suite full: 114 passando.
+**Backend Status:** ~30 testes novos em `tests/test_v1_49.py`. Suite full: 117 passando.
+
+---
+
+## 🐛 SPRINT v1.50 — Bugs do QA visual real (2026-06-03)
+
+**Origem:** sessão de QA visual via `claude-in-chrome` rodando o sistema com Pedro Espelho. Pipeline real disparado com briefing "Reels orgânico menopausa Hator 14 dias". Concierge → ConfirmCard → Otto → Carlos → Pedro → Renata → Aya. Todos os fixes do v1.48/v1.49 validados ao vivo.
+
+### ✅ Funcionando ao vivo (confirmado)
+- **A1b-007 tool-use mode** — Concierge retornou JSON estruturado de primeira, sem retry de fence markdown
+- **A1b-006 tenant-aware + force-include** — Pedro Abrahão foi force-incluído pelo trigger "menopausa" + "Hator" automaticamente
+- **Dark mode bubbles** (chat) — user (stone-700) e Concierge (stone-800) com contraste forte
+- **Pipeline streaming** com indicador "Mais lento que o normal" e alerta "RESTAM ~1 MIN"
+
+### 🐛 Bugs encontrados no QA visual
+
+| # | ID | Severidade | Descrição | Onde |
+|---|---|---|---|---|
+| 1 | QA-B01 | 🔴 ALTO | "E aí, ficou bom?" feedback card aparece DESDE o início, antes do pipeline rodar. `isVisible` mal calculado. | `dashboard/components/chat/FeedbackPosPipeline.tsx` + `useChat.ts` (condição `pipelineCompleto`) |
+| 2 | QA-B02 | 🟡 MÉDIO | Pills do escritório só mostram 3 agentes (OTTO · CARLOS · AYA), Pedro e Renata somem do display | `dashboard/app/page.tsx` ou `components/office-pixel/PixelOfficeScene.tsx` — limite `.slice(0, 3)` |
+| 3 | QA-B03 | 🟡 MÉDIO | Toast "Concierge ativou" não inclui Pedro Abrahão (mostra "Otto · Carlos · Renata · Aya") | `dashboard/lib/useChat.ts` ou onde toast é disparado pós-confirmar |
+| 4 | QA-B04 | 🟢 BAIXO | Avatar "L" central tá com fundo branco em dark mode (deveria inverter pra preto) | `dashboard/app/page.tsx` welcome screen (`bg-stone-900` sem `dark:bg-stone-100`) |
+| 5 | QA-B05 | 🟢 BAIXO | Label "SESSÃO FAVORITA?" muito pálida em dark | `dashboard/components/chat/ChatPanel.tsx` |
+| 6 | QA-B06 | 🟡 MÉDIO | Quando user clica em exemplo do welcome, texto vai pro composer mas NÃO envia automaticamente (UX confusa — espera-se enviar) | `dashboard/app/page.tsx` welcome exemplos onClick |
+| 7 | QA-B07 | 🟡 MÉDIO | Backend congelou após pipeline anterior (workers em executor sem retornar). Reset manual necessário. Investigar timeout em LEMMON_EXECUTOR ou healthcheck que mata workers órfãos | `api/deps.py` (executor) + `api/ws_chat.py` |
+| 8 | QA-B08 | 🟢 BAIXO | Otto entregou conteúdo brilhante mas demorou ~30s (alerta "Mais lento que o normal" disparou). Avaliar se vale cache de prompt ou modelo mais rápido pro Otto | `agentes/otto.py` |
+| 9 | QA-B09 | ✅ FIXED | **Pedro Abrahão era force-incluído pelo Concierge mas NÃO RODAVA no pipeline**. Causa raiz: `dashboard/lib/agents.ts:107` Pedro tinha `reuniaoOnly: true` (flag legacy do tempo que ele só era gate-espelho). O filtro `!agent.reuniaoOnly` em `app/page.tsx:236` removia Pedro silenciosamente da lista `ids` antes do `send()`. Backend tinha case próprio desde v1.46.1 #17. **FIX**: removida a flag `reuniaoOnly` do Pedro. | `dashboard/lib/agents.ts:107` |
+| 10 | QA-B10 | 🟠 ALTO | **Renata aparece em `agentes_usados` mas sem resposta persistida** (`respostas` não tem `renata`, `custos_usd` não tem `renata`). Sessão fechou sem rodar ela ou rodou e crashou silenciosamente. Investigar logs do agente. | `api/ws_chat.py` Renata path |
+| 11 | QA-B11 | 🟡 MÉDIO | **Custo estimado do Concierge muito alto**: mostrou R$ 2,53 (~$0.50) mas custo real foi $0.135 (R$ 0,70). Estimativa 3,6x maior que real. Recalibrar `custo_medio_usd` dos agentes no catálogo | `agentes/*.py` campo `custo_medio_usd` |
+
+### Melhorias sugeridas (UX)
+- **MEL-01**: Welcome exemplos → clicar deveria ENVIAR direto, não só preencher composer (1 clique vs 2)
+- **MEL-02**: Avatar do Concierge dentro da bolha (na resposta) está sem ícone — só um quadrado escuro. Adicionar emoji 🎯 ou sprite
+- **MEL-03**: "VOCÊ" label sobre a bolha do user tá meio invisível em dark — aumentar contraste
+
+**Esforço estimado:** 1-2 dias pra todos os bugs + 1 dia pras melhorias UX.
+
+---
 
 ### Game-changers diferidos (PROD-XX)
 - PROD-3 Meta API direta (Otto+Carlos+Aya → publicar)

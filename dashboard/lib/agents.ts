@@ -104,7 +104,12 @@ export const AGENTS: AgentConfig[] = [
     deskPosition: { x: 400, y: 140 },
     meetingPosition: { x: 440, y: 260 },
     idleQuote: 'Avaliando pela ótica do paciente...',
-    reuniaoOnly: true,
+    // v1.49 QA-B09 — REMOVIDO `reuniaoOnly: true`. Era flag legacy de quando Pedro
+    // só rodava como gate-espelho via Salles. Desde v1.46.1 #17 ele tem case próprio
+    // em api/ws_chat.py (linha 474) como agente top-level. A flag estava fazendo o
+    // filtro `!agent.reuniaoOnly` em page.tsx remover Pedro silenciosamente quando
+    // o Concierge sugeria ele — quebrando todo o force-include de espelho médico
+    // do v1.48 A1b-006. Bug encontrado no QA visual real de 2026-06-03.
   },
   {
     id: 'renata',
