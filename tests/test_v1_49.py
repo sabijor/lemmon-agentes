@@ -193,6 +193,81 @@ def test_lgpd_rejeita_session_id_dotdot(monkeypatch, tmp_path):
     assert r.status_code in (400, 403)
 
 
+# ─── QA-B07/B10/B11 — bugs encontrados no QA visual real ──────────────
+
+def test_qa_b07_anthropic_client_tem_timeout():
+    """v1.49 QA-B07 — cliente Anthropic instanciado com timeout finito.
+
+    Sem timeout, workers do LEMMON_EXECUTOR podiam ficar presos pra sempre
+    se rede caísse durante chamada à API. 10 workers + 10 sessões = backend
+    travado até /health.
+    """
+    from api.deps import _anthropic_client
+    timeout = getattr(_anthropic_client, "timeout", None)
+    assert timeout is not None, "Cliente Anthropic precisa ter timeout configurado"
+    # Aceita 60-600s (range razoável)
+    timeout_val = float(timeout) if not isinstance(timeout, (int, float)) else timeout
+    assert 60.0 <= timeout_val <= 600.0, f"Timeout deveria estar entre 60-600s, é {timeout_val}"
+
+
+def test_qa_b10_all_agents_so_inclui_executados():
+    """v1.49 QA-B10 — código de ws_chat constrói all_agents a partir de
+    agentes EXECUTADOS (em respostas), não de agentes PEDIDOS (em names).
+
+    Antes: se Renata falhasse silenciosamente, ela aparecia em
+    `agentes_usados` mas sem `respostas["renata"]`. Frontend mostrava pill
+    da Renata em sessão sem conteúdo dela.
+    """
+    src = open("api/ws_chat.py", encoding="utf-8").read()
+    assert "_agentes_executados" in src, (
+        "v1.49 QA-B10 — falta filtragem de all_agents por respostas reais"
+    )
+    assert "[a for a in names if a in respostas]" in src, (
+        "Filtragem deveria usar list comprehension pra preservar ordem"
+    )
+
+
+def test_qa_b11_custo_medio_recalibrado():
+    """v1.49 QA-B11 — Carlos e Aya tiveram custo_medio_usd recalibrado
+    baseado em dados reais da sessão Reels menopausa de 2026-06-03.
+    """
+    from agentes.carlos import Carlos
+    from agentes.aya import Aya
+    # Carlos antes 0.10, agora 0.05
+    assert Carlos.custo_medio_usd <= 0.06, (
+        f"Carlos custo_medio_usd ainda muito alto: {Carlos.custo_medio_usd}. "
+        "Esperado <= 0.06 após QA-B11"
+    )
+    # Aya antes 0.08, agora 0.05
+    assert Aya.custo_medio_usd <= 0.06, (
+        f"Aya custo_medio_usd ainda muito alto: {Aya.custo_medio_usd}. "
+        "Esperado <= 0.06 após QA-B11"
+    )
+
+
+def test_qa_b09_pedro_sem_reuniao_only_no_frontend():
+    """v1.49 QA-B09 — Pedro Abrahão não tem mais `reuniaoOnly: true` no
+    catálogo do frontend, senão o filtro `!agent.reuniaoOnly` removeria
+    ele silenciosamente do pipeline (era o que acontecia antes).
+    """
+    src = open("dashboard/lib/agents.ts", encoding="utf-8").read()
+    # Encontra bloco do Pedro (até próximo `id:`)
+    idx = src.find("id: 'pedro_abrahao'")
+    assert idx >= 0
+    proximo_id = src.find("id: '", idx + 10)
+    bloco_pedro = src[idx:proximo_id if proximo_id > 0 else idx + 800]
+    # Tira comentários `//` antes de buscar a flag (senão acerta no comment do fix)
+    linhas_sem_comment = [
+        ln for ln in bloco_pedro.split("\n")
+        if not ln.lstrip().startswith("//")
+    ]
+    bloco_sem_comments = "\n".join(linhas_sem_comment)
+    assert "reuniaoOnly: true" not in bloco_sem_comments, (
+        "v1.49 QA-B09 — flag legacy `reuniaoOnly: true` ainda no Pedro. "
+        "Removida no commit 7c0528d porque fazia ele sumir do pipeline."
+    )
+
+
 # ─── A1b-007 — Concierge usando tool-use mode ─────────────────────────
 
 def test_concierge_tem_ferramenta_responder_definida():
