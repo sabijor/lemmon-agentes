@@ -122,15 +122,25 @@ async def lgpd_deletar_sessao(
     # SEC-equiv — sanitize session_id
     if not re.match(r"^[A-Za-z0-9_+.\-]+$", payload.session_id):
         raise HTTPException(status_code=400, detail="session_id inválido")
+    # v1.49 A3a-007 — defesa em profundidade: rejeita session_id que vire ".."
+    # ou variações que o regex permite mas têm intent suspeito.
+    if payload.session_id in ("..", "...", "....") or ".." in payload.session_id:
+        raise HTTPException(status_code=400, detail="session_id inválido")
 
     t = tenant_id()
     deletados: list[str] = []
 
-    # JSON da sessão
-    json_path = HISTORICO_DIR / t / "dashboard" / f"{payload.session_id}.json"
+    # JSON da sessão — v1.49 A3a-007/008 usa safe_join
+    from core.tenant import safe_join
+    json_path = safe_join(HISTORICO_DIR, t, "dashboard", f"{payload.session_id}.json")
+    if json_path is None:
+        raise HTTPException(status_code=400, detail="session_id inválido (path escape)")
     if json_path.exists():
         json_path.unlink()
-        deletados.append(str(json_path.relative_to(HISTORICO_DIR.parent)))
+        try:
+            deletados.append(str(json_path.relative_to(HISTORICO_DIR.parent)))
+        except ValueError:
+            deletados.append(str(json_path))
 
     # Outputs (PDF, HTML, MD)
     out_dir = OUTPUTS_DIR / t
@@ -139,10 +149,15 @@ async def lgpd_deletar_sessao(
             if not sub.is_dir():
                 continue
             for ext in ("md", "html", "pdf"):
-                f = sub / f"{payload.session_id}.{ext}"
+                f = safe_join(sub, f"{payload.session_id}.{ext}")
+                if f is None:
+                    continue
                 if f.exists():
                     f.unlink()
-                    deletados.append(str(f.relative_to(OUTPUTS_DIR.parent)))
+                    try:
+                        deletados.append(str(f.relative_to(OUTPUTS_DIR.parent)))
+                    except ValueError:
+                        deletados.append(str(f))
 
     if not deletados:
         raise HTTPException(status_code=404, detail="Sessão não encontrada")

@@ -103,7 +103,97 @@ async def health():
 
     Não toca em I/O nem chama LLM — só confirma que o app está rodando.
     """
-    return {"status": "ok", "service": "lemmon-agentes", "version": "1.46"}
+    return {"status": "ok", "service": "lemmon-agentes", "version": "1.48"}
+
+
+@app.get("/health/full")
+async def health_full():
+    """v1.49 A6a-004/005 — health probe completo: disco, env, tenant, cripto.
+
+    Roda em ~10ms (sem chamada externa). Útil pra:
+    - Cron/monitor checando se algo crítico tá degradado
+    - Onboarding: pingar 1x antes do Pedro abrir dashboard
+    - Pós-update: confirmar que migrations não quebraram nada
+
+    Retorna 200 sempre (não 503), pra facilitar parser. Campo `status` por
+    componente: "ok" | "warn" | "error".
+    """
+    import shutil
+    from pathlib import Path
+    relatorio: dict = {"status": "ok", "checks": {}, "version": "1.48"}
+
+    # 1. Disco — alerta se < 500MB livre (não dá pra fazer backup decente)
+    try:
+        total, used, free = shutil.disk_usage(Path(__file__).parent.parent)
+        free_mb = free // (1024 * 1024)
+        if free_mb < 100:
+            disco_status = "error"
+            relatorio["status"] = "error"
+        elif free_mb < 500:
+            disco_status = "warn"
+            if relatorio["status"] == "ok":
+                relatorio["status"] = "warn"
+        else:
+            disco_status = "ok"
+        relatorio["checks"]["disk"] = {
+            "status": disco_status,
+            "free_mb": free_mb,
+            "total_mb": total // (1024 * 1024),
+        }
+    except Exception as e:
+        relatorio["checks"]["disk"] = {"status": "error", "msg": str(e)}
+        relatorio["status"] = "error"
+
+    # 2. ANTHROPIC_API_KEY presente?
+    if os.getenv("ANTHROPIC_API_KEY"):
+        relatorio["checks"]["anthropic_key"] = {"status": "ok"}
+    else:
+        relatorio["checks"]["anthropic_key"] = {
+            "status": "error",
+            "msg": ".env sem ANTHROPIC_API_KEY — agentes vão retornar 401",
+        }
+        relatorio["status"] = "error"
+
+    # 3. Tenant detectado?
+    try:
+        from core.tenant import tenant_id
+        t = tenant_id()
+        relatorio["checks"]["tenant"] = {"status": "ok", "tenant": t}
+        if t == "default":
+            relatorio["checks"]["tenant"]["warn"] = (
+                "tenant='default' — defina LEMMON_TENANT_ID pra multi-cliente"
+            )
+    except Exception as e:
+        relatorio["checks"]["tenant"] = {"status": "error", "msg": str(e)}
+
+    # 4. Cripto-at-rest disponível?
+    try:
+        from core.tenant import cripto_disponivel
+        if cripto_disponivel():
+            relatorio["checks"]["cripto"] = {"status": "ok"}
+        else:
+            relatorio["checks"]["cripto"] = {
+                "status": "warn",
+                "msg": "LEMMON_ENCRYPT_KEY ausente — dados sensíveis em plaintext",
+            }
+    except Exception as e:
+        relatorio["checks"]["cripto"] = {"status": "error", "msg": str(e)}
+
+    # 5. Audit log gravável?
+    try:
+        from core import audit
+        path = audit._audit_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        # Smoke test: tenta abrir em append, fecha. Se filesystem read-only,
+        # detecta antes do request real escrever evento crítico.
+        with open(path, "a", encoding="utf-8") as _f:
+            pass
+        relatorio["checks"]["audit"] = {"status": "ok", "path": str(path)}
+    except Exception as e:
+        relatorio["checks"]["audit"] = {"status": "error", "msg": str(e)}
+        relatorio["status"] = "error"
+
+    return relatorio
 
 
 @app.get("/health/anthropic")

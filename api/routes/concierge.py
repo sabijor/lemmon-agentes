@@ -442,10 +442,13 @@ def _parse_resposta_concierge(text: str) -> dict | None:
         return None
 
 
-# T188.o — padrões comuns de prompt injection que tentamos detectar.
+# T188.o + v1.49 A1b-002 — padrões comuns de prompt injection.
 # Não bloqueia a request (false positives), mas LOGAMOS pra auditoria + adicionamos
 # um guard rail extra no system prompt avisando o modelo.
+# v1.49 A1b-002 — lista expandida com jailbreaks modernos (DAN, role-play attacks,
+# evasão por tradução, tag-injection HTML/XML, exfiltração via "translate to X").
 _PROMPT_INJECTION_PATTERNS = (
+    # Clássicos
     "ignore previous",
     "ignore above",
     "ignore instructions",
@@ -475,6 +478,58 @@ _PROMPT_INJECTION_PATTERNS = (
     "mostre suas instruções",
     "repeat your prompt",
     "repita seu prompt",
+    # v1.49 A1b-002 — jailbreaks famosos (DAN, do anything, etc.)
+    "dan mode",
+    "do anything now",
+    "developer mode",
+    "modo desenvolvedor",
+    "jailbreak",
+    "jailbroken",
+    "without restrictions",
+    "sem restrições",
+    "sem restricoes",
+    "no rules apply",
+    "no limitations",
+    "sem limitações",
+    # Role-play attacks
+    "roleplay as",
+    "role play as",
+    "interprete o papel",
+    "interprete um papel",
+    "from now on you",
+    "a partir de agora você",
+    "a partir de agora voce",
+    # Exfiltração via output formatting / tradução
+    "translate the following",
+    "traduza o seguinte",
+    "in your next response include",
+    "na sua próxima resposta inclua",
+    "output your instructions",
+    "imprima suas instruções",
+    "print your prompt",
+    "print system",
+    "imprima system",
+    # Tag injection adicional (todos minúsculos — match é case-insensitive)
+    "<|im_start|>",
+    "<|im_end|>",
+    "<|system|>",
+    "[inst]",
+    "[/inst]",
+    # Hipnose por verbose
+    "step by step ignore",
+    "step-by-step ignore",
+    "before answering ignore",
+    "antes de responder ignore",
+    # Confidence override
+    "you must comply",
+    "você deve obedecer",
+    "voce deve obedecer",
+    # Persona inversion
+    "evil version of you",
+    "versão maligna",
+    "versao maligna",
+    "opposite of your",
+    "oposto do seu",
 )
 
 
