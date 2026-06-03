@@ -343,6 +343,119 @@ def test_env_example_documenta_chaves_v1_48():
         )
 
 
+# ─── A5 — cobertura de endpoints sem teste anterior ──────────────────
+
+def _client(monkeypatch):
+    """Helper pra criar TestClient em dev mode (sem auth)."""
+    from fastapi.testclient import TestClient
+    monkeypatch.setenv("LEMMON_RATE_LIMIT_PER_MIN", "5000")
+    monkeypatch.delenv("LEMMON_AUTH_TOKEN", raising=False)
+    from api.main import app
+    return TestClient(app)
+
+
+def test_agentes_catalogo_retorna_lista_completa(monkeypatch):
+    """A5 — /agentes/catalogo retorna 12 agentes com metadados básicos."""
+    c = _client(monkeypatch)
+    r = c.get("/agentes/catalogo")
+    assert r.status_code == 200
+    body = r.json()
+    # Pode ser dict {"agentes": [...]} ou lista direta
+    catalogo = body.get("agentes", body) if isinstance(body, dict) else body
+    assert isinstance(catalogo, list)
+    assert len(catalogo) >= 12, f"Esperado >= 12 agentes, veio {len(catalogo)}"
+    ids = {a["id"] for a in catalogo}
+    for esperado in ("otto", "heitor", "salles", "carlos", "aya", "renata"):
+        assert esperado in ids, f"agente {esperado} ausente no catálogo"
+    # Cada agente tem metadata básica
+    for a in catalogo:
+        assert "id" in a
+        assert "papel_curto" in a or "nome" in a
+
+
+def test_saude_latencias_com_agente_param(monkeypatch, tmp_path):
+    """A5 — /saude/latencias?agente=otto sem sessões retorna estrutura vazia (não 500)."""
+    monkeypatch.setenv("LEMMON_TENANT_ID", "saude-test-empty")
+    import importlib
+    import core.tenant
+    importlib.reload(core.tenant)
+    c = _client(monkeypatch)
+    r = c.get("/saude/latencias?agente=otto")
+    assert r.status_code in (200, 204, 404), (
+        f"Esperado 200/204/404 sem dados, veio {r.status_code}: {r.text[:200]}"
+    )
+
+
+def test_pedro_versoes_lista_prompts_existentes(monkeypatch):
+    """A5 — /pedro/versoes lista prompts pedro_abrahao_system_v*.md."""
+    c = _client(monkeypatch)
+    r = c.get("/pedro/versoes")
+    assert r.status_code == 200
+    versoes = r.json()
+    assert isinstance(versoes, list)
+    # v1 existe (PROMPTS_DIR/pedro_abrahao_system_v1.md)
+    assert any(v.get("versao") == "v1" for v in versoes), (
+        f"Esperado pelo menos v1 na lista, veio: {versoes}"
+    )
+
+
+def test_admin_reconstruir_indice_existe(monkeypatch):
+    """A5 — /admin/reconstruir_indice existe e responde (auth/permissão)."""
+    c = _client(monkeypatch)
+    r = c.post("/admin/reconstruir_indice")
+    # Em dev sem token vai retornar 200 (ou 403 se auth required)
+    assert r.status_code in (200, 403, 401), (
+        f"Esperado 200/401/403, veio {r.status_code}: {r.text[:200]}"
+    )
+
+
+def test_brand_kit_default_quando_vazio(monkeypatch, tmp_path):
+    """A5 — GET /brand-kit sem brand kit gravado retorna defaults."""
+    monkeypatch.setenv("LEMMON_TENANT_ID", "brand-empty-test")
+    monkeypatch.delenv("LEMMON_ENCRYPT_KEY", raising=False)
+    import importlib
+    import core.tenant
+    importlib.reload(core.tenant)
+    c = _client(monkeypatch)
+    r = c.get("/brand-kit")
+    assert r.status_code == 200
+    bk = r.json()
+    assert bk["nome"] in ("Cliente", "Hator Clinic"), bk
+    assert "tom_voz" in bk
+    assert "espelho_id" in bk  # v1.48 A1b-006
+
+
+def test_health_anthropic_responde_estruturado(monkeypatch):
+    """A5 — /health/anthropic retorna estrutura coerente mesmo sem key."""
+    c = _client(monkeypatch)
+    r = c.get("/health/anthropic")
+    assert r.status_code == 200
+    body = r.json()
+    assert "status" in body
+    assert body["status"] in ("ok", "error")
+
+
+def test_concierge_conversar_rejeita_historico_vazio(monkeypatch):
+    """A5 — POST /concierge/conversar sem histórico retorna 400."""
+    c = _client(monkeypatch)
+    r = c.post("/concierge/conversar", json={"historico": []})
+    assert r.status_code == 400
+
+
+def test_usuarios_lista_inicial(monkeypatch, tmp_path):
+    """A5 — GET /usuarios funciona mesmo sem usuários gravados."""
+    monkeypatch.setenv("LEMMON_TENANT_ID", "usuarios-empty-test")
+    monkeypatch.delenv("LEMMON_ENCRYPT_KEY", raising=False)
+    import importlib
+    import core.tenant
+    importlib.reload(core.tenant)
+    c = _client(monkeypatch)
+    r = c.get("/usuarios")
+    # Pode ser 200 com lista vazia OU 200 com lista contendo seed user
+    assert r.status_code == 200, f"Esperado 200, veio {r.status_code}: {r.text[:200]}"
+    assert isinstance(r.json(), list)
+
+
 def test_injection_nao_falsea_briefing_legitimo():
     """v1.49 A1b-002 — briefings normais não disparam false-positive."""
     from api.routes.concierge import _detectar_injection_tentativa
