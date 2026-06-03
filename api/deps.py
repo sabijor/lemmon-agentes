@@ -26,7 +26,13 @@ from core.config import (
 )
 
 _log = logging.getLogger("lemmon.api")
-_anthropic_client = _anthropic.Anthropic()
+# v1.49 QA-B07 — timeout=300s pra evitar workers órfãos.
+# Antes: chamadas Anthropic sem timeout — se rede caísse no meio, o thread do
+# LEMMON_EXECUTOR ficava preso pra sempre. Com 10 workers, bastava 10 pipelines
+# pra travar TODO o backend (até /health não respondia).
+# Agora: timeout de 5min (mais que o pior caso real ~30s) libera o worker mesmo
+# se Anthropic não responder. Erro vira HTTP timeout amigável pro cliente.
+_anthropic_client = _anthropic.Anthropic(timeout=300.0)
 
 # T190.D1 — ThreadPoolExecutor dedicado pra chamadas Anthropic blocking.
 # Antes: `loop.run_in_executor(None, ...)` usava o default executor do asyncio

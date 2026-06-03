@@ -164,7 +164,12 @@ export default function ChatPanel({
   useEffect(() => { if (!loopStatus) setLoopCustoDismissed(false) }, [loopStatus])
   useEffect(() => { if (mode === 'reuniao') setConfigOpen(false) }, [mode])
   useEffect(() => {
-    if (configOpen) setPanelSize(prev => prev.w < 540 ? { ...prev, w: 540 } : prev)
+    // v1.49 QA-B12 — quando configOpen, panel precisa de espaço extra (~176px) pra
+    // não cortar a ConfigSidebar interna. Antes só forçava panel >= 540, mas se já
+    // era 540 (default), sidebar ficava com 11px por causa de overflow:hidden no
+    // wrapper interno. Agora soma 176 (largura da sidebar). Quando config fecha,
+    // não diminui (cliente já viu o tamanho maior, pode preferir manter).
+    if (configOpen) setPanelSize(prev => prev.w < 716 ? { ...prev, w: 716 } : prev)
   }, [configOpen])
   useEffect(() => {
     if (mode === 'reuniao') setPanelSize(prev => prev.w < 520 ? { ...prev, w: 520 } : prev)
