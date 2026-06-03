@@ -1745,12 +1745,12 @@ export default function ChatPanel({
               {referencias && referencias.length > 0 && (
                 <div className="space-y-1">
                   {referencias.map(r => (
-                    <div key={r.session_id} className="px-2 py-1.5 rounded-lg bg-stone-50 border border-stone-200">
+                    <div key={r.session_id} className="px-2 py-1.5 rounded-lg bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700">
                       <div className="flex items-center justify-between gap-2">
-                        <p className="text-[9px] font-mono text-stone-600 line-clamp-1 flex-1">{r.briefing}</p>
+                        <p className="text-[9px] font-mono text-stone-600 dark:text-stone-300 line-clamp-1 flex-1">{r.briefing}</p>
                         <div className="flex items-center gap-1.5 flex-shrink-0">
-                          {r.avaliacao && <span className="text-[8px] text-amber-500">{'★'.repeat(r.avaliacao)}</span>}
-                          <span className="text-[8px] font-mono text-stone-400">{Math.round(r.score * 100)}%</span>
+                          {r.avaliacao && <span className="text-[8px] text-amber-500 dark:text-amber-400">{'★'.repeat(r.avaliacao)}</span>}
+                          <span className="text-[8px] font-mono text-stone-400 dark:text-stone-500">{Math.round(r.score * 100)}%</span>
                         </div>
                       </div>
                     </div>
@@ -1758,13 +1758,13 @@ export default function ChatPanel({
                 </div>
               )}
               {referencias && referencias.length === 0 && (
-                <p className="text-[8px] font-mono text-stone-400">Nenhuma referência encontrada.</p>
+                <p className="text-[8px] font-mono text-stone-400 dark:text-stone-500">Nenhuma referência encontrada.</p>
               )}
               {sugestao && (
-                <div className="px-3 py-2.5 rounded-xl bg-violet-50 border border-violet-200">
+                <div className="px-3 py-2.5 rounded-xl bg-violet-50 dark:bg-violet-950/30 border border-violet-200 dark:border-violet-800/60">
                   <div className="flex items-center justify-between mb-2">
-                    <p className="text-[8px] font-mono text-violet-600 uppercase tracking-widest font-bold">sugestão de agentes</p>
-                    <button onClick={() => setSugestao(null)} className="text-violet-400 hover:text-violet-700 text-[10px] leading-none transition-colors">×</button>
+                    <p className="text-[8px] font-mono text-violet-600 dark:text-violet-300 uppercase tracking-widest font-bold">sugestão de agentes</p>
+                    <button onClick={() => setSugestao(null)} className="text-violet-400 hover:text-violet-700 dark:text-violet-500 dark:hover:text-violet-200 text-[10px] leading-none transition-colors">×</button>
                   </div>
                   <div className="flex flex-wrap gap-1.5 mb-2">
                     {sugestao.agentes.map(a => {

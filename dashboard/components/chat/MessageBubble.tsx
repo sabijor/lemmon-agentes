@@ -1,5 +1,6 @@
 import { memo } from 'react'
 import { motion } from 'framer-motion'
+import { useTheme } from 'next-themes'
 import { AGENT_MAP, type AgentId } from '@/lib/agents'
 import { type Message } from '@/lib/useChat'
 import { formatCustoBRL } from '@/lib/formatCusto'  // Refinamento — custo em R$
@@ -31,16 +32,22 @@ export function exportTxt(messages: Message[]) {
 
 // F-01 — React.memo evita re-render em cada token streamado. Antes,
 // ChatPanel inteiro re-renderizava ~500x/segundo durante pipeline.
+//
+// v1.49 QA — dark mode fix recorrente:
+// Antes: bolha do user usava `bg-stone-900` sem variant dark, e o ChatPanel
+// root é `dark:bg-stone-900`. Resultado: bolha sumia no fundo em dark mode.
+// Agora: light = preto sobre branco; dark = stone-100 sobre stone-700.
+// O dark mode inverte a paleta da bolha pra manter contraste visível.
 export const UserMessage = memo(function UserMessage({ msg }: { msg: Message }) {
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-end gap-1">
       <div className="flex items-center gap-2 pr-1">
-        <span className="text-[9px] font-mono text-stone-400 uppercase tracking-widest">Você</span>
-        <div className="w-5 h-5 rounded-full bg-stone-900 flex items-center justify-center">
-          <span className="text-white text-[8px] font-bold">V</span>
+        <span className="text-[9px] font-mono text-stone-400 dark:text-stone-500 uppercase tracking-widest">Você</span>
+        <div className="w-5 h-5 rounded-full bg-stone-900 dark:bg-stone-100 flex items-center justify-center">
+          <span className="text-white dark:text-stone-900 text-[8px] font-bold">V</span>
         </div>
       </div>
-      <div className="max-w-[92%] bg-stone-900 text-white rounded-2xl rounded-tr-sm px-4 py-3 shadow-sm">
+      <div className="max-w-[92%] bg-stone-900 dark:bg-stone-700 text-white rounded-2xl rounded-tr-sm px-4 py-3 shadow-sm border border-transparent dark:border-stone-600">
         {msg.hasImage && (
           <div className="flex items-center gap-1.5 mb-2 opacity-60">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -56,8 +63,38 @@ export const UserMessage = memo(function UserMessage({ msg }: { msg: Message }) 
   )
 })
 
+// v1.49 QA — dark mode legibilidade.
+// `colorDim` é pastel light (ex #dbeafe pro Otto). Sobre fundo dark stone-900,
+// usar essa cor crua deixa a bolha BRILHANTE DEMAIS e o texto `dark:text-stone-100`
+// (quase branco) vira contraste péssimo (branco sobre azul-claro). Como `style`
+// inline ganha de classe Tailwind, precisamos do tema resolvido em JS pra escolher
+// o style certo. No dark: bubble fica stone-800 com border tingida do agent.color
+// (mantém a identidade colorida sem queimar a retina).
+function bubbleStyle(agent: { color: string; colorDim: string }, isDark: boolean) {
+  if (isDark) {
+    return {
+      background: 'rgb(41 37 36)', // stone-800
+      borderColor: `${agent.color}60`,
+    }
+  }
+  return {
+    background: agent.colorDim,
+    borderColor: `${agent.color}30`,
+  }
+}
+
+function pillStyle(agent: { color: string; colorDim: string }, isDark: boolean) {
+  if (isDark) {
+    // Pill do nome: usa cor saturada com transparência sobre stone-800
+    return { background: `${agent.color}30`, color: agent.colorDim }
+  }
+  return { background: agent.colorDim, color: agent.color }
+}
+
 export const AgentMessage = memo(function AgentMessage({ msg, progress }: { msg: Message; progress?: number }) {
   const agent = AGENT_MAP[msg.role as AgentId] ?? AGENT_MAP[msg.role.replace(/_v\d+$/, '') as AgentId]
+  const { resolvedTheme } = useTheme()
+  const isDark = resolvedTheme === 'dark'
   if (!agent) return null
   return (
     <motion.div
@@ -67,31 +104,31 @@ export const AgentMessage = memo(function AgentMessage({ msg, progress }: { msg:
       className="flex gap-3 items-start"
     >
       <div className="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center shadow-sm border"
-        style={{ background: agent.colorDim, borderColor: `${agent.color}30` }}>
+        style={bubbleStyle(agent, isDark)}>
         <CharacterSprite id={agent.id} size={0.7} speaking={!msg.done} />
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1.5">
           <span className="text-[10px] font-mono uppercase tracking-widest font-bold px-2 py-0.5 rounded-full"
-            style={{ background: agent.colorDim, color: agent.color }}>
+            style={pillStyle(agent, isDark)}>
             {agent.name}
           </span>
-          <span className="text-[9px] font-mono text-stone-400">{agent.rpgClass} · {agent.title}</span>
+          <span className="text-[9px] font-mono text-stone-500 dark:text-stone-400">{agent.rpgClass} · {agent.title}</span>
           {msg.cost !== undefined && msg.cost > 0 && (
-            <span className="text-[9px] font-mono text-stone-400 dark:text-stone-500 ml-auto" title={`$${msg.cost.toFixed(5)} USD`}>
+            <span className="text-[9px] font-mono text-stone-500 dark:text-stone-400 ml-auto" title={`$${msg.cost.toFixed(5)} USD`}>
               {formatCustoBRL(msg.cost)}
             </span>
           )}
         </div>
         <div className="rounded-2xl rounded-tl-sm px-4 py-3 border shadow-sm"
-          style={{ background: agent.colorDim, borderColor: `${agent.color}20` }}>
+          style={bubbleStyle(agent, isDark)}>
           {msg.error ? (
-            <p className="text-red-600 text-xs font-mono">{msg.error}</p>
+            <p className="text-red-600 dark:text-red-400 text-xs font-mono">{msg.error}</p>
           ) : (
             <p className={`text-sm font-mono leading-relaxed whitespace-pre-wrap text-stone-800 dark:text-stone-100 ${!msg.done ? 'typing-cursor' : ''}`}>
               {msg.content || (
                 /* T153 — feedback mais informativo enquanto agente trabalha */
-                <span className="text-stone-400 dark:text-stone-500 animate-pulse">
+                <span className="text-stone-500 dark:text-stone-400 animate-pulse">
                   {agent.name.toLowerCase()} {progress !== undefined && progress > 0
                     /* T-bug-Hator-#6: progress já vem em escala 0-100 do useChat.ts:338 (Math.min(95, ... * 100)).
                        Multiplicar de novo por 100 dava "9500%". Agora só Math.round, que é o necessário. */
