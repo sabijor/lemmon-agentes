@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dossiê — Roteiros Topo de Funil · Dr. Pedro Abrahão — Lemmon Produções</title>
+    <style>
+/* ============================================================
+   FONTES — mesmas do design system AURA
+   ============================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700;800;900&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+/* ============================================================
+   PÁGINA — A4, margens generosas (editorial)
+   ============================================================ */
+@page {
+    size: A4;
+    margin: 22mm 18mm 22mm 18mm;
+
+    @bottom-center {
+        content: "Lemmon Produções  ·  " counter(page) " / " counter(pages);
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 8pt;
+        color: #a8a29e;
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
+    }
+}
+
+/* Capa (primeira página) sem rodapé e sem margem */
+@page :first {
+    margin: 0;
+    @bottom-center { content: none; }
+}
+
+/* ============================================================
+   RESET E BASE
+   ============================================================ */
+* { box-sizing: border-box; }
+
+html, body {
+    margin: 0;
+    padding: 0;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: #1c1917;
+    background: #ffffff;
+    line-height: 1.65;
+    font-size: 10.5pt;
+    font-weight: 400;
+    -webkit-font-smoothing: antialiased;
+}
+
+::selection { background: #1c1917; color: #ffffff; }
+
+/* ============================================================
+   CAPA — Fundo Stone 900, tipografia branca minimalista
+   Inspirado no Hero do design_system.html
+   ============================================================ */
+.aura-capa {
+    page-break-after: always;
+    height: 297mm;
+    width: 210mm;
+    padding: 0;
+    margin: 0;
+    background: #1c1917;
+    color: #fafaf9;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    position: relative;
+    overflow: hidden;
+}
+
+.aura-capa::before {
+    content: "";
+    position: absolute;
+    top: 30%;
+    right: -10%;
+    width: 60%;
+    height: 60%;
+    background: radial-gradient(circle, rgba(120,113,108,0.15) 0%, transparent 70%);
+    pointer-events: none;
+}
+
+.aura-capa-topo {
+    padding: 50px 50px 24px 50px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    z-index: 2;
+    position: relative;
+}
+
+.aura-capa-marca {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 12pt;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: #fafaf9;
+}
+
+.aura-capa-marca span { font-weight: 300; }
+
+.aura-capa-meio {
+    padding: 0 50px;
+    z-index: 2;
+    position: relative;
+}
+
+.aura-capa-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 12px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 999px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8pt;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: #d6d3d1;
+    margin-bottom: 32px;
+}
+
+.aura-capa-titulo {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 56pt;
+    font-weight: 500;
+    line-height: 0.92;
+    letter-spacing: -0.03em;
+    margin: 0 0 16px 0;
+    color: #fafaf9;
+    page-break-after: avoid;
+}
+
+.aura-capa-projeto {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 18pt;
+    font-weight: 300;
+    color: #a8a29e;
+    margin: 0;
+    letter-spacing: -0.01em;
+}
+
+.aura-capa-rodape {
+    padding: 0 50px 50px 50px;
+    z-index: 2;
+    position: relative;
+}
+
+.aura-capa-meta {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    padding-top: 24px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+}
+
+.aura-capa-meta-item .label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 7.5pt;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: #78716c;
+    margin-bottom: 6px;
+    display: block;
+}
+
+.aura-capa-meta-item .valor {
+    font-family: 'Inter', sans-serif;
+    font-size: 10pt;
+    font-weight: 500;
+    color: #fafaf9;
+    line-height: 1.4;
+}
+
+/* ============================================================
+   CONTEÚDO INTERNO
+   ============================================================ */
+.aura-conteudo { padding: 0; }
+
+/* ============================================================
+   HEADERS — hierarquia AURA
+   ============================================================ */
+h1 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 32pt;
+    font-weight: 500;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    color: #1c1917;
+    margin: 0 0 24px 0;
+    page-break-after: avoid;
+}
+
+h2 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 22pt;
+    font-weight: 500;
+    line-height: 1.15;
+    letter-spacing: -0.015em;
+    color: #1c1917;
+    margin: 0 0 20px 0;
+    padding-top: 4mm;
+    page-break-before: always;
+    page-break-after: avoid;
+    position: relative;
+}
+
+h2::before {
+    content: "";
+    display: block;
+    width: 32px;
+    height: 1px;
+    background: #1c1917;
+    margin-bottom: 12px;
+}
+
+.aura-conteudo > h2:first-child { page-break-before: avoid; }
+.aura-resumo h2 { page-break-before: avoid; }
+
+h3 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 14pt;
+    font-weight: 500;
+    line-height: 1.3;
+    letter-spacing: -0.01em;
+    color: #1c1917;
+    margin: 24px 0 10px 0;
+    page-break-after: avoid;
+}
+
+h4 {
+    font-family: 'Inter', sans-serif;
+    font-size: 11pt;
+    font-weight: 600;
+    color: #292524;
+    margin: 18px 0 8px 0;
+    page-break-after: avoid;
+    letter-spacing: -0.005em;
+}
+
+/* ============================================================
+   TEXTO — corpo editorial Inter
+   ============================================================ */
+p {
+    margin: 0 0 12px 0;
+    color: #44403c;
+    orphans: 3;
+    widows: 3;
+}
+
+strong, b { font-weight: 600; color: #1c1917; }
+em, i { font-style: italic; color: #292524; }
+
+a {
+    color: #1c1917;
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 2px;
+}
+
+/* ============================================================
+   LISTAS
+   ============================================================ */
+ul, ol { margin: 8px 0 14px 0; padding-left: 22px; }
+li { margin: 4px 0; color: #44403c; }
+li strong { color: #1c1917; }
+
+/* ============================================================
+   BLOCKQUOTE — estilo editorial AURA
+   ============================================================ */
+blockquote {
+    margin: 18px 0;
+    padding: 14px 20px;
+    background: #fafaf9;
+    border-left: 3px solid #1c1917;
+    color: #44403c;
+    font-size: 10pt;
+    line-height: 1.6;
+    page-break-inside: avoid;
+}
+
+blockquote p:last-child { margin-bottom: 0; }
+
+/* ============================================================
+   CÓDIGO E MONO
+   ============================================================ */
+code {
+    font-family: 'JetBrains Mono', monospace;
+    background: #f5f5f4;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 0.88em;
+    color: #1c1917;
+    border: 1px solid #e7e5e4;
+}
+
+pre {
+    background: #fafaf9;
+    border: 1px solid #e7e5e4;
+    padding: 14px 16px;
+    border-radius: 6px;
+    font-size: 9pt;
+    line-height: 1.5;
+    page-break-inside: avoid;
+}
+
+pre code { background: none; padding: 0; border: none; }
+
+/* ============================================================
+   TABELAS
+   ============================================================ */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 9.5pt;
+    page-break-inside: avoid;
+}
+
+th {
+    background: #1c1917;
+    color: #fafaf9;
+    padding: 8px 12px;
+    text-align: left;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 500;
+    font-size: 8pt;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+td {
+    padding: 8px 12px;
+    border-bottom: 1px solid #e7e5e4;
+    color: #44403c;
+}
+
+/* ============================================================
+   SEPARADORES
+   ============================================================ */
+hr { border: none; border-top: 1px solid #e7e5e4; margin: 28px 0; }
+
+/* ============================================================
+   ÍNDICE
+   ============================================================ */
+.aura-indice {
+    background: #fafaf9;
+    border: 1px solid #e7e5e4;
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin: 16px 0 32px 0;
+    page-break-inside: avoid;
+}
+
+.aura-indice-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8pt;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: #78716c;
+    margin-bottom: 12px;
+    display: block;
+}
+
+.aura-indice ul { list-style: none; padding: 0; margin: 0; }
+
+.aura-indice li {
+    margin: 6px 0;
+    padding: 6px 0;
+    border-bottom: 1px dotted #d6d3d1;
+    font-family: 'Inter', sans-serif;
+    font-size: 10pt;
+    font-weight: 500;
+    color: #1c1917;
+}
+
+.aura-indice li:last-child { border-bottom: none; }
+
+/* ============================================================
+   RESUMO EXECUTIVO (página 1 após capa)
+   ============================================================ */
+.aura-resumo { page-break-after: always; }
+
+.aura-resumo-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8pt;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: #78716c;
+    margin-bottom: 8px;
+    display: block;
+}
+
+.aura-resumo-titulo {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 28pt;
+    font-weight: 500;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    color: #1c1917;
+    margin: 0 0 32px 0;
+}
+
+/* ============================================================
+   CARDS DE AGENTE — border-left preto, fundo stone-50
+   ============================================================ */
+.aura-agente {
+    margin: 28px 0;
+    padding: 22px 24px;
+    background: #fafaf9;
+    border-left: 4px solid #1c1917;
+    border-radius: 0 8px 8px 0;
+    page-break-inside: avoid;
+}
+
+.aura-agente-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8pt;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: #78716c;
+    margin-bottom: 6px;
+    display: block;
+}
+
+.aura-agente-nome {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 16pt;
+    font-weight: 500;
+    color: #1c1917;
+    margin: 0 0 12px 0;
+    letter-spacing: -0.01em;
+}
+
+.aura-agente-resumo {
+    font-family: 'Inter', sans-serif;
+    font-size: 10.5pt;
+    line-height: 1.55;
+    color: #44403c;
+}
+
+.aura-agente-resumo p:last-child { margin-bottom: 0; }
+
+/* ============================================================
+   RODAPÉ FINAL
+   ============================================================ */
+.aura-rodape-final {
+    margin-top: 60px;
+    padding: 24px 0 0 0;
+    border-top: 1px solid #e7e5e4;
+    text-align: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8pt;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: #a8a29e;
+}
+
+.aura-page-break { page-break-after: always; }
+
+    </style>
+</head>
+<body>
+
+<div class="aura-capa">
+    <div class="aura-capa-topo">
+        <div class="aura-capa-marca">LEMMON<span>PRODUÇÕES</span></div>
+    </div>
+    <div class="aura-capa-meio">
+        <div class="aura-capa-label">Roteiros · Topo de Funil</div>
+        <h1 class="aura-capa-titulo">Roteiros</h1>
+        <p class="aura-capa-projeto">Roteiros Topo de Funil · Dr. Pedro Abrahão</p>
+    </div>
+    <div class="aura-capa-rodape">
+        <div class="aura-capa-meta">
+            <div class="aura-capa-meta-item">
+                <span class="label">Compilado em</span>
+                <span class="valor">05/06/2026</span>
+            </div>
+            <div class="aura-capa-meta-item">
+                <span class="label">Cliente</span>
+                <span class="valor">HATOR CLINIC</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="aura-conteudo">
+<blockquote>
+<p><strong>Como usar este material.</strong> São roteiros de TOPO DE FUNIL (atração/awareness),<br>
+escritos na voz do Dr. Pedro (registro curto de Reel). Cada roteiro traz: gancho<br>
+de 0–3s, fala completa, indicações visuais [entre colchetes], fechamento com CTA<br>
+discreto, legenda e hashtags. As peças marcadas com 🔴 <strong>passam pelo Heitor antes<br>
+de gravar</strong> (compliance Meta + CFM). Validação final sempre com o Dr. Pedro real.</p>
+</blockquote>
+<hr>
+<h2>Roteiro 01 — "Não é a dieta, é hormônio" (barriga de pochete)</h2>
+<p><strong>Pilar:</strong> A (não é idade, é hormônio) · <strong>Risco compliance:</strong> 🟢 baixo<br>
+<strong>Formato:</strong> Reel vertical · <strong>Duração:</strong> 35–45s · <strong>Objetivo:</strong> identificação + autoridade</p>
+<p><strong>GANCHO (0–3s)</strong> — [Pedro de frente pra câmera, segura levemente a região abdominal]</p>
+<blockquote>
+<p>"Você treina, fecha a boca na dieta… e essa barriguinha aqui teima em ficar? Vou<br>
+ser direto: às vezes não é a dieta. É hormônio."</p>
+</blockquote>
+<p><strong>DESENVOLVIMENTO (3–30s)</strong></p>
+<blockquote>
+<p>"Tem um nome que viralizou aí na internet, 'barriga de cortisol'. E, olha, tem<br>
+fundo de verdade. O cortisol é o hormônio do estresse. Quando ele fica alto o<br>
+tempo todo — noite mal dormida, rotina apertada, cabeça acelerada — junto com a<br>
+insulina lá em cima, o corpo entende que é hora de <strong>guardar</strong> gordura. E guarda<br>
+bem aqui, no meio da barriga."<br>
+[B-ROLL: exame de bioimpedância / composição corporal na clínica]<br>
+"Aí a pessoa faz dieta, faz exercício, e não entende por que não sai. Então deixa<br>
+eu traduzir: insulina alta, dificuldade pra perder peso. Quando a gente corrige o<br>
+terreno, o corpo volta a colaborar."</p>
+</blockquote>
+<p><strong>FECHAMENTO + CTA (30–40s)</strong></p>
+<blockquote>
+<p>"Antes de culpar a idade ou a sua força de vontade, vale medir o que tá<br>
+acontecendo por dentro. Tem solução — mas começa por entender a causa. Quer<br>
+entender o seu caso? Clica aqui que a minha equipe conversa com você."</p>
+</blockquote>
+<p><strong>LEGENDA</strong></p>
+<blockquote>
+<p>Treina, faz dieta e a barriga não sai? Às vezes não é a dieta — é o terreno<br>
+hormonal. Cortisol e insulina altos fazem o corpo guardar gordura bem no meio da<br>
+barriga. A boa notícia: tem como entender e corrigir a causa. 🟢</p>
+</blockquote>
+<p><strong>HASHTAGS:</strong> #barrigadecortisol #saudedamulher #emagrecimentosaudavel #hormonios #medicinapersonalizada</p>
+<hr>
+<h2>Roteiro 02 — "Barriga de cortisol: mito ou real?" (mito-busting)</h2>
+<p><strong>Pilar:</strong> B (tratar a causa) · <strong>Risco compliance:</strong> 🟢 baixo<br>
+<strong>Formato:</strong> Reel vertical · <strong>Duração:</strong> 30–40s · <strong>Objetivo:</strong> educar + diferenciar voz séria</p>
+<p><strong>GANCHO (0–3s)</strong> — [hook visual: Pedro levanta a mão pedindo "calma"]</p>
+<blockquote>
+<p>"'Barriga de cortisol' virou moda. Mas o que é mito e o que é real aqui? Vou<br>
+separar pra você."</p>
+</blockquote>
+<p><strong>DESENVOLVIMENTO (3–28s)</strong></p>
+<blockquote>
+<p>"Mito: que existe uma fórmula mágica, um chazinho, que derrete a barriga de<br>
+cortisol. Não existe. Real: o cortisol cronicamente alto realmente atrapalha,<br>
+principalmente quando o sono tá ruim."<br>
+[TEXTO NA TELA: "1. Sono · 2. Estresse · 3. Onde a gordura concentra"]<br>
+"Então três sinais que valem atenção, né: você dorme mal, vive no modo<br>
+acelerado, e a gordura concentra justamente na barriga. Obviamente isso não<br>
+fecha diagnóstico sozinho — mas é um bom motivo pra investigar de verdade."</p>
+</blockquote>
+<p><strong>FECHAMENTO + CTA (28–38s)</strong></p>
+<blockquote>
+<p>"A diferença não tá em tratar o sintoma, tá em entender a causa. É isso que a<br>
+gente faz numa avaliação completa. Ficou com dúvida? Deixa aí nos comentários."</p>
+</blockquote>
+<p><strong>LEGENDA</strong></p>
+<blockquote>
+<p>Barriga de cortisol: o que é mito e o que é real. Não existe fórmula mágica — mas<br>
+sono ruim e estresse crônico mexem com o seu corpo de verdade. Investigar a causa<br>
+vale mais que correr atrás do sintoma. 🟢</p>
+</blockquote>
+<p><strong>HASHTAGS:</strong> #cortisol #saudefeminina #mitooureal #bemestar #medicinapreventiva</p>
+<hr>
+<h2>Roteiro 03 — "Suas pernas podem estar te avisando" (lipedema · sinais)</h2>
+<p><strong>Pilar:</strong> D (lipedema tem nome) · <strong>Risco compliance:</strong> 🟢 baixo<br>
+<strong>Formato:</strong> Reel vertical · <strong>Duração:</strong> 40–50s · <strong>Objetivo:</strong> identificação forte</p>
+<p><strong>GANCHO (0–3s)</strong> — [Pedro sério, tom acolhedor]</p>
+<blockquote>
+<p>"Se as suas pernas incham, doem e não afinam com dieta nenhuma… presta atenção<br>
+nesse vídeo. Pode ser lipedema."</p>
+</blockquote>
+<p><strong>DESENVOLVIMENTO (3–38s)</strong></p>
+<blockquote>
+<p>"O lipedema é uma doença multifatorial — ela tem fundo metabólico, inflamatório,<br>
+hormonal e genético. E, olha, existem muitas mulheres hoje que convivem com isso<br>
+sem diagnóstico, simplesmente por falta de profissional capacitado pra reconhecer."<br>
+[TEXTO NA TELA, um por vez: peso e cansaço nas pernas · dor ao toque · hematoma<br>
+fácil · formato desproporcional · não responde a dieta]<br>
+"Então alguns sinais que aparecem: aquela sensação de peso no fim do dia, dor<br>
+quando encosta, gordura que se concentra nas pernas de um jeito desproporcional ao<br>
+resto do corpo. Não é frescura, não é só 'estética'. É uma condição real."</p>
+</blockquote>
+<p><strong>FECHAMENTO + CTA (38–48s)</strong></p>
+<blockquote>
+<p>"O tratamento é com mulher 360, né — estratégia alimentar, parte hormonal,<br>
+anti-inflamatória — e não só visando a balança. Se você se reconheceu, fala com a<br>
+minha equipe pra a gente avaliar direito."</p>
+</blockquote>
+<p><strong>LEGENDA</strong></p>
+<blockquote>
+<p>Lipedema é real, é mais comum do que se imagina (~11% das mulheres) e segue muito<br>
+subdiagnosticado. Peso nas pernas, dor ao toque, gordura desproporcional que não<br>
+responde a dieta são sinais que merecem avaliação. 🟢</p>
+</blockquote>
+<p><strong>HASHTAGS:</strong> #lipedema #saudedamulher #dornaspernas #diagnostico #mulher360</p>
+<hr>
+<h2>Roteiro 04 — "Quanto tempo até descobrir?" (lipedema · subdiagnóstico)</h2>
+<p><strong>Pilar:</strong> D (lipedema tem nome) · <strong>Risco compliance:</strong> 🟢 baixo<br>
+<strong>Formato:</strong> Reel vertical · <strong>Duração:</strong> 30–40s · <strong>Objetivo:</strong> autoridade + urgência suave</p>
+<p><strong>GANCHO (0–3s)</strong></p>
+<blockquote>
+<p>"Quanto tempo uma mulher demora pra descobrir que tem lipedema? Tempo demais. E<br>
+isso precisa mudar."</p>
+</blockquote>
+<p><strong>DESENVOLVIMENTO (3–28s)</strong></p>
+<blockquote>
+<p>"Muita paciente passa anos ouvindo que é 'só engordar', que é falta de dieta, que<br>
+é da idade. Aí faz dieta atrás de dieta, e a perna não responde — porque o problema<br>
+não era esse."<br>
+[B-ROLL: anamnese / conversa de consultório, tom de acolhimento]<br>
+"Em 2026 saiu até um consenso internacional pra padronizar o diagnóstico. Ou seja:<br>
+a medicina tá levando isso a sério. O que falta, muitas vezes, é a mulher saber que<br>
+aquilo tem nome."</p>
+</blockquote>
+<p><strong>FECHAMENTO + CTA (28–38s)</strong></p>
+<blockquote>
+<p>"Dar nome ao que você sente já é metade do caminho. Tem solução. Quer entender se é<br>
+o seu caso? Clica aqui."</p>
+</blockquote>
+<p><strong>LEGENDA</strong></p>
+<blockquote>
+<p>Anos ouvindo "é só fazer dieta" — quando na verdade era lipedema. Diagnóstico<br>
+tardio é a regra, e não deveria ser. Em 2026 já há consenso internacional pra<br>
+orientar diagnóstico e manejo. 🟢</p>
+</blockquote>
+<p><strong>HASHTAGS:</strong> #lipedema #diagnosticotardio #saudefeminina #autoconhecimento #medicina</p>
+<hr>
+<h2>Roteiro 05 — "Não é da idade" (perimenopausa / reposição hormonal)</h2>
+<p><strong>Pilar:</strong> A (não é idade, é hormônio) · <strong>Risco compliance:</strong> 🟡 médio (cuidado ao falar de reposição) — <strong>revisar com Heitor</strong><br>
+<strong>Formato:</strong> Reel vertical · <strong>Duração:</strong> 35–45s · <strong>Objetivo:</strong> identificação + reposicionar "idade"</p>
+<p><strong>GANCHO (0–3s)</strong></p>
+<blockquote>
+<p>"Cansaço, insônia, irritação, libido lá embaixo depois dos 40… e te falaram que é<br>
+da idade? Vou ser direto: nem sempre é."</p>
+</blockquote>
+<p><strong>DESENVOLVIMENTO (3–30s)</strong></p>
+<blockquote>
+<p>"Existe uma fase, a perimenopausa, que pode começar lá no fim dos 30. E nela os<br>
+hormônios não caem numa linha reta — eles oscilam, sobem e descem de um jeito<br>
+intenso. É isso que bagunça o sono, o humor, a memória, a energia."<br>
+[TEXTO NA TELA: fogacho · insônia · névoa mental · irritabilidade · libido]<br>
+"Então quando a mulher entende que aquilo tem explicação hormonal, muda o jogo.<br>
+Não é fraqueza, não é 'frescura', e obviamente não é só 'da idade'."</p>
+</blockquote>
+<p><strong>FECHAMENTO + CTA (30–42s)</strong></p>
+<blockquote>
+<p>"Reposição hormonal feita com critério, individualizada, não é vaidade — é<br>
+qualidade de vida e longevidade. Mas começa por uma avaliação de verdade. Fala com<br>
+a minha equipe."</p>
+</blockquote>
+<p><strong>LEGENDA</strong></p>
+<blockquote>
+<p>Depois dos 40, cansaço, insônia e irritação nem sempre são "da idade". A<br>
+perimenopausa é uma fase de oscilação hormonal intensa — e tem explicação. Entender<br>
+o que acontece no seu corpo é o primeiro passo. 🟡</p>
+</blockquote>
+<p><strong>HASHTAGS:</strong> #perimenopausa #naoehidadeehormonio #saudedamulher #reposicaohormonal #longevidade</p>
+<hr>
+<h2>Roteiro 06 — "A caneta não é vilã nem milagre" (GLP-1 / emagrecimento) 🔴</h2>
+<p><strong>Pilar:</strong> E (sem mágica, com critério) · <strong>Risco compliance:</strong> 🔴 alto — <strong>Heitor obrigatório (<code>--profundo</code>)</strong><br>
+<strong>Formato:</strong> Reel vertical · <strong>Duração:</strong> 35–45s · <strong>Objetivo:</strong> contraponto técnico + autoridade</p>
+<p><strong>GANCHO (0–3s)</strong></p>
+<blockquote>
+<p>"A famosa caneta de emagrecer não é vilã, mas também não é milagre. Vou te explicar<br>
+quando ela faz sentido — e quando não."</p>
+</blockquote>
+<p><strong>DESENVOLVIMENTO (3–30s)</strong></p>
+<blockquote>
+<p>"Os medicamentos da classe do GLP-1 têm indicação clínica específica. Pra<br>
+determinados casos, são uma ferramenta bacana. O problema é tratar como solução<br>
+universal, pra qualquer pessoa, sem avaliação."<br>
+[B-ROLL: exames, avaliação — NÃO mostrar caixa/marca de medicamento]<br>
+"Porque, olha, sem corrigir o terreno — insulina, parte hormonal, composição<br>
+corporal — nenhuma medicação sustenta resultado sozinha. Senão vira aquilo de<br>
+jogar a sujeira pra debaixo do tapete: trata o sintoma e não trata a causa."</p>
+</blockquote>
+<p><strong>FECHAMENTO + CTA (30–42s)</strong></p>
+<blockquote>
+<p>"Então a pergunta certa não é 'qual a caneta'. É 'o que o meu corpo precisa'. E<br>
+isso só uma avaliação individual responde. Quer fazer a sua? Clica aqui."</p>
+</blockquote>
+<p><strong>LEGENDA</strong></p>
+<blockquote>
+<p>GLP-1 tem indicação clínica específica — não é solução universal. Sem corrigir o<br>
+terreno hormonal e metabólico, nenhuma medicação sustenta o resultado. A pergunta<br>
+certa é o que o SEU corpo precisa. 🔴 <em>(peça em revisão de compliance)</em></p>
+</blockquote>
+<p><strong>HASHTAGS:</strong> #emagrecimentosaudavel #glp1 #medicinapersonalizada #semmilagre #saude</p>
+<blockquote>
+<p>⚠️ <strong>Nota Heitor:</strong> não citar marca ("Ozempic"/"Mounjaro"), não mostrar embalagem,<br>
+não prometer percentual de perda, não usar antes-e-depois. Tom estritamente<br>
+educativo. Validar enquadramento CFM sobre divulgação de medicação.</p>
+</blockquote>
+<hr>
+<h2>Roteiro 07 — "Chip da beleza e reposição não são a mesma coisa" 🔴</h2>
+<p><strong>Pilar:</strong> E (sem mágica, com critério) · <strong>Risco compliance:</strong> 🔴 alto — <strong>Heitor obrigatório (<code>--profundo</code>)</strong><br>
+<strong>Formato:</strong> Reel vertical · <strong>Duração:</strong> 40–50s · <strong>Objetivo:</strong> posicionar a voz séria sobre o tema mais buscado</p>
+<p><strong>GANCHO (0–3s)</strong></p>
+<blockquote>
+<p>"'Chip da beleza' e reposição hormonal são a mesma coisa? Não são. E essa diferença<br>
+importa demais pra sua saúde."</p>
+</blockquote>
+<p><strong>DESENVOLVIMENTO (3–38s)</strong></p>
+<blockquote>
+<p>"Vou ser direto. O que ficou conhecido como 'chip da beleza' é um implante<br>
+manipulado, muitas vezes com substância sem controle de dose e sem comprovação de<br>
+segurança a longo prazo. Tanto que a Anvisa suspendeu esse tipo de implante<br>
+manipulado."<br>
+[TEXTO NA TELA: "manipulado sem controle ≠ reposição médica individualizada"]<br>
+"Reposição hormonal séria é outra conversa: parte de avaliação completa, de<br>
+indicação clínica, com dose ajustada pra VOCÊ e acompanhamento. Não é atalho<br>
+estético, é decisão médica. Sem mágica, com critério."</p>
+</blockquote>
+<p><strong>FECHAMENTO + CTA (38–48s)</strong></p>
+<blockquote>
+<p>"Então, se te ofereceram um atalho, desconfia. Saúde hormonal se faz com avaliação<br>
+e acompanhamento. Quer entender o caminho certo? Fala com a minha equipe."</p>
+</blockquote>
+<p><strong>LEGENDA</strong></p>
+<blockquote>
+<p>"Chip da beleza" (implante manipulado, suspenso pela Anvisa) não é o mesmo que<br>
+reposição hormonal médica, individualizada e acompanhada. Desconfie de atalho. Saúde<br>
+hormonal é decisão clínica, não estética. 🔴 <em>(peça em revisão de compliance)</em></p>
+</blockquote>
+<p><strong>HASHTAGS:</strong> #reposicaohormonal #saudedamulher #semmilagre #hormonios #medicinaséria</p>
+<blockquote>
+<p>⚠️ <strong>Nota Heitor:</strong> tema sensível (Anvisa/CFM). Não citar gestrinona como produto,<br>
+não dar a entender que a clínica oferece "alternativa ao chip". Enquadrar 100% como<br>
+educação + alerta. Validar antes de qualquer veiculação, principalmente se for ad pago.</p>
+</blockquote>
+<hr>
+<h2>Resumo de priorização</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Roteiro</th>
+<th>Tema</th>
+<th>Risco</th>
+<th>Ordem sugerida</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>01</td>
+<td>Não é a dieta, é hormônio</td>
+<td>barriga de pochete</td>
+<td>🟢</td>
+<td>1º</td>
+</tr>
+<tr>
+<td>03</td>
+<td>Suas pernas te avisam</td>
+<td>lipedema</td>
+<td>🟢</td>
+<td>2º</td>
+</tr>
+<tr>
+<td>02</td>
+<td>Mito ou real</td>
+<td>cortisol</td>
+<td>🟢</td>
+<td>3º</td>
+</tr>
+<tr>
+<td>04</td>
+<td>Quanto tempo até descobrir</td>
+<td>lipedema</td>
+<td>🟢</td>
+<td>4º</td>
+</tr>
+<tr>
+<td>05</td>
+<td>Não é da idade</td>
+<td>perimenopausa</td>
+<td>🟡</td>
+<td>5º (rev. Heitor)</td>
+</tr>
+<tr>
+<td>06</td>
+<td>Caneta não é vilã</td>
+<td>GLP-1</td>
+<td>🔴</td>
+<td>só com Heitor</td>
+</tr>
+<tr>
+<td>07</td>
+<td>Chip ≠ reposição</td>
+<td>implante</td>
+<td>🔴</td>
+<td>só com Heitor</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<div class="aura-rodape-final">
+    Lemmon Produções · 05/06/2026
+</div>
+
+</body>
+</html>
