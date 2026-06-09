@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Toninho Pires · Recrutamento · AURA</title>
+<!--FONTS-->
+<style>
+/* ============ AURA TOKENS ============ */
+:root{
+  --pure:#ffffff; --bg:#fdfdfd;
+  --s50:#fafaf9; --s100:#f5f5f4; --s200:#e7e5e4; --s300:#d6d3d1;
+  --s400:#a8a29e; --s500:#78716c; --s600:#57534e; --s700:#44403c;
+  --s800:#292524; --s900:#1c1917;
+  --amber:#f59e0b; --orange:#f97316;
+  --ease:cubic-bezier(0.16,1,0.3,1);
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-font-smoothing:antialiased;text-rendering:geometricPrecision;}
+body{background:#e7e5e4;font-family:'Inter',sans-serif;}
+
+/* one slide = one instagram story frame */
+.slide{
+  position:relative; width:1080px; height:1920px; overflow:hidden;
+  display:flex; flex-direction:column; justify-content:space-between;
+  padding:120px 96px 110px;
+}
+.light{background:var(--bg); color:var(--s900);}
+.dark{background:var(--s900); color:var(--pure);}
+
+/* noise + texture overlays (from AURA) */
+.slide::after{
+  content:""; position:absolute; inset:0; pointer-events:none; z-index:40;
+  opacity:.16; mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.orb{position:absolute; border-radius:9999px; filter:blur(120px); pointer-events:none; z-index:0;}
+
+/* shared chrome ------------------------------------------------ */
+.topbar{position:relative; z-index:10; display:flex; justify-content:space-between; align-items:center;}
+.brand{font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:30px; letter-spacing:-.03em;}
+.brand span{font-weight:300; opacity:.55;}
+.idx{font-family:'JetBrains Mono',monospace; font-size:20px; letter-spacing:.18em; opacity:.5;}
+
+.eyebrow{font-family:'JetBrains Mono',monospace; font-size:21px; text-transform:uppercase; letter-spacing:.32em;}
+.light .eyebrow{color:var(--s400);} .dark .eyebrow{color:var(--s500);}
+
+.pill{display:inline-flex; align-items:center; gap:14px; padding:14px 26px; border-radius:9999px;
+  font-family:'JetBrains Mono',monospace; font-size:19px; text-transform:uppercase; letter-spacing:.22em;}
+.light .pill{background:var(--pure); border:1px solid var(--s200); color:var(--s700); box-shadow:0 8px 30px rgba(0,0,0,.05);}
+.dark .pill{background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12); color:var(--s200); backdrop-filter:blur(20px);}
+.dot{width:11px; height:11px; border-radius:9999px; background:var(--amber); box-shadow:0 0 16px 2px rgba(245,158,11,.6);}
+
+h1.display{font-family:'Space Grotesk',sans-serif; font-weight:500; line-height:.86; letter-spacing:-.045em;}
+.stroke{color:transparent; -webkit-text-stroke:2px rgba(255,255,255,.28);}
+.light .stroke{-webkit-text-stroke:2px rgba(0,0,0,.18);}
+.amber{background:linear-gradient(100deg,var(--amber),var(--orange)); -webkit-background-clip:text; background-clip:text; color:transparent;}
+
+.rule{height:2px; width:100%; border-radius:2px;}
+.light .rule{background:linear-gradient(90deg,var(--s900),transparent);}
+.dark .rule{background:linear-gradient(90deg,rgba(255,255,255,.6),transparent);}
+
+.lead{font-family:'Inter',sans-serif; font-weight:300; line-height:1.38;}
+.light .lead{color:var(--s600);} .dark .lead{color:var(--s400);}
+
+.foot{position:relative; z-index:10; display:flex; justify-content:space-between; align-items:flex-end;}
+.foot .mono{font-family:'JetBrains Mono',monospace; font-size:19px; letter-spacing:.18em; text-transform:uppercase;}
+.light .foot .mono{color:var(--s400);} .dark .foot .mono{color:var(--s500);}
+.swipe{display:inline-flex; align-items:center; gap:14px; font-family:'JetBrains Mono',monospace;
+  font-size:20px; letter-spacing:.2em; text-transform:uppercase;}
+.swipe .arrow{font-size:26px; animation:none;}
+
+/* cards / lists ------------------------------------------------ */
+.card{border-radius:34px; padding:46px 44px;}
+.light .card{background:var(--pure); border:1px solid var(--s200); box-shadow:0 20px 50px -20px rgba(0,0,0,.10);}
+.dark .card{background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.10); backdrop-filter:blur(20px);}
+.card .num{font-family:'JetBrains Mono',monospace; font-size:18px; letter-spacing:.2em; opacity:.5;}
+.card h3{font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:46px; letter-spacing:-.02em; margin:14px 0 16px;}
+.card p{font-family:'Inter',sans-serif; font-weight:300; font-size:30px; line-height:1.35;}
+.light .card p{color:var(--s500);} .dark .card p{color:var(--s400);}
+
+.row{display:flex; align-items:flex-start; gap:26px; padding:30px 0; border-bottom:1px solid;}
+.light .row{border-color:var(--s200);} .dark .row{border-color:rgba(255,255,255,.10);}
+.row .ic{flex:none; width:62px; height:62px; border-radius:18px; display:flex; align-items:center; justify-content:center; font-size:32px;}
+.light .row .ic{background:var(--s100); color:var(--s900);} .dark .row .ic{background:rgba(255,255,255,.07); color:var(--pure);}
+.row .tx{font-family:'Inter',sans-serif; font-weight:500; font-size:35px; line-height:1.2; padding-top:8px;}
+.row .tx small{display:block; font-weight:300; font-size:26px; margin-top:8px;}
+.light .row .tx small{color:var(--s400);} .dark .row .tx small{color:var(--s500);}
+
+.cols{display:grid; grid-template-columns:1fr 1fr; gap:34px;}
+.col-head{font-family:'JetBrains Mono',monospace; font-size:20px; letter-spacing:.18em; text-transform:uppercase; margin-bottom:26px;}
+.col li{list-style:none; display:flex; gap:18px; align-items:flex-start; font-family:'Inter',sans-serif;
+  font-weight:400; font-size:30px; line-height:1.3; margin-bottom:24px;}
+.col .mk{flex:none; font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:30px; line-height:1.3;}
+.yes .mk{color:var(--amber);} .no .mk{opacity:.35;}
+.light .yes li{color:var(--s700);} .light .no li{color:var(--s400);}
+.dark .yes li{color:var(--s200);} .dark .no li{color:var(--s500);}
+
+/* big CTA button */
+.cta{display:inline-flex; align-items:center; gap:22px; padding:38px 54px; border-radius:9999px;
+  font-family:'JetBrains Mono',monospace; font-size:28px; letter-spacing:.14em; text-transform:uppercase; font-weight:500;
+  background:var(--pure); color:var(--s900); box-shadow:0 30px 70px -20px rgba(245,158,11,.55);}
+.cta .glyph{display:inline-flex; width:54px; height:54px; border-radius:9999px; align-items:center; justify-content:center;
+  background:linear-gradient(120deg,var(--amber),var(--orange)); color:#fff; font-size:30px;}
+.handle{font-family:'Space Grotesk',sans-serif; font-weight:500; font-size:34px; letter-spacing:-.01em;}
+.light .handle{color:var(--s900);} .dark .handle{color:var(--pure);}
+</style>
+</head>
+<body>
+
+<!-- ============ SLIDE 1 · CAPA ============ -->
+<section class="slide dark">
+  <div class="orb" style="width:760px;height:760px;background:rgba(245,158,11,.16);top:-160px;right:-200px;"></div>
+  <div class="orb" style="width:560px;height:560px;background:rgba(120,113,108,.40);bottom:120px;left:-180px;"></div>
+  <div class="topbar">
+    <div class="brand">TONINHO PIRES<span> · imóveis</span></div>
+    <div class="idx">01 / 05</div>
+  </div>
+  <div style="position:relative;z-index:10;">
+    <div class="pill" style="margin-bottom:54px;"><span class="dot"></span>Vaga aberta · CRECI ativo</div>
+    <h1 class="display" style="font-size:200px;">
+      <span class="stroke">PROCURO</span><br>
+      Corretor<br>
+      <span class="amber">de Imóveis</span>
+    </h1>
+    <div class="rule" style="margin:64px 0 50px;"></div>
+    <p class="lead" style="font-size:46px;max-width:820px;">
+      Não é sobre vender <em style="font-style:normal;color:#fff;font-weight:500;">mais</em>.
+      É sobre vender <em style="font-style:normal;color:#fff;font-weight:500;">bem</em> — e bem acompanhado.
+    </p>
+  </div>
+  <div class="foot">
+    <span class="mono">Mentoria · Ambiente · Método</span>
+    <span class="swipe"><span style="opacity:.6">arraste</span><span class="arrow">→</span></span>
+  </div>
+</section>
+
+<!-- ============ SLIDE 2 · DIAGNÓSTICO ============ -->
+<section class="slide light">
+  <div class="orb" style="width:640px;height:640px;background:rgba(231,229,228,.9);top:-140px;left:-160px;"></div>
+  <div class="topbar">
+    <div class="eyebrow">02 / O diagnóstico</div>
+    <div class="idx" style="color:var(--s400)">02 / 05</div>
+  </div>
+  <div style="position:relative;z-index:10;">
+    <h1 class="display" style="font-size:104px;color:var(--s900);">
+      Talvez o problema<br>
+      nunca tenha sido<br>
+      <span class="amber">você.</span>
+    </h1>
+    <p class="lead" style="font-size:38px;max-width:780px;margin-top:44px;">
+      Corretor bom que rende pouco quase nunca é falta de esforço.
+      É o terreno onde ele tenta plantar.
+    </p>
+    <div style="margin-top:58px;">
+      <div class="row"><div class="ic">◦</div><div class="tx">Sozinho na rua<small>Sem ninguém revisando sua abordagem.</small></div></div>
+      <div class="row"><div class="ic">◦</div><div class="tx">Mentoria de palco<small>Discurso anual que não vira rotina.</small></div></div>
+      <div class="row"><div class="ic">◦</div><div class="tx">Meta sem método<small>Cobram o número, ninguém ensina o caminho.</small></div></div>
+      <div class="row" style="border-bottom:none;"><div class="ic">◦</div><div class="tx">Ambiente que pesa<small>Competição interna no lugar de time.</small></div></div>
+    </div>
+  </div>
+  <div class="foot">
+    <span class="mono">Toninho Pires · imóveis</span>
+    <span class="swipe" style="color:var(--s400)"><span style="opacity:.7">a virada</span><span class="arrow">→</span></span>
+  </div>
+</section>
+
+<!-- ============ SLIDE 3 · O AMBIENTE ============ -->
+<section class="slide dark">
+  <div class="orb" style="width:680px;height:680px;background:rgba(245,158,11,.12);bottom:-180px;right:-160px;"></div>
+  <div class="topbar">
+    <div class="eyebrow">03 / O ambiente</div>
+    <div class="idx">03 / 05</div>
+  </div>
+  <div style="position:relative;z-index:10;">
+    <h1 class="display" style="font-size:130px;">
+      Aqui o jogo<br><span class="amber">muda.</span>
+    </h1>
+    <p class="lead" style="font-size:36px;max-width:760px;margin:40px 0 56px;">
+      Três coisas que ninguém te dá num anúncio comum — e que decidem sua próxima safra de vendas.
+    </p>
+    <div style="display:flex;flex-direction:column;gap:30px;">
+      <div class="card"><div class="num">/ 01</div><h3>Ambiente saudável</h3><p>Time que cresce junto. Sem cotovelada, sem disputa por lead.</p></div>
+      <div class="card"><div class="num">/ 02</div><h3>Mentoria real</h3><p>Acompanhamento próximo, semana a semana. Não palestra de fim de ano.</p></div>
+      <div class="card"><div class="num">/ 03</div><h3>Método de venda</h3><p>Processo que favorece quem executa. Você aplica, eu ando junto.</p></div>
+    </div>
+  </div>
+  <div class="foot">
+    <span class="mono">Crescer acompanhado</span>
+    <span class="swipe"><span style="opacity:.6">pra quem é</span><span class="arrow">→</span></span>
+  </div>
+</section>
+
+<!-- ============ SLIDE 4 · PERFIL ============ -->
+<section class="slide light">
+  <div class="orb" style="width:600px;height:600px;background:rgba(231,229,228,.9);top:-120px;right:-160px;"></div>
+  <div class="topbar">
+    <div class="eyebrow">04 / Perfil</div>
+    <div class="idx" style="color:var(--s400)">04 / 05</div>
+  </div>
+  <div style="position:relative;z-index:10;">
+    <h1 class="display" style="font-size:130px;color:var(--s900);">
+      Pra quem<br><span class="amber">é isso?</span>
+    </h1>
+    <p class="lead" style="font-size:36px;max-width:740px;margin:40px 0 64px;">
+      Sou seletivo de propósito. Ambiente bom se protege com a entrada certa.
+    </p>
+    <div class="cols">
+      <div class="col yes">
+        <div class="col-head" style="color:var(--amber)">— É pra você se</div>
+        <ul>
+          <li><span class="mk">+</span> Tem CRECI ativo e quer carreira, não bico.</li>
+          <li><span class="mk">+</span> Aceita ser orientado pra vender melhor.</li>
+          <li><span class="mk">+</span> Valoriza time acima de ego.</li>
+          <li><span class="mk">+</span> Topa método e consistência.</li>
+        </ul>
+      </div>
+      <div class="col no">
+        <div class="col-head" style="color:var(--s400)">— Não é, se</div>
+        <ul>
+          <li><span class="mk">×</span> Procura promessa de dinheiro fácil.</li>
+          <li><span class="mk">×</span> Não quer prestar contas de processo.</li>
+          <li><span class="mk">×</span> Some quando o mês aperta.</li>
+          <li><span class="mk">×</span> Já acha que sabe tudo.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="foot">
+    <span class="mono">Toninho Pires · imóveis</span>
+    <span class="swipe" style="color:var(--s400)"><span style="opacity:.7">o convite</span><span class="arrow">→</span></span>
+  </div>
+</section>
+
+<!-- ============ SLIDE 5 · CTA ============ -->
+<section class="slide dark">
+  <div class="orb" style="width:820px;height:820px;background:rgba(245,158,11,.20);top:-220px;right:-220px;"></div>
+  <div class="orb" style="width:560px;height:560px;background:rgba(120,113,108,.40);bottom:60px;left:-200px;"></div>
+  <div class="topbar">
+    <div class="eyebrow">05 / O convite</div>
+    <div class="idx">05 / 05</div>
+  </div>
+  <div style="position:relative;z-index:10;">
+    <div class="pill" style="margin-bottom:50px;"><span class="dot"></span>Conversa reservada</div>
+    <h1 class="display" style="font-size:150px;">
+      Me chame<br>no <span class="amber">privado.</span>
+    </h1>
+    <p class="lead" style="font-size:44px;max-width:820px;margin:50px 0 70px;color:#fff;font-weight:300;">
+      Tenho uma proposta que <em style="font-style:normal;font-weight:500;">não cabe num story</em>.
+      Manda um direct — eu respondo pessoalmente.
+    </p>
+    <div class="cta">Chamar no direct <span class="glyph">→</span></div>
+  </div>
+  <div class="foot">
+    <span class="handle">@toninhopires.re</span>
+    <span class="mono">Lemmon · padrão AURA</span>
+  </div>
+</section>
+
+</body>
+</html>

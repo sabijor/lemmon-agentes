@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Toninho Pires · Story · AURA (mono)</title>
+<!--FONTS-->
+<style>
+:root{
+  --pure:#ffffff; --bg:#fdfdfd;
+  --s50:#fafaf9; --s100:#f5f5f4; --s200:#e7e5e4; --s300:#d6d3d1;
+  --s400:#a8a29e; --s500:#78716c; --s600:#57534e; --s700:#44403c;
+  --s800:#292524; --s900:#1c1917;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-font-smoothing:antialiased;text-rendering:geometricPrecision;}
+body{background:#cfcdcb;font-family:'Inter',sans-serif;}
+
+.slide{
+  position:relative; width:1080px; height:1920px; overflow:hidden;
+  /* stone gradient matched to the studio backdrop so the photo dissolves in */
+  background:
+    radial-gradient(140% 100% at 12% 8%, #ffffff 0%, #fafaf9 32%, #ededeb 60%, #d9d6d3 100%);
+  color:var(--s900);
+}
+/* AURA noise */
+.slide::after{
+  content:""; position:absolute; inset:0; pointer-events:none; z-index:60;
+  opacity:.14; mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.orb{position:absolute; border-radius:9999px; filter:blur(120px); pointer-events:none; z-index:0;}
+
+/* ---- the photo, feathered into the page ---- */
+.photo{
+  position:absolute; bottom:0; left:80%; transform:translateX(-50%);
+  height:1045px; width:auto; z-index:1;
+  -webkit-mask-image:
+     linear-gradient(to bottom, transparent 0%, #000 17%),
+     linear-gradient(to right, transparent 0%, #000 12%, #000 90%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-image:
+     linear-gradient(to bottom, transparent 0%, #000 17%),
+     linear-gradient(to right, transparent 0%, #000 12%, #000 90%, transparent 100%);
+  mask-composite: intersect;
+}
+/* a soft vignette under the figure to seat him on the page */
+.seat{position:absolute; left:78%; transform:translateX(-50%); bottom:0; width:820px; height:720px; z-index:0;
+  background:radial-gradient(58% 55% at 50% 92%, rgba(120,113,108,.16), transparent 72%);}
+
+/* ---- content layer ---- */
+.wrap{position:relative; z-index:10; width:100%; height:100%;
+  display:flex; flex-direction:column; justify-content:space-between;
+  padding:138px 90px 210px;}
+
+.top{display:flex; justify-content:space-between; align-items:center;}
+.brand{font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:30px; letter-spacing:-.03em; color:var(--s900);}
+.brand span{font-weight:300; color:var(--s500);}
+.tag{font-family:'JetBrains Mono',monospace; font-size:19px; letter-spacing:.2em; text-transform:uppercase; color:var(--s500);}
+
+.pill{display:inline-flex; align-items:center; gap:14px; padding:15px 28px; border-radius:9999px;
+  background:var(--s900); color:#fff;
+  font-family:'JetBrains Mono',monospace; font-size:19px; text-transform:uppercase; letter-spacing:.2em;}
+.pill .dot{width:10px;height:10px;border-radius:9999px;background:#fff;animation:none;}
+
+h1{font-family:'Space Grotesk',sans-serif; font-weight:600; line-height:.93;
+  letter-spacing:-.045em; color:var(--s900); font-size:90px; margin-top:34px;}
+h1 .stroke{ -webkit-text-stroke:2px var(--s900); color:transparent; font-weight:500; }
+h1 .mark{ display:inline-block; background:var(--s900); color:#fff;
+  padding:.02em .16em .1em; border-radius:14px; line-height:.9; }
+h1 .num{ font-family:'Space Grotesk',sans-serif; font-weight:700; }
+
+.mid{ }
+
+.bottom{display:flex; flex-direction:column; gap:26px;}
+.cta{align-self:flex-start; display:inline-flex; align-items:center; gap:20px;
+  padding:28px 42px; border-radius:9999px; background:#fff; color:var(--s900);
+  border:1px solid var(--s200);
+  font-family:'JetBrains Mono',monospace; font-size:25px; letter-spacing:.12em; text-transform:uppercase; font-weight:600;
+  box-shadow:0 26px 50px -18px rgba(28,25,23,.40);}
+.cta .glyph{display:inline-flex; width:48px; height:48px; border-radius:9999px; align-items:center; justify-content:center;
+  background:var(--s900); color:#fff; font-size:26px; font-weight:700;}
+.props{font-family:'JetBrains Mono',monospace; font-size:20px; letter-spacing:.1em; text-transform:uppercase;
+  color:var(--s500); display:flex; align-items:center; gap:14px; flex-wrap:wrap;}
+.props .x{color:var(--s300);}
+.handle-row{display:flex; align-items:center; justify-content:space-between; margin-top:4px;}
+.handle{font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:34px; color:var(--s900); letter-spacing:-.01em;}
+.fine{font-family:'JetBrains Mono',monospace; font-size:17px; letter-spacing:.18em; text-transform:uppercase; color:var(--s400);}
+</style>
+</head>
+<body>
+<section class="slide">
+  <div class="orb" style="width:680px;height:680px;background:rgba(168,162,158,.30);top:-160px;left:-160px;"></div>
+  <div class="seat"></div>
+  <img class="photo" src="/tmp/photo_data_uri_PLACEHOLDER" alt="Toninho Pires" />
+
+  <div class="wrap">
+    <div class="top">
+      <div class="brand">TONINHO PIRES<span> · imóveis</span></div>
+      <div class="tag">CRECI ativo</div>
+    </div>
+
+    <div class="mid">
+      <div class="pill"><span class="dot"></span>Vaga aberta · 1 posição</div>
+      <h1>
+        <span class="stroke">Procuro</span><br>
+        <span class="num">1</span> corretor<br>
+        que cansou<br>
+        de vender<br>
+        <span class="mark">sozinho.</span>
+      </h1>
+    </div>
+
+    <div class="bottom">
+      <div class="props">
+        Ambiente <span class="x">/</span> Mentoria <span class="x">/</span> Método
+      </div>
+      <div class="cta">Bora? chama no direct <span class="glyph">→</span></div>
+      <div class="handle-row">
+        <span class="handle">@toninhopires.re</span>
+      </div>
+    </div>
+  </div>
+</section>
+</body>
+</html>
