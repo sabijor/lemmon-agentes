@@ -137,20 +137,16 @@ footer{position:fixed;left:0;right:0;bottom:0;z-index:30;background:rgba(253,253
 /* ---- print / PDF document ---- */
 #printdoc{display:none}
 .pd{font-family:var(--sans);color:#1c1917}
-.pd-head{border-bottom:2px solid #1c1917;padding-bottom:10px;margin-bottom:14px}
-.pd h1{font-family:var(--display);font-weight:700;font-size:24px;margin:0;letter-spacing:-.02em}
-.pd .meta{font-family:var(--mono);font-size:10px;letter-spacing:.1em;color:#78716c;text-transform:uppercase;margin-top:5px}
-.pd-stats{display:flex;gap:22px;margin-top:9px;font-family:var(--mono);font-size:11px;color:#44403c}
-.pd-stats b{font-family:var(--display);font-size:15px;color:#1c1917}
-.pd-stats .am b{color:#d97706}
-.pd h2{font-family:var(--display);font-size:15px;margin:16px 0 8px;border-top:1px solid #d6d3d1;padding-top:11px}
-.pd-team{break-inside:avoid;margin-bottom:10px}
-.pd-team .tn{font-family:var(--display);font-weight:600;font-size:13px}
-.pd-team .tn .ct{color:#d97706;font-weight:500}
-.pd-cols{column-count:2;column-gap:24px;margin-top:4px}
-.pd-cols.three{column-count:3}
-.pd-item{break-inside:avoid;font-size:11px;line-height:1.55;color:#292524}
-.pd-item code{font-family:var(--mono);font-size:9.5px;color:#78716c;letter-spacing:.02em;margin-right:4px}
+.pd-head{border-bottom:1.5px solid #1c1917;padding-bottom:7px;margin-bottom:12px}
+.pd h1{font-family:var(--display);font-weight:700;font-size:18px;margin:0;letter-spacing:-.02em;display:flex;align-items:baseline;gap:8px}
+.pd h1 .hcount{font-size:18px;color:#d97706}
+.pd .meta{font-family:var(--mono);font-size:9.5px;letter-spacing:.06em;color:#78716c;text-transform:uppercase;margin-top:3px}
+.pd-team{break-inside:avoid;margin-bottom:9px}
+.pd-team .tn{font-family:var(--display);font-weight:600;font-size:12.5px}
+.pd-team .tn .ct{color:#d97706;font-weight:500;margin-left:3px}
+.pd-cols{column-count:3;column-gap:22px;margin-top:3px}
+.pd-item{break-inside:avoid;font-size:10.5px;line-height:1.5;color:#292524}
+.pd-item code{font-family:var(--mono);font-size:9px;color:#78716c;letter-spacing:.02em;margin-right:4px}
 @media print{
   @page{margin:13mm}
   .noise,.blob,header.top,footer,.chips,.hint,.wrap,.toast,.sheet,.sheet-bg{display:none!important}
@@ -396,16 +392,13 @@ function buildPrintDoc(){
   DATA.sections.forEach(s=>{
     const miss=s.slots.filter(sl=>status(sl)==='missing');
     if(!miss.length)return;
-    teams+='<div class="pd-team"><div class="tn">'+esc(s.title)+(s.group?' · Grupo '+s.group:'')+' <span class="ct">('+miss.length+')</span></div>'+
+    teams+='<div class="pd-team"><div class="tn">'+esc(s.title)+(s.group?' · Grupo '+s.group:'')+' <span class="ct">'+miss.length+'</span></div>'+
       '<div class="pd-cols three">'+miss.map(sl=>'<div class="pd-item"><code>'+esc(sl.code)+'</code>'+esc(sl.player)+'</div>').join('')+'</div></div>';
   });
-  const repItems=[];
-  DATA.sections.forEach(s=>s.slots.forEach(sl=>{const v=dup(sl.code);if(v>0&&status(sl)==='have')repItems.push('<div class="pd-item"><code>'+esc(sl.code)+'</code>'+esc(sl.player)+' ×'+v+'</div>')}));
-  const rep=repItems.length?'<h2>Tenho repetidas para troca ('+repItems.length+')</h2><div class="pd-cols three">'+repItems.join('')+'</div>':'';
-  $('printdoc').innerHTML='<div class="pd"><div class="pd-head"><h1>Figurinhas que faltam</h1>'+
-    '<div class="meta">Meu Álbum · Copa 2026 — Panini · '+dd+'</div>'+
-    '<div class="pd-stats"><span class="am"><b>'+c.m+'</b> faltam</span><span><b>'+c.h+'</b> coladas</span><span><b>'+pct+'%</b> completo</span></div></div>'+
-    (teams||'<p>Nenhuma faltando — álbum completo! 🎉</p>')+rep+'</div>';
+  $('printdoc').innerHTML='<div class="pd"><div class="pd-head">'+
+    '<h1>Figurinhas que faltam <span class="hcount">'+c.m+'</span></h1>'+
+    '<div class="meta">Meu Álbum · Copa 2026 — Panini · '+dd+' · '+c.h+'/'+c.t+' coladas · '+pct+'% completo</div></div>'+
+    (teams||'<p>Nenhuma faltando — álbum completo! 🎉</p>')+'</div>';
 }
 $('a-pdf').addEventListener('click',()=>{buildPrintDoc();closeSheet();
   const old=document.title;document.title='Faltam — Album Copa 2026';
