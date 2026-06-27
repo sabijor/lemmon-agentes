@@ -199,7 +199,7 @@ footer{position:fixed;left:0;right:0;bottom:0;z-index:30;background:rgba(253,253
   <div id="sheet-menu">
     <h3>Ações</h3><div class="sub">COLEÇÃO · TROCA · BACKUP</div>
     <button class="act" id="a-share"><div class="ic"><svg class="i" viewBox="0 0 24 24"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="M8.2 10.8l7.6-4.3M8.2 13.2l7.6 4.3"/></svg></div><div class="tx"><b>Lista de troca</b><span>Faltantes + repetidas pra compartilhar</span></div></button>
-    <button class="act" id="a-pdf"><div class="ic"><svg class="i" viewBox="0 0 24 24"><path d="M6 9V3h12v6"/><rect x="6" y="13" width="12" height="8" rx="1"/><path d="M6 17H4a2 2 0 01-2-2v-3a2 2 0 012-2h16a2 2 0 012 2v3a2 2 0 01-2 2h-2"/><path d="M9 16h6"/></svg></div><div class="tx"><b>Exportar PDF (faltam)</b><span>Folha pra imprimir ou mandar pra troca</span></div></button>
+    <button class="act" id="a-pdf"><div class="ic"><svg class="i" viewBox="0 0 24 24"><path d="M6 9V3h12v6"/><rect x="6" y="13" width="12" height="8" rx="1"/><path d="M6 17H4a2 2 0 01-2-2v-3a2 2 0 012-2h16a2 2 0 012 2v3a2 2 0 01-2 2h-2"/><path d="M9 16h6"/></svg></div><div class="tx"><b>Exportar PDF (faltam)</b><span>Respeita o filtro atual · imprimir ou trocar</span></div></button>
     <button class="act" id="a-export"><div class="ic"><svg class="i" viewBox="0 0 24 24"><path d="M12 3v12M12 15l-4-4M12 15l4-4M5 19h14"/></svg></div><div class="tx"><b>Exportar backup</b><span>Salva seu progresso num arquivo</span></div></button>
     <button class="act" id="a-import"><div class="ic"><svg class="i" viewBox="0 0 24 24"><path d="M12 21V9M12 9l-4 4M12 9l4 4M5 5h14"/></svg></div><div class="tx"><b>Importar backup</b><span>Restaura num aparelho novo</span></div></button>
     <button class="act danger" id="a-reset"><div class="ic"><svg class="i" viewBox="0 0 24 24"><path d="M3 12a9 9 0 109-9 9 9 0 00-7 3.3M3 3v4h4"/></svg></div><div class="tx"><b>Resetar coleção</b><span>Volta ao estado escaneado original</span></div></button>
@@ -385,23 +385,38 @@ $('a-export').addEventListener('click',()=>{closeSheet();
   a.href=url;a.download='meu-album-copa-2026.json';document.body.appendChild(a);a.click();
   setTimeout(()=>{URL.revokeObjectURL(url);a.remove()},500);showToast('Backup exportado')});
 // ---- PDF (print) of what's missing ----
+function scopeLabel(){
+  let sc='Álbum completo';
+  if(activeChip.indexOf('grp:')===0)sc='Grupo '+activeChip.slice(4);
+  else if(activeChip!=='all'){const sec=DATA.sections.find(s=>(s.team_code||s.title)===activeChip);sc=sec?sec.title:activeChip}
+  const qq=query.trim();
+  if(qq)sc=(activeChip==='all'?'':sc+' · ')+'busca “'+qq+'”';
+  return sc;
+}
 function buildPrintDoc(){
   const c=counts(),pct=c.t?Math.round(c.h/c.t*100):0;
   const d=new Date();const dd=('0'+d.getDate()).slice(-2)+'/'+('0'+(d.getMonth()+1)).slice(-2)+'/'+d.getFullYear();
-  let teams='';
+  const q=norm(query.trim());let teams='',scopeMiss=0;
   DATA.sections.forEach(s=>{
-    const miss=s.slots.filter(sl=>status(sl)==='missing');
-    if(!miss.length)return;
+    if(activeChip==='all'){}
+    else if(activeChip.indexOf('grp:')===0){if(s.group!==activeChip.slice(4))return}
+    else if((s.team_code||s.title)!==activeChip)return;
+    const teamMatch=q&&(norm(s.title).includes(q)||norm(s.team_code).includes(q));
+    let miss=s.slots.filter(sl=>status(sl)==='missing');
+    if(q&&!teamMatch)miss=miss.filter(sl=>norm(sl.player).includes(q)||norm(sl.code).includes(q));
+    if(!miss.length)return;scopeMiss+=miss.length;
     teams+='<div class="pd-team"><div class="tn">'+esc(s.title)+(s.group?' · Grupo '+s.group:'')+' <span class="ct">'+miss.length+'</span></div>'+
       '<div class="pd-cols three">'+miss.map(sl=>'<div class="pd-item"><code>'+esc(sl.code)+'</code>'+esc(sl.player)+'</div>').join('')+'</div></div>';
   });
+  const sc=scopeLabel();
   $('printdoc').innerHTML='<div class="pd"><div class="pd-head">'+
-    '<h1>Figurinhas que faltam <span class="hcount">'+c.m+'</span></h1>'+
-    '<div class="meta">Meu Álbum · Copa 2026 — Panini · '+dd+' · '+c.h+'/'+c.t+' coladas · '+pct+'% completo</div></div>'+
-    (teams||'<p>Nenhuma faltando — álbum completo! 🎉</p>')+'</div>';
+    '<h1>Figurinhas que faltam <span class="hcount">'+scopeMiss+'</span></h1>'+
+    '<div class="meta">'+esc(sc)+' · '+dd+' · álbum '+c.h+'/'+c.t+' ('+pct+'%)</div></div>'+
+    (teams||'<p>Nada faltando neste filtro — tudo colado! 🎉</p>')+'</div>';
+  return sc;
 }
-$('a-pdf').addEventListener('click',()=>{buildPrintDoc();closeSheet();
-  const old=document.title;document.title='Faltam — Album Copa 2026';
+$('a-pdf').addEventListener('click',()=>{const sc=buildPrintDoc();closeSheet();
+  const old=document.title;document.title='Faltam - '+sc;
   const restore=()=>{document.title=old;window.removeEventListener('afterprint',restore)};
   window.addEventListener('afterprint',restore);
   setTimeout(()=>{window.print();},400)});
