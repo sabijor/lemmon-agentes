@@ -24,6 +24,8 @@ com ícone próprio).
 - **Toque** numa figurinha para alternar tenho / falta (com micro-animação + **desfazer**).
 - **Repetidas**: nas coladas, use `−` / `+` para contar quantas você tem para troca.
 - **Lista de troca**: gera um texto com faltantes + repetidas para copiar/compartilhar.
+- **Exportar PDF (faltam)**: folha A4 com as faltantes agrupadas por seleção (+ repetidas) para
+  imprimir ou mandar para quem você troca (via impressão nativa → "Salvar em PDF").
 - **Backup**: exportar/importar seu progresso num arquivo `.json` (para trocar de aparelho).
 - **PWA**: manifest + ícone para "Adicionar à Tela de Início".
 - Tudo salvo no navegador (`localStorage`).
