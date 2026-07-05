@@ -71,5 +71,7 @@
   "CRO 8":  {"status": "have"},
   "KSA 13": {"status": "have"},
   "KOR 8":  {"status": "have"},
-  "BIH 1":  {"status": "have"}
+  "BIH 1":  {"status": "have"},
+  "CC8":    {"status": "have"},
+  "CC11":   {"status": "have"}
 }
