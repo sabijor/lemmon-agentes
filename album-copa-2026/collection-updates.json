@@ -22,6 +22,7 @@
   "ECU 4":  {"status": "have"},
   "ECU 16": {"status": "have"},
   "JPN 2":  {"status": "have"},
+  "IRN 11": {"status": "have", "dupes": 1},
   "BRA 4":  {"status": "have"},
   "BRA 7":  {"status": "have"},
   "BRA 11": {"status": "have"},
