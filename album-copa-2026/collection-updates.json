@@ -30,6 +30,7 @@
   "IRQ 11": {"status": "have"},
   "AUT 14": {"status": "have"},
   "JOR 5":  {"status": "have"},
+  "COL 20": {"status": "have"},
   "BRA 4":  {"status": "have"},
   "BRA 7":  {"status": "have"},
   "BRA 11": {"status": "have"},
